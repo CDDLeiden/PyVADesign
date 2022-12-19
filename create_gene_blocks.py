@@ -1,8 +1,6 @@
 import os
-import re
 import sys
 import numpy as np
-import pandas as pd
 from Bio import SeqIO
 from utils import DNA_Codons
 import matplotlib.pyplot as plt
@@ -229,7 +227,7 @@ if __name__ == "__main__":
     # Make histogram with bins
     make_histogram(idx_dna, outpath)
 
-    bins = make_bins(idx_dna)
+    bins = make_bins(idx_dna, binwidth=350)
     print(bins)
 
     gene_blocks = make_gene_block(bins, dna_seq)
@@ -277,3 +275,5 @@ if __name__ == "__main__":
         print(key, value)
 
     write_gene_blocks_to_txt(results, outpath)
+
+    print("Finished without any problems")
