@@ -27,7 +27,7 @@ DNA_Codons = {
     # "TAA": "_", "TAG": "_", "TGA": "_"
 }
 
-def read_codon_usage(fp="codon_usage_smegmatis.csv"):
+def read_codon_usage(fp="data/codon_usage_smegmatis.csv"):
     # Obtained from http://www.kazusa.or.jp/codon/cgi-bin/showcodon.cgi?species=246196
     codon_usage = {}
     codon_usage_no_U = {}

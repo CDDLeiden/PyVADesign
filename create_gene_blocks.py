@@ -1,15 +1,17 @@
 import os
 import sys
+import random
 import argparse
 import numpy as np
 from Bio import SeqIO
 from utils import DNA_Codons
+from random import randrange
+from operator import add, sub
 import matplotlib.pyplot as plt
 from utils import read_codon_usage
+from scipy.signal import argrelextrema
+from sklearn.cluster import MeanShift, estimate_bandwidth
 
-# TODO FIND OPTIMAL NUMBER OF BLOCKS (AS FEW AS POSSIBLE WHILE COSTS ARE OKAY)
-# TODO ADD ARGPARSE
-# TODO ADD MAIN FUNCTION
 
 def check_type_input_sequence(sequence):
     """
@@ -96,14 +98,123 @@ def translate_sequence(dna_seq):
     return dna_seq.translate()
 
 def make_bins(data, binwidth=280):
-    bins=np.arange(min(data) -20, max(data) + binwidth, binwidth)
+    bins=np.arange(min(data) - min_bin_overlap(), max(data) + min_bin_overlap(), binwidth)
+    print(bins)
+    return bins
+
+def make_bins_from_cluster(clusters):
+    bins = []
+    for key, value in clusters.items():
+        bins.append(min(value) - min_bin_overlap())
+        bins.append(max(value) + min_bin_overlap())
+    bins.sort()
     return bins
 
 def make_histogram(data, outpath, bins, fname="hist.png"):
     # TODO: ADD NUMBER OF INSTANCES PER BIN
+    # TODO: ADD NAME OF GENE BLOCK
     outname = os.path.join(outpath, fname)
     plt.hist(data, bins=bins)
     plt.savefig(outname)
+
+def calculate_max_number_of_bases(max_price: int, base_price=0.055):
+    num_bases = (max_price) // (base_price)
+    return num_bases
+
+def calculate_max_length_fragment(num_bases, num_mutations):
+    max_fragment_length = (num_bases) // (num_mutations)
+    if (idt_min_length_fragment() < max_fragment_length) and (idt_max_length_fragment() > max_fragment_length):
+        return int(max_fragment_length)
+    elif (idt_min_length_fragment() > max_fragment_length):
+        return idt_min_length_fragment()
+    elif (idt_max_length_fragment() < max_fragment_length):
+        return idt_max_length_fragment()
+
+def calculate_cost(clusters):
+    total_cost = 0
+    for key, value in clusters.items():
+        min_val = min(value)
+        max_val = max(value)
+        len_gene_block = (max_val - min_val) + 2 * min_bin_overlap()
+        cost = len_gene_block * 0.05 * len(value)
+        total_cost += cost
+    return round(total_cost, 2)
+
+def check_fragment_sizes(clusters, bandwidth):
+    for key, value in clusters.items():
+        
+        min_val = min(value)
+        max_val = max(value)
+        len_gene_block = (max_val - min_val) + 2 * min_bin_overlap()
+        
+        # size of gene block is too small > increasing bandwidth
+        if len_gene_block < idt_min_length_fragment():
+            newbandwith = bandwidth + 1
+            return newbandwith
+        # size of gene block is too large > decreasing bandwidth
+        elif len_gene_block > idt_max_length_fragment():
+            newbandwith = bandwidth - 1
+            return newbandwith
+        else:
+            return bandwidth
+
+
+def optimize_bins(x):
+
+    lowest_cost = 10000
+    num_iterations = 200
+    optimal_bandwidth = 0
+    bandwidth = 200
+
+    # TODO CHANGE SO THAT ALGORITHM STOPS WHEN NO IMPROVEMENT AFTER X ITERATIONS
+    for i in range(num_iterations):
+
+        # Start with default value
+        clusters = meanshift(x, bandwidth)
+
+        # Calculate costs and check size of fragments
+        cost = calculate_cost(clusters)
+        new_bandwidth = check_fragment_sizes(clusters, bandwidth)
+        if bandwidth == new_bandwidth:
+            if lowest_cost > cost:
+                lowest_cost = cost
+                optimal_bandwidth = new_bandwidth
+
+                print(lowest_cost, optimal_bandwidth)
+            
+            ops = (add, sub)
+            operation = random.choice(ops)
+            random_int = random.randint(1,10)
+            bandwidth = operation(bandwidth, random_int)
+        else:
+            bandwidth = new_bandwidth
+
+        print(bandwidth)
+
+    return optimal_bandwidth, lowest_cost
+
+
+def meanshift(x: list, bandwidth: int):
+    
+    # https://stackoverflow.com/questions/18364026/clustering-values-by-their-proximity-in-python-machine-learning
+    X = np.array(list(zip(x, np.zeros(len(x)))), dtype=np.int64)
+
+    bandwidth = bandwidth # estimate_bandwidth(X, quantile=0.3)
+    ms = MeanShift(bandwidth=bandwidth, bin_seeding=True)
+    ms.fit(X)
+    labels = ms.labels_
+    cluster_centers = ms.cluster_centers_
+
+    labels_unique = np.unique(labels)
+    n_clusters_ = len(labels_unique)
+
+    clusters = {}
+    for label in labels_unique:
+        clusters[f'cluster {label}'] = []
+    for num, i in enumerate(labels):
+        clusters[f'cluster {i}'].append(x[num])
+
+    return clusters
 
 def name_block(num, bins):
     return f'Block_{num}_pos_{bins[num]}_{bins[num+1]}'
@@ -204,6 +315,15 @@ def write_gene_blocks_to_txt(gene_block_dict,
 def length_gene_block(gene_block):
     return len(gene_block)
 
+def min_bin_overlap():
+    return 15
+
+def idt_max_length_fragment():
+    return 1500
+
+def idt_min_length_fragment():
+    return 300
+
 def read_arguments():
     parser = argparse.ArgumentParser(description='')
     parser.add_argument("-i", "--input_gene", help="FASTA file containing the gene of interest")
@@ -224,10 +344,22 @@ def main(args):
     mutations = read_mutations(args.mutations)
 
     # Find indexes in sequence where mutation occures
-    idx_dna, idx_res = index_mutations(mutations)
+    idx_dna, _ = index_mutations(mutations)
+
+    # Optimize bins
+    print("Optimizing bin sizes ..")
+    optimal_bandwidth, lowest_cost = optimize_bins(idx_dna)
+    print(optimal_bandwidth, lowest_cost)
+
+    clusters = meanshift(idx_dna, optimal_bandwidth)
+    print(clusters)
 
     # Make bins (TODO: OPTIMIZE THIS)
-    bins = make_bins(idx_dna, binwidth=350)
+    # bins = make_bins(idx_dna, binwidth=350)
+    # print(bins)
+
+    bins = make_bins_from_cluster(clusters)
+    print(bins)
 
     # Make histogram with bins
     make_histogram(idx_dna, args.output_location, bins)
