@@ -141,7 +141,7 @@ def calculate_cost(clusters):
     return round(total_cost, 2)
 
 def check_fragment_sizes(clusters, bandwidth):
-    for key, value in clusters.items():
+    for _, value in clusters.items():
         
         min_val = min(value)
         max_val = max(value)
@@ -149,16 +149,17 @@ def check_fragment_sizes(clusters, bandwidth):
         
         # size of gene block is too small > increasing bandwidth
         if len_gene_block < idt_min_length_fragment():
-            newbandwith = bandwidth + 1
-            return newbandwith
+            newbandwidth = bandwidth + 1
+            return newbandwidth
         # size of gene block is too large > decreasing bandwidth
         elif len_gene_block > idt_max_length_fragment():
-            newbandwith = bandwidth - 1
-            return newbandwith
+            newbandwidth = bandwidth - 1
+            return newbandwidth 
         else:
-            return bandwidth
-
-
+            continue
+    
+    return bandwidth
+    
 def optimize_bins(x):
 
     lowest_cost = 10000
@@ -175,6 +176,9 @@ def optimize_bins(x):
         # Calculate costs and check size of fragments
         cost = calculate_cost(clusters)
         new_bandwidth = check_fragment_sizes(clusters, bandwidth)
+        
+        print(bandwidth, new_bandwidth)
+
         if bandwidth == new_bandwidth:
             if lowest_cost > cost:
                 lowest_cost = cost
@@ -184,12 +188,10 @@ def optimize_bins(x):
             
             ops = (add, sub)
             operation = random.choice(ops)
-            random_int = random.randint(1,10)
+            random_int = random.randint(1, 15)
             bandwidth = operation(bandwidth, random_int)
         else:
             bandwidth = new_bandwidth
-
-        print(bandwidth)
 
     return optimal_bandwidth, lowest_cost
 
@@ -409,6 +411,7 @@ def main(args):
     #     print(key, value)
 
     write_gene_blocks_to_txt(results, args.output_location)
+    print(f"Estimated costs are {lowest_cost} euros plus the costs of the primers")
 
     
 if __name__ == "__main__":
