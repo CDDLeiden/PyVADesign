@@ -1,5 +1,6 @@
 import os
 import sys
+import argparse
 import numpy as np
 from Bio import SeqIO
 from utils import DNA_Codons
@@ -7,6 +8,8 @@ import matplotlib.pyplot as plt
 from utils import read_codon_usage
 
 # TODO FIND OPTIMAL NUMBER OF BLOCKS (AS FEW AS POSSIBLE WHILE COSTS ARE OKAY)
+# TODO ADD ARGPARSE
+# TODO ADD MAIN FUNCTION
 
 def check_type_input_sequence(sequence):
     """
@@ -96,10 +99,10 @@ def make_bins(data, binwidth=280):
     bins=np.arange(min(data) -20, max(data) + binwidth, binwidth)
     return bins
 
-def make_histogram(data, outpath, fname="hist.png"):
+def make_histogram(data, outpath, bins, fname="hist.png"):
     # TODO: ADD NUMBER OF INSTANCES PER BIN
     outname = os.path.join(outpath, fname)
-    plt.hist(data, bins=make_bins(data))
+    plt.hist(data, bins=bins)
     plt.savefig(outname)
 
 def name_block(num, bins):
@@ -201,40 +204,37 @@ def write_gene_blocks_to_txt(gene_block_dict,
 def length_gene_block(gene_block):
     return len(gene_block)
 
+def read_arguments():
+    parser = argparse.ArgumentParser(description='')
+    parser.add_argument("-i", "--input_gene", help="FASTA file containing the gene of interest")
+    parser.add_argument("-m", "--mutations", help="TXT file containing the mutations to make")
+    parser.add_argument("-o", "--output_location", help="Location where to store the output of the script")
+    args = parser.parse_args()
+    return args
 
-if __name__ == "__main__":
-    
-    gene = r"example_data\mtb_DnaE1_seq.txt"
-    mutations_fp = r"example_data\mutations.txt"
-    outpath = r"C:\Users\Rosan\Documents\git\my_repositories\design_gene_blocks\example_output"
+def main(args):
 
     # Read input DNA sequence
-    dna_seq = read_seq(gene)
-    print(dna_seq)
+    dna_seq = read_seq(args.input_gene)
 
     # Convert DNA sequence to protein sequence
     prot_seq = translate_sequence(dna_seq)
-    print(prot_seq)
 
     # Read mutations
-    mutations = read_mutations(mutations_fp)
-    print(mutations)
+    mutations = read_mutations(args.mutations)
 
     # Find indexes in sequence where mutation occures
     idx_dna, idx_res = index_mutations(mutations)
-    print(idx_dna)
+
+    # Make bins (TODO: OPTIMIZE THIS)
+    bins = make_bins(idx_dna, binwidth=350)
 
     # Make histogram with bins
-    make_histogram(idx_dna, outpath)
+    make_histogram(idx_dna, args.output_location, bins)
 
-    bins = make_bins(idx_dna, binwidth=350)
-    print(bins)
-
+    # Make gene blocks
     gene_blocks = make_gene_block(bins, dna_seq)
-    print(gene_blocks)
-    
     residues_codons_mapped = map_codons_aas(prot_seq, dna_seq)
-    print(residues_codons_mapped)
 
     # Make mutations
     # - loop over mutations to make
@@ -244,36 +244,47 @@ if __name__ == "__main__":
 
     results = {}
     for num, mut in enumerate(mutations):
+        
         print("*********")
         print("processing mutation:", mut)
         print("*********")
-        mut_res = mut[-1]
+        # mut_res = mut[-1]
         
         # Find codon of WT residue
-        wt_codon = extract_wt_codon(mut, residues_codons_mapped)
-        print("original_codon:", wt_codon)
+        # wt_codon = extract_wt_codon(mut, residues_codons_mapped)
+        # print("original_codon:", wt_codon)
 
         mut_codons = extract_mut_codons(mut)
-        print(mut_codons)
+        # print(mut_codons)
 
         # Find most occuring mutant codon
         mut_codon = select_mut_codon(mut_codons)
-        print(mut_codon)
+        # print(mut_codon)
 
         # Find gene block
         mut_idx = idx_dna[num]
         mut_gene_block_name, mut_gene_block_value = find_gene_block(gene_blocks, mut_idx)
-        print(mut_gene_block_name, mut_gene_block_value)
+        # print(mut_gene_block_name, mut_gene_block_value)
 
         # Mutate gene block
         idx = find_mutation_index_in_gene_block(mut_gene_block_name, mut_idx)
         mut_gene_block = mutate_gene_block(mut_codon, mut_idx, mut_gene_block_value)
+
+        # Store output in dictionary
         results[mut] = [mut_gene_block_name, mut_gene_block, idx, mut_codon]
         
+    # for key, value in results.items():
+    #     print(key, value)
 
-    for key, value in results.items():
-        print(key, value)
+    write_gene_blocks_to_txt(results, args.output_location)
 
-    write_gene_blocks_to_txt(results, outpath)
+    
+if __name__ == "__main__":
 
+    arguments = read_arguments()
+    main(arguments)
     print("Finished without any problems")
+    
+    # input_gene = r"example_data\mtb_DnaE1_seq.txt"
+    # mutations = r"example_data\mutations.txt"
+    # output_location = r"C:\Users\Rosan\Documents\git\my_repositories\design_gene_blocks\example_output"
