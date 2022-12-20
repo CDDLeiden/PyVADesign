@@ -35,7 +35,8 @@ def check_for_start_stop_codon(sequence):
     if (sequence[0:3] == "ATG".lower()) and ((sequence[-3:] == "TAA".lower()) | (sequence[-3:] == "TAG".lower()) | (sequence[-3:] =="TGA".lower())):
         return True
     else:
-        print("Sequence does not start with a start codon or end with an stop codon")
+        print("Sequence does not start with a start codon or end with an stop codon, \
+               this is very likely to result in a shifted reading frame. Please correct your input sequence.")
         sys.exit()
 
 def read_seq(fp):
@@ -76,6 +77,15 @@ def index_mutations(mut_list):
     return idx_dna, idx_aa
 
 def check_input_mutations(mutations):
+    """
+    Make sure that none of the input mutations contains a unusual amino acid
+
+    Args:
+        mutations (list): List of mutations in format [WT residue][index][mutant residue], such as G432W
+
+    Returns:
+        Bool: Returns true if all amino acids are valid
+    """    
     valid = 'acdefghiklmnpqrstvwy'
     if all(i[0].lower() in valid for i in mutations):
         if all(i[-1].lower() in valid for i in mutations):
@@ -84,7 +94,17 @@ def check_input_mutations(mutations):
         print("Mutations contain non-natural amino acids")
         sys.exit()
 
-def read_mutations(fp):
+def read_mutations(fp: str):
+    """
+    Read mutations file in TXT format. 
+    Each line of the file should contain one amino acid in the format [WT residue][index][mutant residue], such as G432W
+    
+    Args:
+        fp (string): filepath of input mutations TXT
+
+    Returns:
+        list: list of mutations that were extracted from the input file
+    """    
     mutations = []
     with open(fp, 'r') as f:
         content = f.readlines()
@@ -95,14 +115,21 @@ def read_mutations(fp):
         return mutations
 
 def translate_sequence(dna_seq):    
+    """
+    Translate DNA sequence to protein sequence
+    """
     return dna_seq.translate()
 
-def make_bins(data, binwidth=280):
-    bins=np.arange(min(data) - min_bin_overlap(), max(data) + min_bin_overlap(), binwidth)
-    print(bins)
-    return bins
+def make_bins(clusters: dict):
+    """
+    Create bins, based on optimal mutation clusters
 
-def make_bins_from_cluster(clusters):
+    Args:
+        clusters (dict): dictionary of the format d['cluster X'] = [list of mutation indexes belonging to cluster]
+
+    Returns:
+        list: list of bins
+    """    
     bins = []
     for key, value in clusters.items():
         bins.append(min(value) - min_bin_overlap())
@@ -117,30 +144,36 @@ def make_histogram(data, outpath, bins, fname="hist.png"):
     plt.hist(data, bins=bins)
     plt.savefig(outname)
 
-def calculate_max_number_of_bases(max_price: int, base_price=0.055):
-    num_bases = (max_price) // (base_price)
-    return num_bases
+def calculate_cost(clusters: dict) -> float:
+    """
+    Calculate the total cost of all fragments, based on clusters
 
-def calculate_max_length_fragment(num_bases, num_mutations):
-    max_fragment_length = (num_bases) // (num_mutations)
-    if (idt_min_length_fragment() < max_fragment_length) and (idt_max_length_fragment() > max_fragment_length):
-        return int(max_fragment_length)
-    elif (idt_min_length_fragment() > max_fragment_length):
-        return idt_min_length_fragment()
-    elif (idt_max_length_fragment() < max_fragment_length):
-        return idt_max_length_fragment()
+    Args:
+        clusters (dict): dictionary of the format d['cluster X'] = [list of mutation indexes belonging to cluster]
 
-def calculate_cost(clusters):
+    Returns:
+        float: cost in euros
+    """    
     total_cost = 0
-    for key, value in clusters.items():
+    for _, value in clusters.items():
         min_val = min(value)
         max_val = max(value)
-        len_gene_block = (max_val - min_val) + 2 * min_bin_overlap()
-        cost = len_gene_block * 0.05 * len(value)
+        len_gene_block = (max_val - min_val) + 2 * min_bin_overlap()  # on both size of the gene block there should be a number of non-mutated basepairs for IVA primer design
+        cost = len_gene_block * 0.05 * len(value)  # 0.05 euros per base pair
         total_cost += cost
     return round(total_cost, 2)
 
 def check_fragment_sizes(clusters, bandwidth):
+    """
+    Check that the size of the fragments in the clusters are within bounds
+
+    Args:
+        clusters (dict): clusters (dict): dictionary of the format d['cluster X'] = [list of mutation indexes belonging to cluster]
+        bandwidth (int): sklearn.cluster.estimate_bandwidth
+
+    Returns:
+        bandwidth (int): new bandwith value based on size of gene blocks
+    """    
     for _, value in clusters.items():
         
         min_val = min(value)
@@ -151,23 +184,33 @@ def check_fragment_sizes(clusters, bandwidth):
         if len_gene_block < idt_min_length_fragment():
             newbandwidth = bandwidth + 1
             return newbandwidth
+
         # size of gene block is too large > decreasing bandwidth
         elif len_gene_block > idt_max_length_fragment():
             newbandwidth = bandwidth - 1
             return newbandwidth 
         else:
             continue
-    
+
     return bandwidth
     
 def optimize_bins(x):
+    """
+    Optimize the bins using a meanshift algorithm
 
-    lowest_cost = 10000
-    num_iterations = 200
-    optimal_bandwidth = 0
+    Args:
+        x (list): indexes of mutations
+
+    Returns:
+        optimal_bandwidth (int): 
+        lowest_cost (float): estimated costs of all gene blocks together
+    """    
+
     bandwidth = 200
-
-    # TODO CHANGE SO THAT ALGORITHM STOPS WHEN NO IMPROVEMENT AFTER X ITERATIONS
+    lowest_cost = 10000
+    num_iterations = 1000
+    optimal_bandwidth = 0
+    
     for i in range(num_iterations):
 
         # Start with default value
@@ -177,8 +220,6 @@ def optimize_bins(x):
         cost = calculate_cost(clusters)
         new_bandwidth = check_fragment_sizes(clusters, bandwidth)
         
-        print(bandwidth, new_bandwidth)
-
         if bandwidth == new_bandwidth:
             if lowest_cost > cost:
                 lowest_cost = cost
@@ -197,18 +238,25 @@ def optimize_bins(x):
 
 
 def meanshift(x: list, bandwidth: int):
+    """
+    Meanshift algorithm for finding clusters of mutations that fit in a gene block
+
+    Args:
+        x (list): _description_
+        bandwidth (int): _description_
+
+    Returns:
+        clusters (dict): _description_
+    """    
     
     # https://stackoverflow.com/questions/18364026/clustering-values-by-their-proximity-in-python-machine-learning
     X = np.array(list(zip(x, np.zeros(len(x)))), dtype=np.int64)
-
-    bandwidth = bandwidth # estimate_bandwidth(X, quantile=0.3)
+    bandwidth = bandwidth
     ms = MeanShift(bandwidth=bandwidth, bin_seeding=True)
     ms.fit(X)
     labels = ms.labels_
-    cluster_centers = ms.cluster_centers_
 
     labels_unique = np.unique(labels)
-    n_clusters_ = len(labels_unique)
 
     clusters = {}
     for label in labels_unique:
@@ -222,7 +270,6 @@ def name_block(num, bins):
     return f'Block_{num}_pos_{bins[num]}_{bins[num+1]}'
 
 def make_gene_block(bins, dna_sequence):
-    # TODO: Make sure that a block starts in the correct reading frame
     gene_blocks = {}
     for num in range(len(bins) - 1):
         name = name_block(num, bins)
@@ -280,13 +327,13 @@ def find_gene_block(gene_blocks, mutation_idx):
             result = (key, value)
             return result
     
-def check_position_gene_block(gene_block, idx_mutation, min_nonmutated=15):
+def check_position_gene_block(gene_block, idx_mutation):
     # TODO: Think of way to fix this
     begin_range, end_range = gene_block_range(gene_block)
-    if (idx_mutation - begin_range) > min_nonmutated:
+    if (idx_mutation - begin_range) > idt_min_length_fragment():
         print("Mutation is too close to beginning of gene block")
         sys.exit()
-    elif (end_range - idx_mutation) < min_nonmutated:
+    elif (end_range - idx_mutation) < idt_min_length_fragment():
         print("Mutation is too close to final part of gene block")
         sys.exit()
     
@@ -356,11 +403,7 @@ def main(args):
     clusters = meanshift(idx_dna, optimal_bandwidth)
     print(clusters)
 
-    # Make bins (TODO: OPTIMIZE THIS)
-    # bins = make_bins(idx_dna, binwidth=350)
-    # print(bins)
-
-    bins = make_bins_from_cluster(clusters)
+    bins = make_bins(clusters)
     print(bins)
 
     # Make histogram with bins
@@ -370,19 +413,8 @@ def main(args):
     gene_blocks = make_gene_block(bins, dna_seq)
     residues_codons_mapped = map_codons_aas(prot_seq, dna_seq)
 
-    # Make mutations
-    # - loop over mutations to make
-        # - find which code block it should be in
-        # - mutate in block
-        # - save output in dictionary
-
     results = {}
     for num, mut in enumerate(mutations):
-        
-        print("*********")
-        print("processing mutation:", mut)
-        print("*********")
-        # mut_res = mut[-1]
         
         # Find codon of WT residue
         # wt_codon = extract_wt_codon(mut, residues_codons_mapped)
@@ -407,9 +439,6 @@ def main(args):
         # Store output in dictionary
         results[mut] = [mut_gene_block_name, mut_gene_block, idx, mut_codon]
         
-    # for key, value in results.items():
-    #     print(key, value)
-
     write_gene_blocks_to_txt(results, args.output_location)
     print(f"Estimated costs are {lowest_cost} euros plus the costs of the primers")
 
