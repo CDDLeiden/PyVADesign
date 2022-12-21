@@ -1,9 +1,12 @@
 import os
 import sys
 import pickle
+import difflib
+import pandas as pd
 from Bio.Seq import Seq
 from Bio.SeqUtils import MeltingTemp as mt
 from design_gene_blocks import read_seq, gene_block_range
+
 
 def reverse_complement(sequence):
     return sequence.reverse_complement()
@@ -14,37 +17,60 @@ def melting_temperature(sequence):
 def invert_sequence(sequence):
     return sequence[::-1]
 
+def df_to_csv(df, outpath, fname="IVA_primers.csv"):
+    df.to_csv(os.path.join(outpath, fname))
+
 def load_pickle(fp):
     with open(fp, 'rb') as handle:
         obj = pickle.load(handle)
     return obj
 
-def initial_Fw_IVA_primers(end_block, dna_seq_fw):
-    # Initial fw primer
-    primer_fw_oh = dna_seq_fw[end_block-(initial_oh_length()):end_block]
-    primer_fw_template_binding = dna_seq_fw[end_block:end_block+(initial_template_binding_length())]
-    return primer_fw_oh, primer_fw_template_binding
+def optimize_tm(optimum, primer, pos, size, sequence, nsteps=20):
 
-def initial_Rv_IVA_primers(begin_block, dna_seq_rv):
-    # Initial Rv primer
-    primer_rv_oh = dna_seq_rv[begin_block-(initial_oh_length()):begin_block]
-    primer_rv_template_binding = dna_seq_rv[begin_block-(initial_template_binding_length() + initial_oh_length()):begin_block-(initial_oh_length())]
-    return primer_rv_oh, primer_rv_template_binding
+    best_tm = melting_temperature(primer)
+    best_diff = round(abs(optimum - best_tm), 2)
 
-def combine_fw_primers(primer_oh, primer_template):
-    result = str(primer_oh) + str(primer_template)  # 5>3
-    return result
+    for i in range(nsteps):
 
-def combine_rv_primers(primer_oh, primer_template):
-    result = str(primer_template) + str(primer_oh)  # 3>5
+        tm = melting_temperature(primer)
+        diff = round(abs(optimum - tm), 2)
+
+        if diff < best_diff:
+            best_tm = tm
+            best_diff = diff
+
+        if tm > optimum:
+            size -= 1
+            primer = IVA_Fw_overhang(pos, sequence, size)
+        elif tm < optimum:
+            size += 1
+            primer = IVA_Fw_overhang(pos, sequence, size)
+
+    return size
+
+def IVA_Fw_overhang(block_end, fw_sequence, size=15):
+    fw_oh = fw_sequence[block_end-size:block_end]
+    return fw_oh
+    
+def IVA_Fw_template(block_end, fw_sequence, size=20):
+    fw_template = fw_sequence[block_end:block_end+size]
+    return fw_template
+
+def IVA_Rv_template(block_begin, rv_sequence, size=20):
+    rv_template = rv_sequence[block_begin-size:block_begin]
+    return rv_template
+
+def IVA_Rv_overhang(block_begin, rv_sequence, size=15):
+    rv_oh = rv_sequence[block_begin:block_begin+size]
+    return rv_oh
+
+def combine_fw_primers(overhang, template_binding):
+    return overhang + template_binding
+    
+def combine_rv_primers(overhang, template_binding):
+    result = template_binding + overhang  # 3>5
     result = invert_sequence(result)  # 5>3
     return result
-        
-def initial_oh_length():
-    return 15
-
-def initial_template_binding_length():
-    return 20
 
 def extract_unique_gene_blocks(gene_blocks):
     unique_gene_blocks = []
@@ -53,60 +79,155 @@ def extract_unique_gene_blocks(gene_blocks):
             unique_gene_blocks.append(value[0])
     return unique_gene_blocks
 
-if __name__ == "__main__":
-
-    # TODO Design primers for insertion
-    # TODO Design primers for deletion of gene fragment
-
-    # Length of 18-24 bases
-    # 40-60% G/C content
-    # Start and end with 1-2 G/C pairs
-    # Melting temperature (Tm) of 50-60°C
-    # Primer pairs should have a Tm within 5°C of each other
-    # Primer pairs should not have complementary regions
-
-    # The rules set for finding primers are (a) the Tm value of sequences flanking the mutagenic codon is greater than 45; (b) The GC content of the primer is between 40 and 60%. 
-    # https://biopython.org/docs/1.75/api/Bio.SeqUtils.MeltingTemp.html
-
-
-    result_path = r"example_output\gene_blocks.npy"
-    gene_path = r"example_data\mtb_DnaE1_seq.txt"
-    output_path = r"example_output"
+def store_output_in_df(primers):
     
+    gene_blocks = []
+    final_fw_oh = []
+    final_fw_oh_tm = []
+    final_fw_template = []
+    final_fw_template_tm = []
+    final_rv_oh = []
+    final_rv_oh_tm = []
+    final_rv_template = []
+    final_rv_template_tm = []
+    fw_combined = []
+    fw_combined_tm = []
+    rv_combined = []
+    rv_combined_tm = []
+
+    for key, value in primers.items():
+        gene_blocks.append(key)
+        final_fw_oh.append(value[0])
+        final_fw_template.append(value[1])
+        final_rv_oh.append(value[2])
+        final_rv_template.append(value[3])
+        fw_combined.append(value[4])
+        rv_combined.append(value[5])
+
+    # Calculate melting temperatures
+    final_fw_oh_tm = [melting_temperature(i) for i in final_fw_oh]
+    final_fw_template_tm = [melting_temperature(i) for i in final_fw_template]
+    final_rv_oh_tm = [melting_temperature(i) for i in final_rv_oh]
+    final_rv_template_tm = [melting_temperature(i) for i in final_rv_template]
+    fw_combined_tm = [melting_temperature(i) for i in fw_combined]
+    rv_combined_tm = [melting_temperature(i) for i in rv_combined]
+
+    # Calculate lengths
+    final_fw_oh_len = [len(i) for i in final_fw_oh]
+    final_fw_template_len = [len(i) for i in final_fw_template]
+    final_rv_oh_len = [len(i) for i in final_rv_oh]
+    final_rv_template_len = [len(i) for i in final_rv_template]
+    fw_combined_len = [len(i) for i in fw_combined]
+    rv_combined_len = [len(i) for i in rv_combined]
+
+    # Store in data frame
+    df = pd.DataFrame()
+    df['Gene Block'] = gene_blocks
+    df['Fw Overhang'] = final_fw_oh
+    df['Fw Overhang Tm'] = final_fw_oh_tm
+    df['Fw Overhang length'] = final_fw_oh_len
+    df['Fw Template'] = final_fw_template
+    df['Fw Template Tm'] = final_fw_template_tm
+    df['Fw Template length'] = final_fw_template_len
+    df['Rv Overhang'] = final_rv_oh
+    df['Rv Overhang Tm'] = final_rv_oh_tm
+    df['Rv Overhang length'] = final_rv_oh_len
+    df['Rv Template'] = final_rv_template
+    df['Rv Template Tm'] = final_rv_template_tm
+    df['Rv Template length'] = final_rv_template_len
+    df['Forward primer (5>3)'] = fw_combined
+    df['Forward primer Tm'] = fw_combined_tm
+    df['Forward primer length'] = fw_combined_len
+    df['Reverse primer (5>3)'] = rv_combined
+    df['Reverse primer Tm'] = rv_combined_tm
+    df['Reverse primer length'] = rv_combined_len
+    df['dTm Overhangs'] = abs(df['Fw Overhang Tm'] - df['Rv Overhang Tm']).apply(lambda x: round(x, 2))
+    df['dTm Templates'] = abs(df['Fw Template Tm'] - df['Rv Template Tm']).apply(lambda x: round(x, 2))
+
+    return df
+
+def get_overlap(s1, s2):
+    s = difflib.SequenceMatcher(None, s1, s2)
+    pos_a, _, size = s.find_longest_match(0, len(s1), 0, len(s2)) 
+    return s1[pos_a:pos_a+size]
+
+def check_complementarity_primers(df, threshold=4):
+    # Primer pairs should not have complementary regions
+    # TODO DOUBLE CHECK THIS FUNCTION
+    for _, row in df.iterrows():
+        s1 = row['Forward primer (5>3)']
+        s2 = row['Reverse primer (5>3)']
+        overlap = get_overlap(s1, s2)
+        if len(overlap) > threshold:
+            print(f"Complementarity between the primers for {row['Gene Block']} exceeds threshold of {threshold}")
+
+def check_tms_within_bounds_of_each_other(df, threshold=4):
+    # Primer pairs should have a Tm within 5°C of each other
+    for _, row in df.iterrows():
+        if row['dTm Overhangs'] > threshold:
+            print(f"The overhang temperatures for Fw and Rv primer of {row['Gene Block']} exceed max Tm difference of {threshold} degrees")
+        if row['dTm Templates'] > threshold:
+            print(f"The template temperatures for Fw and Rv primer of {row['Gene Block']} exceed max Tm difference {threshold} degrees")
+
+def overhang_temp():
+    return 50
+
+def template_temp():
+    return 60
+
+def main(result_path, gene_path, output_path):
+    
+    # Load input
     gene_blocks = load_pickle(result_path)
-    dna_seq_53 = read_seq(gene_path)
-    dna_seq_35 = reverse_complement(dna_seq_53)
+    fw_sequence = read_seq(gene_path)
+    rv_sequence = reverse_complement(fw_sequence)
 
     unique_gene_blocks = extract_unique_gene_blocks(gene_blocks)
 
-    # First make primers to delete the gene block
-    with open(os.path.join(output_path, 'IVA_deletion_primers.txt'), 'w+') as out:
-        header = ['gene_block', 'fw_oh', 'fw_oh_tm', 'fw_template_binding', 'fw_template_binding_tm', 'rv_oh', 'rv_oh_tm', 'rv_teplate_binding', 'rv_teplate_binding_tm', 'fw_primer', 'rv_primer']
-        out.write('\t'.join(header) + '\n')
-        for gb in unique_gene_blocks:
-            
-            print(gb)
-
-            begin_pos, end_pos = gene_block_range(gb)
-            
-            # Design initial primers
-            primer_fw_oh, primer_fw_template_binding = initial_Fw_IVA_primers(end_pos, dna_seq_53)
-            primer_rv_oh, primer_rv_template_binding = initial_Rv_IVA_primers(begin_pos, dna_seq_35)  
-
-            # Combine primers
-            fw_deletion_combined = combine_fw_primers(primer_fw_oh, primer_fw_template_binding)
-            rv_deletion_combined = combine_rv_primers(primer_rv_oh, primer_rv_template_binding)
-
-            # Write to file
-            # TODO ADD LENGTH OF PRIMERS TO OUTPUT FILE
-            # TODO ADD EXPECTED OUTPUT SIZE TO FILE
-            out.write(gb + '\t' + str(primer_fw_oh) + '\t' + str(melting_temperature(primer_fw_oh)) + '\t' + str(primer_fw_template_binding) + '\t' + str(melting_temperature(primer_fw_template_binding)) \
-                          + '\t' + str(primer_rv_oh) + '\t' + str(melting_temperature(primer_rv_oh)) + '\t' + str(primer_rv_template_binding) + '\t' + str(melting_temperature(primer_rv_template_binding)) \
-                          + '\t' + str(fw_deletion_combined) + '\t' + str(rv_deletion_combined) + '\n')
-
-    # Next create the primers for subcloning consisting of a primer to amplify the insert and a primer to amplify the vector
-
-
-
-            
+    primers = {}
+    for gb in unique_gene_blocks:
         
+        begin_pos, end_pos = gene_block_range(gb)
+        
+        # Design initial primers and optimize temperatures
+        init_fw_oh = IVA_Fw_overhang(end_pos, fw_sequence)
+        size = optimize_tm(overhang_temp(), init_fw_oh, end_pos, 15, fw_sequence)
+        final_fw_oh = IVA_Fw_overhang(end_pos, fw_sequence, size=size)
+
+        init_fw_template = IVA_Fw_template(end_pos, fw_sequence)
+        size = optimize_tm(template_temp(), init_fw_template, end_pos, 15, fw_sequence)
+        final_fw_template = IVA_Fw_template(end_pos, fw_sequence, size)
+
+        init_rv_oh = IVA_Rv_overhang(begin_pos, rv_sequence)
+        size = optimize_tm(overhang_temp(), init_rv_oh, begin_pos, 15, rv_sequence)
+        final_rv_oh = IVA_Rv_overhang(begin_pos, rv_sequence, size)
+
+        init_rv_template = IVA_Rv_template(begin_pos, rv_sequence)
+        size = optimize_tm(template_temp(), init_rv_template, begin_pos, 15, rv_sequence)
+        final_rv_template = IVA_Rv_template(begin_pos, rv_sequence, size)
+
+        # Combine primers
+        fw_combined = combine_fw_primers(final_fw_oh, final_fw_template)
+        rv_combined = combine_rv_primers(final_rv_oh, final_rv_template)
+
+        primers[gb] = [final_fw_oh, final_fw_template, final_rv_oh, final_rv_template, fw_combined, rv_combined]
+        
+    df = store_output_in_df(primers)
+
+    # Check temperatures
+    check_tms_within_bounds_of_each_other(df)
+
+    # Check primer complementarity
+    check_complementarity_primers(df)
+
+    # Write to file
+    df_to_csv(df, output_path)
+    print("Primers written to file")
+    print("Make sure that primer binds nowhere else in sequence")
+
+
+if __name__ == "__main__":
+    result_path = r"example_output\gene_blocks.npy"
+    gene_path = r"example_data\mtb_DnaE1_seq.txt"
+    output_path = r"example_output"
+    main(result_path, gene_path, output_path)
