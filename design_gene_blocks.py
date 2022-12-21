@@ -1,16 +1,15 @@
 import os
 import sys
 import random
+import pickle
 import argparse
 import numpy as np
 from Bio import SeqIO
 from utils import DNA_Codons
-from random import randrange
 from operator import add, sub
 import matplotlib.pyplot as plt
 from utils import read_codon_usage
-from scipy.signal import argrelextrema
-from sklearn.cluster import MeanShift, estimate_bandwidth
+from sklearn.cluster import MeanShift
 
 
 def check_type_input_sequence(sequence):
@@ -352,7 +351,7 @@ def mutate_gene_block(mut_codon, mut_index, gene_block_seq):
 
 def write_gene_blocks_to_txt(gene_block_dict, 
                              outpath, 
-                             fname="code_blocks.txt"):
+                             fname="gene_blocks.txt"):
     header = ['mutation', 'gene block name', 'length gene block', 'gene block sequence', 'index mutation', 'mut codon']
     outfile = os.path.join(outpath, fname)
     with open(outfile, 'w+') as out:
@@ -361,6 +360,12 @@ def write_gene_blocks_to_txt(gene_block_dict,
             len_gene_block = length_gene_block(value[1])
             out.write(key + '\t' + value[0] + '\t' + str(len_gene_block) + '\t' + value[1] + '\t' + str(value[2]) + '\t' + value[3] + '\n')
 
+def write_pickle(obj,
+                 outpath,
+                 fname="gene_blocks.npy"):
+    with open(os.path.join(outpath, fname), 'wb') as handle:
+        pickle.dump(obj, handle, protocol=pickle.HIGHEST_PROTOCOL)
+    
 def length_gene_block(gene_block):
     return len(gene_block)
 
@@ -439,7 +444,10 @@ def main(args):
         # Store output in dictionary
         results[mut] = [mut_gene_block_name, mut_gene_block, idx, mut_codon]
         
+    # Store output
     write_gene_blocks_to_txt(results, args.output_location)
+    write_pickle(results, args.output_location)
+    
     print(f"Estimated costs are {lowest_cost} euros plus the costs of the primers")
 
     
