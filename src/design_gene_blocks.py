@@ -4,10 +4,10 @@ import random
 import pickle
 import numpy as np
 from Bio import SeqIO
-from utils import DNA_Codons
+from src.utils import DNA_Codons
 from operator import add, sub
 import matplotlib.pyplot as plt
-from utils import read_codon_usage
+from src.utils import read_codon_usage
 from sklearn.cluster import MeanShift
 
 
@@ -373,7 +373,7 @@ def length_gene_block(gene_block):
     return len(gene_block)
 
 def min_bin_overlap():
-    return 15
+    return 20
 
 def idt_max_length_fragment():
     return 1500
