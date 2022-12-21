@@ -435,18 +435,3 @@ def main(args):
     # Store output
     write_gene_blocks_to_txt(results, args.output_location)
     write_pickle(results, args.output_location)
-    
-# def read_arguments():
-#     parser = argparse.ArgumentParser(description='')
-#     parser.add_argument("-i", "--input_gene", help="FASTA file containing the gene of interest")
-#     parser.add_argument("-m", "--mutations", help="TXT file containing the mutations to make")
-#     parser.add_argument("-o", "--output_location", help="Location where to store the output of the script")
-#     args = parser.parse_args()
-#     return args
-
-if __name__ == "__main__":
-
-    # arguments = read_arguments()
-    main(args)
-
-    print("Finished without any problems")

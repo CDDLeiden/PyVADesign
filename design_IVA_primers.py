@@ -224,10 +224,3 @@ def main(result_path, gene_path, output_path):
     df_to_csv(df, output_path)
     print("Primers written to file")
     print("Make sure that primer binds nowhere else in sequence")
-
-
-if __name__ == "__main__":
-    result_path = r"example_output\gene_blocks.npy"
-    gene_path = r"example_data\mtb_DnaE1_seq.txt"
-    output_path = r"example_output"
-    main(result_path, gene_path, output_path)
