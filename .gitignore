@@ -1,6 +1,7 @@
-### QSPRpred Specific
+### Specific for this directory
 
 example_output/*
+!example_output/.gitkeep 
 
 ### Python template
 # Byte-compiled / optimized / DLL files

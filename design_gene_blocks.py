@@ -2,7 +2,6 @@ import os
 import sys
 import random
 import pickle
-import argparse
 import numpy as np
 from Bio import SeqIO
 from utils import DNA_Codons
@@ -407,7 +406,6 @@ def main(args):
 
     # Make gene blocks
     gene_blocks = make_gene_block(bins, dna_seq)
-    print(gene_blocks)
 
     # Make histogram with bins
     labels = gene_blocks.keys()
