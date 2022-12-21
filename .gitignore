@@ -1,7 +1,7 @@
 ### Specific for this directory
 
-example_output/*
-!example_output/.gitkeep 
+example/example_output/*
+!example/example_output/.gitkeep 
 
 ### Python template
 # Byte-compiled / optimized / DLL files
