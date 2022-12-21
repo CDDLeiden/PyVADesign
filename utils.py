@@ -32,7 +32,7 @@ def read_codon_usage(fp="data/codon_usage_smegmatis.csv"):
     codon_usage = {}
     codon_usage_no_U = {}
     df = pd.read_csv(fp, sep=';')
-    for idx, row in df.iterrows():
+    for _, row in df.iterrows():
         codon_usage[row['Triplet']] = row['frequency_number']
     for key, value in codon_usage.items():
         newkey = key.replace('U', 'T').lower()
