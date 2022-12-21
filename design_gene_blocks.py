@@ -93,6 +93,14 @@ def check_input_mutations(mutations):
         print("Mutations contain non-natural amino acids")
         sys.exit()
 
+def check_number_input_mutations(mutations):
+    if len(mutations) < idt_min_order():
+        print(f"Minimum number of mutations {len(mutations)} is lower than the minimum amount of {idt_min_order()}. \
+                Please make sure you have enough mutations in your input.")
+        sys.exit()
+    elif len(mutations) >= idt_min_order():
+        return True
+
 def read_mutations(fp: str):
     """
     Read mutations file in TXT format. 
@@ -110,7 +118,9 @@ def read_mutations(fp: str):
         for line in content:
             line = line.split()
             mutations.append(line[0])
-    if check_input_mutations:  # Make sure there are NO non-natural amino acids in the mutations
+    # (1) Check there are NO non-natural amino acids in the mutations
+    # (2) Check that there are enough mutations to process
+    if (check_input_mutations) and (check_number_input_mutations):  
         return mutations
 
 def translate_sequence(dna_seq):    
@@ -130,17 +140,18 @@ def make_bins(clusters: dict):
         list: list of bins
     """    
     bins = []
-    for key, value in clusters.items():
+    for _, value in clusters.items():
         bins.append(min(value) - min_bin_overlap())
         bins.append(max(value) + min_bin_overlap())
     bins.sort()
     return bins
 
-def make_histogram(data, outpath, bins, fname="hist.png"):
-    # TODO: ADD NUMBER OF INSTANCES PER BIN
-    # TODO: ADD NAME OF GENE BLOCK
+def make_histogram(data, outpath, bins, labels, fname="hist.png"):
+    # TODO ADD LABELS TO HISTOGRAM
+    # TODO ADD COUNTS TO HISTOGRAM
     outname = os.path.join(outpath, fname)
     plt.hist(data, bins=bins)
+    # plt.xticks(labels)
     plt.savefig(outname)
 
 def calculate_cost(clusters: dict) -> float:
@@ -223,8 +234,6 @@ def optimize_bins(x):
             if lowest_cost > cost:
                 lowest_cost = cost
                 optimal_bandwidth = new_bandwidth
-
-                print(lowest_cost, optimal_bandwidth)
             
             ops = (add, sub)
             operation = random.choice(ops)
@@ -247,22 +256,18 @@ def meanshift(x: list, bandwidth: int):
     Returns:
         clusters (dict): _description_
     """    
-    
     # https://stackoverflow.com/questions/18364026/clustering-values-by-their-proximity-in-python-machine-learning
     X = np.array(list(zip(x, np.zeros(len(x)))), dtype=np.int64)
     bandwidth = bandwidth
     ms = MeanShift(bandwidth=bandwidth, bin_seeding=True)
     ms.fit(X)
     labels = ms.labels_
-
     labels_unique = np.unique(labels)
-
     clusters = {}
     for label in labels_unique:
         clusters[f'cluster {label}'] = []
     for num, i in enumerate(labels):
         clusters[f'cluster {i}'].append(x[num])
-
     return clusters
 
 def name_block(num, bins):
@@ -327,7 +332,6 @@ def find_gene_block(gene_blocks, mutation_idx):
             return result
     
 def check_position_gene_block(gene_block, idx_mutation):
-    # TODO: Think of way to fix this
     begin_range, end_range = gene_block_range(gene_block)
     if (idx_mutation - begin_range) > idt_min_length_fragment():
         print("Mutation is too close to beginning of gene block")
@@ -378,21 +382,13 @@ def idt_max_length_fragment():
 def idt_min_length_fragment():
     return 300
 
-def read_arguments():
-    parser = argparse.ArgumentParser(description='')
-    parser.add_argument("-i", "--input_gene", help="FASTA file containing the gene of interest")
-    parser.add_argument("-m", "--mutations", help="TXT file containing the mutations to make")
-    parser.add_argument("-o", "--output_location", help="Location where to store the output of the script")
-    args = parser.parse_args()
-    return args
+def idt_min_order():
+    return 24
 
 def main(args):
 
     # Read input DNA sequence
     dna_seq = read_seq(args.input_gene)
-
-    # Convert DNA sequence to protein sequence
-    prot_seq = translate_sequence(dna_seq)
 
     # Read mutations
     mutations = read_mutations(args.mutations)
@@ -400,42 +396,34 @@ def main(args):
     # Find indexes in sequence where mutation occures
     idx_dna, _ = index_mutations(mutations)
 
-    # Optimize bins
+    # Optimize bin size and bin position using meanshift
     print("Optimizing bin sizes ..")
     optimal_bandwidth, lowest_cost = optimize_bins(idx_dna)
-    print(optimal_bandwidth, lowest_cost)
 
     clusters = meanshift(idx_dna, optimal_bandwidth)
-    print(clusters)
+    print("Lowest cost: ", str(lowest_cost), f"with {len(clusters)} clusters")
 
     bins = make_bins(clusters)
-    print(bins)
-
-    # Make histogram with bins
-    make_histogram(idx_dna, args.output_location, bins)
 
     # Make gene blocks
     gene_blocks = make_gene_block(bins, dna_seq)
-    residues_codons_mapped = map_codons_aas(prot_seq, dna_seq)
+    print(gene_blocks)
+
+    # Make histogram with bins
+    labels = gene_blocks.keys()
+    make_histogram(idx_dna, args.output_location, bins, labels)
 
     results = {}
     for num, mut in enumerate(mutations):
         
-        # Find codon of WT residue
-        # wt_codon = extract_wt_codon(mut, residues_codons_mapped)
-        # print("original_codon:", wt_codon)
-
         mut_codons = extract_mut_codons(mut)
-        # print(mut_codons)
 
         # Find most occuring mutant codon
         mut_codon = select_mut_codon(mut_codons)
-        # print(mut_codon)
 
         # Find gene block
         mut_idx = idx_dna[num]
         mut_gene_block_name, mut_gene_block_value = find_gene_block(gene_blocks, mut_idx)
-        # print(mut_gene_block_name, mut_gene_block_value)
 
         # Mutate gene block
         idx = find_mutation_index_in_gene_block(mut_gene_block_name, mut_idx)
@@ -448,15 +436,17 @@ def main(args):
     write_gene_blocks_to_txt(results, args.output_location)
     write_pickle(results, args.output_location)
     
-    print(f"Estimated costs are {lowest_cost} euros plus the costs of the primers")
+# def read_arguments():
+#     parser = argparse.ArgumentParser(description='')
+#     parser.add_argument("-i", "--input_gene", help="FASTA file containing the gene of interest")
+#     parser.add_argument("-m", "--mutations", help="TXT file containing the mutations to make")
+#     parser.add_argument("-o", "--output_location", help="Location where to store the output of the script")
+#     args = parser.parse_args()
+#     return args
 
-    
 if __name__ == "__main__":
 
-    arguments = read_arguments()
-    main(arguments)
+    # arguments = read_arguments()
+    main(args)
+
     print("Finished without any problems")
-    
-    # input_gene = r"example_data\mtb_DnaE1_seq.txt"
-    # mutations = r"example_data\mutations.txt"
-    # output_location = r"C:\Users\Rosan\Documents\git\my_repositories\design_gene_blocks\example_output"
