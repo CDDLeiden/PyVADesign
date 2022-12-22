@@ -3,13 +3,20 @@ import sys
 import pickle
 import difflib
 import pandas as pd
-from Bio.Seq import Seq
 from Bio.SeqUtils import MeltingTemp as mt
 from design_gene_blocks import read_seq, gene_block_range
 
 
+# def reverse_complement(sequence):
+#     return sequence.reverse_complement()
+
 def reverse_complement(sequence):
-    return sequence.reverse_complement()
+    pairs = {"a": "t", "c":"g", "t":"a", "g":"c"}
+    reverse = ""
+    for nucleotide in sequence:
+        rev_nucl = pairs[nucleotide]
+        reverse += rev_nucl
+    return reverse
 
 def melting_temperature(sequence):
     return round(mt.Tm_NN(sequence), 2)
@@ -64,14 +71,9 @@ def IVA_Rv_overhang(block_begin, rv_sequence, size=15):
     rv_oh = rv_sequence[block_begin:block_begin+size]
     return rv_oh
 
-def combine_fw_primers(overhang, template_binding):
+def combine_primers(overhang, template_binding):
     return overhang + template_binding
     
-def combine_rv_primers(overhang, template_binding):
-    result = template_binding + overhang  # 3>5
-    result = invert_sequence(result)  # 5>3
-    return result
-
 def extract_unique_gene_blocks(gene_blocks):
     unique_gene_blocks = []
     for _, value in gene_blocks.items():
@@ -201,14 +203,16 @@ def main(result_path, gene_path, output_path):
         init_rv_oh = IVA_Rv_overhang(begin_pos, rv_sequence)
         size = optimize_tm(overhang_temp(), init_rv_oh, begin_pos, 15, rv_sequence)
         final_rv_oh = IVA_Rv_overhang(begin_pos, rv_sequence, size)
+        final_rv_oh = invert_sequence(final_rv_oh)
 
         init_rv_template = IVA_Rv_template(begin_pos, rv_sequence)
         size = optimize_tm(template_temp(), init_rv_template, begin_pos, 15, rv_sequence)
         final_rv_template = IVA_Rv_template(begin_pos, rv_sequence, size)
+        final_rv_template = invert_sequence(final_rv_template)
 
         # Combine primers
-        fw_combined = combine_fw_primers(final_fw_oh, final_fw_template)
-        rv_combined = combine_rv_primers(final_rv_oh, final_rv_template)
+        fw_combined = combine_primers(final_fw_oh, final_fw_template)
+        rv_combined = combine_primers(final_rv_oh, final_rv_template)
 
         primers[gb] = [final_fw_oh, final_fw_template, final_rv_oh, final_rv_template, fw_combined, rv_combined]
         
