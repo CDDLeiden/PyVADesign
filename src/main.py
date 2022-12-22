@@ -1,16 +1,28 @@
 import os
 import sys
 import argparse
+import snapgene_output as sno
 import design_gene_blocks as dgb
 import design_IVA_primers as dip
 
 def read_arguments():
     parser = argparse.ArgumentParser(description='')
-    parser.add_argument("-i", "--input_gene", help="FASTA file containing the gene of interest")
-    parser.add_argument("-m", "--mutations", help="TXT file containing the mutations to make")
-    parser.add_argument("-o", "--output_location", help="Location where to store the output of the script")
+    parser.add_argument("-i", "--input_gene", required=True, help="FASTA file containing the gene of interest")
+    parser.add_argument("-m", "--mutations", required=True, help="TXT file containing the mutations to make")
+    parser.add_argument("-o", "--output_location", required=True, help="Location where to store the output of the script")
+    parser.add_argument("-s", "--snapgene_file", required=False, help="Snapgene DNA file of the vector for which mutations will be made")
     args = parser.parse_args()
     return args
+
+def cleanup(args):
+    to_remove = [os.path.join(args.output_location, "mut_gene_blocks.npy"),
+                 os.path.join(args.output_location, "wt_gene_blocks.npy")]
+    for fp in to_remove:
+        if os.path.exists(fp):
+            os.remove(fp)
+        else:
+            print(f"{fp} does not exist")
+    
 
 if __name__ == "__main__":
     
@@ -19,9 +31,20 @@ if __name__ == "__main__":
     dgb.main(args)
 
     # Next; design IVA primers
-    result_file = os.path.join(args.output_location, "gene_blocks.npy")
-    dip.main(result_file, args.input_gene, args.output_location)
+    mut_gene_blocks_fp = os.path.join(args.output_location, "mut_gene_blocks.npy")
+    wt_gene_blocks_fp = os.path.join(args.output_location, "wt_gene_blocks.npy")
+    dip.main(mut_gene_blocks_fp, args.input_gene, args.output_location, args.snapgene_file)
 
-    # Finally; write results to files that SnapGene can open
+    # Also write results to files that SnapGene can open
+    primers_fp = os.path.join(args.output_location, "IVA_primers.csv")
+    gene_blocks_mutation_info_fp = os.path.join(args.output_location, "gene_blocks.txt")
+    if args.snapgene_file:
+        sno.main(wt_gene_blocks_fp,
+                 mut_gene_blocks_fp,
+                 primers_fp,
+                 args.output_location,
+                 args.snapgene_file,
+                 gene_blocks_mutation_info_fp)
 
-    # TODO Remove unnecessary files when done
+    # Finally; clean-up files when done
+    cleanup(args)

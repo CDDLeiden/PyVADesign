@@ -3,12 +3,10 @@ import sys
 import pickle
 import difflib
 import pandas as pd
+from utils import extract_filename
+from snapgene_output import short_name
 from Bio.SeqUtils import MeltingTemp as mt
 from design_gene_blocks import read_seq, gene_block_range
-
-
-# def reverse_complement(sequence):
-#     return sequence.reverse_complement()
 
 def reverse_complement(sequence):
     pairs = {"a": "t", "c":"g", "t":"a", "g":"c"}
@@ -26,11 +24,6 @@ def invert_sequence(sequence):
 
 def df_to_csv(df, outpath, fname="IVA_primers.csv"):
     df.to_csv(os.path.join(outpath, fname))
-
-def load_pickle(fp):
-    with open(fp, 'rb') as handle:
-        obj = pickle.load(handle)
-    return obj
 
 def optimize_tm(optimum, primer, pos, size, sequence, nsteps=20):
 
@@ -153,9 +146,30 @@ def get_overlap(s1, s2):
     pos_a, _, size = s.find_longest_match(0, len(s1), 0, len(s2)) 
     return s1[pos_a:pos_a+size]
 
+def create_primers_fname(fp, extension="_primers.txt"):
+    fname = extract_filename(fp)
+    fname_ext = fname + extension
+    return fname_ext
+
+def write_primers_to_file(df, fp, snapgene_file):
+    """
+    Write primers to TXT file that can be imported in snapgene
+
+    Args:
+        df (pd.DataFrame): _description_
+        fp (str): _description_
+    """    
+    fname = create_primers_fname(snapgene_file)
+    with open(os.path.join(fp, fname), 'w+') as out:
+        for _, row in df.iterrows():
+            name = row['Gene Block']
+            fw_primer = row['Forward primer (5>3)']
+            rv_primer = row['Reverse primer (5>3)']
+            out.write(short_name(name) + '_Fw' + ';' + str(fw_primer) + '\n')
+            out.write(short_name(name) + '_Rv' + ';' + str(rv_primer) + '\n')
+
 def check_complementarity_primers(df, threshold=4):
     # Primer pairs should not have complementary regions
-    # TODO DOUBLE CHECK THIS FUNCTION
     for _, row in df.iterrows():
         s1 = row['Forward primer (5>3)']
         s2 = row['Reverse primer (5>3)']
@@ -171,13 +185,18 @@ def check_tms_within_bounds_of_each_other(df, threshold=4):
         if row['dTm Templates'] > threshold:
             print(f"The template temperatures for Fw and Rv primer of {row['Gene Block']} exceed max Tm difference {threshold} degrees")
 
+def load_pickle(fp):
+    with open(fp, 'rb') as handle:
+        obj = pickle.load(handle)
+    return obj
+
 def overhang_temp():
     return 50
 
 def template_temp():
     return 60
 
-def main(result_path, gene_path, output_path):
+def main(result_path, gene_path, output_path, snapgene_file):
     
     # Load input
     gene_blocks = load_pickle(result_path)
@@ -226,5 +245,9 @@ def main(result_path, gene_path, output_path):
 
     # Write to file
     df_to_csv(df, output_path)
+    # Also write primers to file that snapgene can import
+    if snapgene_file:
+        write_primers_to_file(df, output_path, snapgene_file)
+    
     print("Primers written to file")
     print("Make sure that primer binds nowhere else in sequence")
