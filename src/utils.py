@@ -1,7 +1,6 @@
 import pandas as pd
 
 DNA_Codons = {
-    # 'M' - START, '_' - STOP
     "ATG": "start",
     "TAA": "stop", "TAG": "stop", "TGA": "stop",
     "GCT": "A", "GCC": "A", "GCA": "A", "GCG": "A",
@@ -24,7 +23,6 @@ DNA_Codons = {
     "GTT": "V", "GTC": "V", "GTA": "V", "GTG": "V",
     "TGG": "W",
     "TAT": "Y", "TAC": "Y",
-    # "TAA": "_", "TAG": "_", "TGA": "_"
 }
 
 def read_codon_usage(fp="../data/codon_usage_smegmatis.csv"):

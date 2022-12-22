@@ -362,7 +362,7 @@ def write_gene_blocks_to_txt(gene_block_dict,
 
 def write_pickle(obj,
                  outpath,
-                 fname="gene_blocks.npy"):
+                 fname="mut_gene_blocks.npy"):
     with open(os.path.join(outpath, fname), 'wb') as handle:
         pickle.dump(obj, handle, protocol=pickle.HIGHEST_PROTOCOL)
     
@@ -403,6 +403,7 @@ def main(args):
 
     # Make gene blocks
     gene_blocks = make_gene_block(bins, dna_seq)
+    write_pickle(gene_blocks, args.output_location, fname="wt_gene_blocks.npy")
 
     # Make histogram with bins
     labels = gene_blocks.keys()
