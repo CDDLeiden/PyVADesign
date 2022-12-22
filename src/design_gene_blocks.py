@@ -269,6 +269,10 @@ def meanshift(x: list, bandwidth: int):
 def name_block(num, bins):
     return f'Block_{num}_pos_{bins[num]}_{bins[num+1]}'
 
+def short_name(name):
+    short_name = '_'.join(name.split('_')[0:2])
+    return short_name
+
 def make_gene_block(bins, dna_sequence):
     gene_blocks = {}
     for num in range(len(bins) - 1):

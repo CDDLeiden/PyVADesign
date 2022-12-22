@@ -1,3 +1,4 @@
+import os
 import pandas as pd
 
 DNA_Codons = {
@@ -36,3 +37,8 @@ def read_codon_usage(fp="../data/codon_usage_smegmatis.csv"):
         newkey = key.replace('U', 'T').lower()
         codon_usage_no_U[newkey] = value
     return codon_usage_no_U
+
+def extract_filename(fp):
+    base=  os.path.basename(fp)
+    fname = os.path.splitext(base)[0]
+    return fname
