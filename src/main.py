@@ -18,6 +18,10 @@ if __name__ == "__main__":
     args = read_arguments()
     dgb.main(args)
 
-    # Then design IVA primers
+    # Next; design IVA primers
     result_file = os.path.join(args.output_location, "gene_blocks.npy")
     dip.main(result_file, args.input_gene, args.output_location)
+
+    # Finally; write results to files that SnapGene can open
+
+    # TODO Remove unnecessary files when done
