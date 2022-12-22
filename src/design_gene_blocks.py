@@ -4,11 +4,10 @@ import random
 import pickle
 import numpy as np
 from Bio import SeqIO
-from src.utils import DNA_Codons
 from operator import add, sub
 import matplotlib.pyplot as plt
-from src.utils import read_codon_usage
 from sklearn.cluster import MeanShift
+from utils import read_codon_usage, DNA_Codons
 
 
 def check_type_input_sequence(sequence):
@@ -203,7 +202,7 @@ def check_fragment_sizes(clusters, bandwidth):
 
     return bandwidth
     
-def optimize_bins(x):
+def optimize_bins(x, bandwidth=200, num_iterations=1000):
     """
     Optimize the bins using a meanshift algorithm
 
@@ -215,10 +214,8 @@ def optimize_bins(x):
         lowest_cost (float): estimated costs of all gene blocks together
     """    
 
-    bandwidth = 200
-    lowest_cost = 10000
-    num_iterations = 1000
-    optimal_bandwidth = 0
+    lowest_cost = np.inf
+    optimal_bandwidth = bandwidth
     
     for i in range(num_iterations):
 
@@ -236,7 +233,7 @@ def optimize_bins(x):
             
             ops = (add, sub)
             operation = random.choice(ops)
-            random_int = random.randint(1, 15)
+            random_int = random.randint(1, 50)
             bandwidth = operation(bandwidth, random_int)
         else:
             bandwidth = new_bandwidth
@@ -373,7 +370,7 @@ def length_gene_block(gene_block):
     return len(gene_block)
 
 def min_bin_overlap():
-    return 20
+    return 25
 
 def idt_max_length_fragment():
     return 1500
@@ -425,7 +422,7 @@ def main(args):
 
         # Mutate gene block
         idx = find_mutation_index_in_gene_block(mut_gene_block_name, mut_idx)
-        mut_gene_block = mutate_gene_block(mut_codon, mut_idx, mut_gene_block_value)
+        mut_gene_block = mutate_gene_block(mut_codon, idx, mut_gene_block_value)
 
         # Store output in dictionary
         results[mut] = [mut_gene_block_name, mut_gene_block, idx, mut_codon]
