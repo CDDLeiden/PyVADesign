@@ -12,7 +12,7 @@ For running this program you will need:
 The program will give you the sequence of the gene blocks as well PCR primers to open up the destination plasmid.
 Additionaly, the program can create files with the eblocks, mutations and primers in a file that can directly be imported into snapgene.
 
-![gene blocks]("C:\Users\Rosan\Documents\eblocks.png")
+![gene blocks]("https://gitlab.com/rcmkuin/design_gene_blocks/-/blob/main/doc/eblocks.png")
 
 ## Installation
 
