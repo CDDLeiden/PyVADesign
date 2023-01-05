@@ -170,7 +170,6 @@ def write_primers_to_file(df, fp, snapgene_file):
 
 def check_complementarity_primers(df, threshold=4):
     # Primer pairs should not have complementary regions
-    # TODO DOUBLE CHECK THIS FUNCTION
     for _, row in df.iterrows():
         s1 = row['Forward primer (5>3)']
         s2 = row['Reverse primer (5>3)']
