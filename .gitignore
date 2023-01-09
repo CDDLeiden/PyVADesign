@@ -2,6 +2,7 @@
 
 example/example_output/*
 !example/example_output/.gitkeep 
+doc/problems.txt
 
 ### Python template
 # Byte-compiled / optimized / DLL files
