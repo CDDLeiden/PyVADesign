@@ -2,7 +2,9 @@ import os
 import sys
 import random
 import pickle
+import openpyxl
 import numpy as np
+import pandas as pd
 from Bio import SeqIO
 from operator import add, sub
 import matplotlib.pyplot as plt
@@ -364,6 +366,21 @@ def write_gene_blocks_to_txt(gene_block_dict,
             len_gene_block = length_gene_block(value[1])
             out.write(key + '\t' + value[0] + '\t' + str(len_gene_block) + '\t' + value[1] + '\t' + str(value[2]) + '\t' + value[3] + '\n')
 
+def write_gene_blocks_to_template(gene_block_dict, outpath, fname="eblocks-plate-upload-template-96-filled.xlsx", template='data\eblocks-plate-upload-template-96.xlsx'):
+    outfile = os.path.join(outpath, fname)
+    df = pd.read_excel(template)
+    names = []
+    seqs = []
+    for key, value in gene_block_dict.items():
+        mutation = key
+        block = value[0].split('_')[0:1]
+        name = mutation + '_' + block
+        names.append(name)
+        seqs.append(value[1])
+    df['Name'] = names
+    df['Sequence'] = seqs
+    df.to_excel(outfile, index=False)
+
 def write_pickle(obj,
                  outpath,
                  fname="mut_gene_blocks.npy"):
@@ -434,4 +451,5 @@ def main(args):
         
     # Store output
     write_gene_blocks_to_txt(results, args.output_location)
+    # write_gene_blocks_to_template(results, args.output_location)
     write_pickle(results, args.output_location)
