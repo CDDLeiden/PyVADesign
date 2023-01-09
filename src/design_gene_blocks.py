@@ -2,7 +2,7 @@ import os
 import sys
 import random
 import pickle
-# import openpyxl
+import openpyxl
 import numpy as np
 import pandas as pd
 from Bio import SeqIO
@@ -366,17 +366,26 @@ def write_gene_blocks_to_txt(gene_block_dict,
             len_gene_block = length_gene_block(value[1])
             out.write(key + '\t' + value[0] + '\t' + str(len_gene_block) + '\t' + value[1] + '\t' + str(value[2]) + '\t' + value[3] + '\n')
 
-def write_gene_blocks_to_template(gene_block_dict, outpath, fname="eblocks-plate-upload-template-96-filled.xlsx", template='data\eblocks-plate-upload-template-96.xlsx'):
-    outfile = os.path.join(outpath, fname)
+def extract_wells_from_template(template='data\eblocks-plate-upload-template-96.xlsx'):
     df = pd.read_excel(template)
+    wells = df['Well Position'].tolist()
+    return wells
+
+def write_gene_blocks_to_template(gene_block_dict, outpath, fname="eblocks-plate-upload-template-96-filled.xlsx"):
+    outfile = os.path.join(outpath, fname)
     names = []
     seqs = []
     for key, value in gene_block_dict.items():
         mutation = key
-        block = value[0].split('_')[0:1]
+        block = value[0].split('_')[0:2]
+        block = block[0] + '-' + block[1]
         name = mutation + '_' + block
         names.append(name)
         seqs.append(value[1])
+    wells = extract_wells_from_template()
+    wells = wells[:len(names)]
+    df = pd.DataFrame()
+    df['Well Position'] = wells
     df['Name'] = names
     df['Sequence'] = seqs
     df.to_excel(outfile, index=False)
@@ -451,5 +460,5 @@ def main(args):
         
     # Store output
     write_gene_blocks_to_txt(results, args.output_location)
-    # write_gene_blocks_to_template(results, args.output_location)
+    write_gene_blocks_to_template(results, args.output_location)
     write_pickle(results, args.output_location)
