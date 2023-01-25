@@ -68,8 +68,9 @@ dependencies:
   - numpy=1.24.1=py38h90ce339_0
   - openjpeg=2.5.0=ha2aaf27_2
   - openssl=3.0.7=hcfcfb64_1
+  - openpyxl==3.0.10
   - packaging=22.0=pyhd8ed1ab_0
-  - pandas=1.5.2=py38h5846ac1_0
+  - pandas=1.4.3
   - pcre2=10.40=h17e33f8_0
   - pillow=9.4.0=py38h409c3de_0
   - pip=22.3.1=pyhd8ed1ab_0
