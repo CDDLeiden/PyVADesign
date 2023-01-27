@@ -2,49 +2,69 @@ import os
 import sys
 import random
 import pickle
-import openpyxl
+# import openpyxl
 import numpy as np
 import pandas as pd
 from Bio import SeqIO
 from operator import add, sub
 import matplotlib.pyplot as plt
 from sklearn.cluster import MeanShift
-from utils import read_codon_usage, DNA_Codons
+from utils import read_codon_usage, DNA_Codons, write_pickle
 
 
 class DesignEblocks:
     """
     """
 
-    def __init__(self, sequence_fp: str, mutations_fp: str, output_fp: str):
+    def __init__(self, 
+                 sequence_fp: str, 
+                 mutations_fp: str,
+                 output_fp: str,  # Path to store output files
+                 species: str,
+                 min_bin_overlap = 25,
+                 idt_max_length_fragment = 1500,
+                 idt_min_length_fragment = 300,
+                 idt_min_order = 24):
+        
+        # Mutation types supported
+        self.type_mutation = "Mutation"
+        self.type_insert = "Insert"
+        self.type_deletion = "Deletion"
+        self.type_combined = "Combined"
+
+        self.output_fp = output_fp
+        self.species = species
+        self.min_bin_overlap = min_bin_overlap
+        self.idt_max_length_fragment = idt_max_length_fragment
+        self.idt_min_length_fragment = idt_min_length_fragment
+        self.idt_min_order = idt_min_order
         
         self.dna_seq = self.read_seq(sequence_fp)
-        self.mutations = self.read_mutations(mutations_fp)
-        self.out_fp = output_fp
+        self.mutations, self.mutation_types = self.read_mutations(mutations_fp)  # Types > Mutation, Insert, Deletion
+        self.codon_usage = self.check_existance_codon_usage_table()  # Check if codon usage table is present for selected species
 
-        # Default settings based on IDT requirements
-        self.min_bin_overlap = 25
-        self.idt_max_length_fragment = 1500
-        self.idt_min_length_fragment = 300
-        self.idt_min_order = 24
 
     def run(self):
 
+        # TODO Describe somewhere how this should be formatted in input and describe which codon usage tables are present at the moment
+        # TODO Add an option to include own codon usage table in CLI
+        # TODO Also add option for default codon usage table?
+
         # Find indexes in sequence where mutation occures
-        idx_dna, _ = self.index_mutations()
+        idx_dna, idx_dna_tups = self.index_mutations(self.mutations, self.mutation_types)
 
         # Optimize bin size and bin position using meanshift
-        print("Optimizing bin sizes ..")
+        print("Optimizing bin sizes ...")
         optimal_bandwidth, lowest_cost = self.optimize_bins(idx_dna)
 
         clusters = self.meanshift(idx_dna, optimal_bandwidth)
         print("Lowest cost: ", str(lowest_cost), f"with {len(clusters)} clusters")
 
         bins = self.make_bins(clusters)
-
-        # Make gene blocks
+        
+        # Make gene blocks (WT DNA sequences cut to the correct size)
         gene_blocks = self.make_gene_block(bins, self.dna_seq)
-        self.write_pickle(gene_blocks, self.output_fp, fname="wt_gene_blocks.npy")
+        write_pickle(gene_blocks, self.output_fp, fname="wt_gene_blocks.npy")
 
         # Make histogram with bins
         labels = gene_blocks.keys()
@@ -52,27 +72,111 @@ class DesignEblocks:
 
         results = {}
         for num, mut in enumerate(self.mutations):
-            
-            mut_codons = self.extract_mut_codons(mut)
 
-            # Find most occuring mutant codon
-            mut_codon = self.select_mut_codon(mut_codons)
+            mut_type = self.mutation_types[num]
 
-            # Find gene block
-            mut_idx = idx_dna[num]
-            mut_gene_block_name, mut_gene_block_value = self.find_gene_block(gene_blocks, mut_idx)
+            # Change gene block in selected position for mutation
+            if mut_type == self.type_mutation:
 
-            # Mutate gene block
-            idx = self.find_mutation_index_in_gene_block(mut_gene_block_name, mut_idx)
-            mut_gene_block = self.mutate_gene_block(mut_codon, idx, mut_gene_block_value)
+                # Find gene block and index of insert/deletion/mutation
+                mut_idx = idx_dna_tups[num][1]
+                mut_gene_block_name, mut_gene_block_value = self.find_gene_block(gene_blocks, mut_idx)
+                idx = self.find_mutation_index_in_gene_block(mut_gene_block_name, mut_idx)
 
-            # Store output in dictionary
-            results[mut] = [mut_gene_block_name, mut_gene_block, idx, mut_codon]
+                mut_codons = self.extract_mut_codons(mut[-1])
+                # Find most occuring mutant codon based on codon usage for species
+                mut_codon = self.select_mut_codon(mut_codons)
+
+                # Mutate gene block
+                mut_gene_block = self.mutate_gene_block(mut_codon, idx, mut_gene_block_value, mut_type)
+
+                # Store output in dictionary
+                results[mut] = [mut_gene_block_name, mut_gene_block, idx, mut_codon]
+
+            elif mut_type == self.type_insert:
+
+                res_insert = mut.split('-')[1]
+                codon_insert = ''  # Sequence to insert in gene block
+                for res in res_insert:
+                    codons = self.extract_mut_codons(res)
+                    codon = self.select_mut_codon(codons)
+                    codon_insert += codon
+
+                # Find gene block and index of insert/deletion/mutation
+                mut_idx = idx_dna_tups[num][1]
+                mut_gene_block_name, mut_gene_block_value = self.find_gene_block(gene_blocks, mut_idx)
+                idx = self.find_mutation_index_in_gene_block(mut_gene_block_name, mut_idx)
+
+                # Mutate gene block
+                mut_gene_block = self.mutate_gene_block(codon_insert, idx, mut_gene_block_value, mut_type)
+
+                # Store output in dictionary
+                results[mut] = [mut_gene_block_name, mut_gene_block, idx, codon_insert]
+
+            elif mut_type == self.type_deletion:
+
+                idx_del_start = idx_dna_tups[num][1]
+                idx_del_end = int(mut.split('-')[1][1:-1]) * 3
+
+                mut_gene_block_name, mut_gene_block_value = self.find_gene_block(gene_blocks, idx_del_start)
+                idx = self.find_mutation_index_in_gene_block(mut_gene_block_name, idx_del_start)
+                idx_end = self.find_mutation_index_in_gene_block(mut_gene_block_name, idx_del_end)
+
+                # Mutate gene block
+                mut_gene_block = self.mutate_gene_block('', idx, mut_gene_block_value, mut_type, idx_end)
+
+                # Store output in dictionary
+                results[mut] = [mut_gene_block_name, mut_gene_block, idx, '']  # TODO Maybe do it based on a string to remove 
+
+            elif mut_type == self.type_combined:
+
+                # TODO Check if the different mutations are in the same eblock
+
+                # Start with the first mutation and them perform the other mutation wiht the mutated gene block as input
+
+                # Find gene block and index of insert/deletion/mutation
+                mut_idx = idx_dna_tups[num][0][1]
+
+                mut_gene_block_name, mut_gene_block_value = self.find_gene_block(gene_blocks, mut_idx)
+
+                idxs = []
+                codons = []
+                
+                for mut_i in idx_dna_tups[num]:
+
+                    idx = self.find_mutation_index_in_gene_block(mut_gene_block_name, mut_idx)
+                    idxs.append(idx)
+                    mut_codons = self.extract_mut_codons(mut_i[0][-1])
+                    # Find most occuring mutant codon based on codon usage for species
+                    mut_codon = self.select_mut_codon(mut_codons)
+                    codons.append(mut_codon)
+
+                    # Mutate gene block
+                    mut_gene_block_value = self.mutate_gene_block(mut_codon, idx, mut_gene_block_value, mut_type)
+
+                # Store output in dictionary
+                results[mut] = [mut_gene_block_name, mut_gene_block_value, idx, mut_codon]
             
         # Store output
-        self.write_gene_blocks_to_txt(results, self.out_fp)
-        self.write_gene_blocks_to_template(results, self.out_fp)
-        self.write_pickle(results, self.out_fp)
+        self.write_gene_blocks_to_txt(results, self.output_fp)
+        self.write_gene_blocks_to_template(results, self.output_fp)
+        write_pickle(results, self.output_fp)
+
+    def check_existance_codon_usage_table(self):
+        codon_usage_present = [file for file in os.listdir(r"data/codon_usage")]
+        organisms_present = [file.split('.')[0:-1] for file in codon_usage_present]
+        organisms_present = [i[0] for i in organisms_present]
+        organisms_present_format = []
+        for i in organisms_present:
+            inew = i.split('_')
+            inew = ' '.join([i for i in inew])
+            organisms_present_format.append(inew.lower())
+        if self.species.lower() in organisms_present_format:
+            i = organisms_present_format.index(self.species.lower())
+            return os.path.join(r"data/codon_usage", codon_usage_present[i])
+        else:
+            print("It looks like the codon usage table for the specified organism is not present.")
+            sys.exit()
 
     def check_type_input_sequence(self, sequence):
         """
@@ -121,7 +225,7 @@ class DesignEblocks:
         else:
             print("Check input sequence")
 
-    def index_mutations(self, mut_list):
+    def index_mutations(self, mut_list, mut_types):
         """_summary_
 
         Args:
@@ -130,29 +234,71 @@ class DesignEblocks:
         Returns:
             _type_: _description_
         """    
-        idx_dna, idx_aa = [], []
-        for mut in mut_list:
-            idx_aa.append(int(mut[1:-1]))
-            idx_dna.append(int(mut[1:-1]) * 3)  # A residue consists of 3 nucleotides
-        return idx_dna, idx_aa
-
-    def check_input_mutations(self, mutations):
+        idx_dna, idx_dna_tups = [], []
+        for mut, type in zip(mut_list, mut_types):
+            if type == self.type_mutation:
+                idx_dna.append(int(mut[1:-1]) * 3)  # A residue consists of 3 nucleotides
+                idx_dna_tups.append([mut, int(mut[1:-1]) * 3])
+            elif (type == self.type_insert) or (type == self.type_deletion):
+                mut_i = mut.split('-')[0]
+                idx_dna.append(int(mut_i[1:-1]) * 3)  # A residue consists of 3 nucleotides
+                idx_dna_tups.append([mut_i, int(mut_i[1:-1]) * 3])
+            elif type == self.type_combined:
+                muts = mut.split('-')
+                tmp = []
+                for i in muts:
+                    idx_dna.append(int(i[1:-1]) * 3)  # A residue consists of 3 nucleotides
+                    tmp.append([i, int(i[1:-1]) * 3])
+                idx_dna_tups.append(tmp)
+        return idx_dna, idx_dna_tups
+    
+    def check_input_mutations(self, mutations, mutation_types):
         """
         Make sure that none of the input mutations contains a unusual amino acid
 
         Args:
             mutations (list): List of mutations in format [WT residue][index][mutant residue], such as G432W
+            mutation_types (list): List with type of mutations, either: Mutation, Insert or Deletion
 
         Returns:
             Bool: Returns true if all amino acids are valid
-        """    
+        """
         valid = 'acdefghiklmnpqrstvwy'
-        if all(i[0].lower() in valid for i in mutations):
-            if all(i[-1].lower() in valid for i in mutations):
-                return True
-        else:
-            print("Mutations contain non-natural amino acids")
-            sys.exit()
+        for mut, type in zip(mutations, mutation_types):
+            print(mut, type)
+            if type == self.type_mutation:
+                if not self.check_mut_format(mut):
+                    print(f"Input {mut} contain non-natural amino acids or incorrect formatting")
+                    sys.exit()
+            elif type == self.type_insert:
+                mut_format = mut.split('-')[0]
+                added_residues = mut.split('-')[1]
+                if not self.check_mut_format(mut_format):
+                        print(f"Input {mut} contain non-natural amino acids or incorrect formatting")
+                        sys.exit()
+                for i in added_residues:
+                    if not i.lower() in valid:
+                        print(f"Input {i} contain non-natural amino acids or incorrect formatting")
+                        sys.exit()
+            elif type == self.type_deletion:
+                mut_start = mut.split('-')[0]
+                mut_end = mut.split('-')[0]
+                if not self.check_mut_format(mut_start):
+                    print(f"Input {mut_start} contain non-natural amino acids or incorrect formatting")
+                    sys.exit()
+                if not self.check_mut_format(mut_end):
+                    print(f"Input {mut_end} contain non-natural amino acids or incorrect formatting")
+                    sys.exit()
+            elif type == self.type_combined:
+                mut_list = mut.split('-')
+                for i in mut_list:
+                    if not self.check_mut_format(i):
+                        print(f"Input {i} contain non-natural amino acids or incorrect formatting")
+                        sys.exit()
+            else:
+                print("Input contains non standard mutation")
+                sys.exit()
+        return True
 
     def check_number_input_mutations(self, mutations):
         if len(mutations) < self.idt_min_order:
@@ -171,18 +317,34 @@ class DesignEblocks:
             fp (string): filepath of input mutations TXT
 
         Returns:
-            list: list of mutations that were extracted from the input file
-        """    
+            list: list of mutations that were extracted from the input file as well as the types of mutation (mutation, insert, deletion)
+        """
         mutations = []
+        mutation_types = []
         with open(fp, 'r') as f:
             content = f.readlines()
             for line in content:
                 line = line.split()
-                mutations.append(line[0])
+                if len(line) == 1:
+                    mutations.append(line[0])
+                    mutation_types.append(self.type_mutation)
+                elif (len(line) == 2) and (line[0] == self.type_deletion):
+                    mutation_types.append(self.type_deletion)
+                    mutations.append(line[1])
+                elif (len(line) == 2) and (line[0] == self.type_insert):
+                    mutation_types.append(self.type_insert)
+                    mutations.append(line[1])
+                elif (len(line) == 2) and (line[0] == self.type_combined):
+                    mutation_types.append(self.type_combined)
+                    mutations.append(line[1])
+                else:
+                    print(f"Please check format of mutation {line}, one mutation should be written per line and for inserts and deletions check the requirements.")
+                    sys.exit() 
         # (1) Check there are NO non-natural amino acids in the mutations
         # (2) Check that there are enough mutations to process
-        if (self.check_input_mutations) and (self.check_number_input_mutations):  
-            return mutations
+        # (3) Check formatting of mutations
+        if (self.check_input_mutations(mutations, mutation_types)) and (self.check_number_input_mutations(mutations)):  
+            return mutations, mutation_types
 
     def translate_sequence(self, dna_seq):    
         """
@@ -211,8 +373,8 @@ class DesignEblocks:
         # TODO ADD LABELS TO HISTOGRAM
         # TODO ADD COUNTS TO HISTOGRAM
         outname = os.path.join(outpath, fname)
-        plt.hist(data, bins=bins)
-        # plt.xticks(labels)
+        plt.hist(data, bins=bins, align=('mid'), label=labels)
+        # plt.set_xticks(labels)
         plt.savefig(outname)
 
     def calculate_cost(self, clusters: dict) -> float:
@@ -332,10 +494,6 @@ class DesignEblocks:
     def name_block(self, num, bins):
         return f'Block_{num}_pos_{bins[num]}_{bins[num+1]}'
 
-    def short_name(self, name):
-        short_name = '_'.join(name.split('_')[0:2])
-        return short_name
-
     def make_gene_block(self, bins, dna_sequence):
         gene_blocks = {}
         for num in range(len(bins) - 1):
@@ -364,7 +522,7 @@ class DesignEblocks:
         """
         Choose codon from list of codons based on occurance of codon in nature.
         """
-        codon_dict = read_codon_usage()
+        codon_dict = read_codon_usage(fp = self.codon_usage)
         highest_freq = 0
         most_occuring_codon = 'xxx'
         for codon in codon_list:
@@ -374,11 +532,10 @@ class DesignEblocks:
                 most_occuring_codon = codon
         return most_occuring_codon
 
-    def extract_mut_codons(self, mutation: str):
+    def extract_mut_codons(self, res: str):
         mut_codons = []
-        mut_residue = mutation[-1]
         for key, value in DNA_Codons.items():  # d[codon] = amino acid
-            if value == mut_residue:
+            if value == res:
                 mut_codons.append(key.lower())
         return mut_codons
 
@@ -411,9 +568,15 @@ class DesignEblocks:
         self.check_position_gene_block(gene_block, index)
         return index
 
-    def mutate_gene_block(self, mut_codon, mut_index, gene_block_seq):
-        # Change this codon in the gene_block
-        mut_block = gene_block_seq[:mut_index -3] + mut_codon + gene_block_seq[mut_index:]
+    def mutate_gene_block(self, mut_codon, mut_index, gene_block_seq, change_type, end_idx = None):
+        # end_idx neccessary for deletion
+        if (change_type == self.type_mutation) or (change_type == self.type_combined):
+            # Change this codon in the gene_block
+            mut_block = gene_block_seq[:mut_index -3] + mut_codon + gene_block_seq[mut_index:]
+        elif change_type == self.type_insert:
+            mut_block = gene_block_seq[:mut_index] + mut_codon + gene_block_seq[mut_index:]
+        elif change_type == self.type_deletion:
+            mut_block = gene_block_seq[:mut_index -3] + gene_block_seq[end_idx -3:]
         return mut_block
 
     def write_gene_blocks_to_txt(self, gene_block_dict, 
@@ -424,7 +587,7 @@ class DesignEblocks:
         with open(outfile, 'w+') as out:
             out.write('\t'.join(header) + '\n')
             for key, value in gene_block_dict.items():
-                len_gene_block = self.length_gene_block(value[1])
+                len_gene_block = len(value[1])
                 out.write(key + '\t' + value[0] + '\t' + str(len_gene_block) + '\t' + value[1] + '\t' + str(value[2]) + '\t' + value[3] + '\n')
 
     def extract_wells_from_template(self, template='data\eblocks-plate-upload-template-96.xlsx'):
@@ -450,12 +613,16 @@ class DesignEblocks:
         df['Name'] = names
         df['Sequence'] = seqs
         df.to_excel(outfile, index=False)
-
-    def write_pickle(self, obj,
-                    outpath,
-                    fname="mut_gene_blocks.npy"):
-        with open(os.path.join(outpath, fname), 'wb') as handle:
-            pickle.dump(obj, handle, protocol=pickle.HIGHEST_PROTOCOL)
         
-    def length_gene_block(self, gene_block):
-        return len(gene_block)
+    @staticmethod
+    def short_name(name):
+        short_name = '_'.join(name.split('_')[0:2])
+        return short_name
+    
+    @staticmethod
+    def check_mut_format(mut):
+        valid = 'acdefghiklmnpqrstvwy'
+        if (mut[0].lower() in valid) and (mut[-1].lower() in valid) and (isinstance(int(mut[1:-1]), int)):
+            return True
+        else:
+            return False

@@ -3,7 +3,7 @@ import sys
 import pandas as pd
 from Bio import SeqIO
 from utils import extract_filename
-from design_gene_blocks import short_name
+from design_gene_blocks import DesignEblocks
 from design_IVA_primers import load_pickle, extract_unique_gene_blocks, reverse_complement, invert_sequence
 
 def read_snapgene_dna_file(fp):
@@ -54,23 +54,23 @@ def write_features_to_gff3(outpath,
         
         # Write all geneblocks to file (color = grey)
         for key, value in gene_blocks.items():
-            result = gff3_line(value[0], value[1], short_name(key), '#939393')
+            result = gff3_line(value[0], value[1], DesignEblocks.short_name(key), '#939393')
             f.write('\t'.join(result) + '\n')
         
         # Write all overhangs to file (color = pink)
         for key, value in fw_overhangs.items():
-            result = gff3_line(value[0], value[1], short_name(key) + '_Fw_OH', '#FF00D4')
+            result = gff3_line(value[0], value[1], DesignEblocks.short_name(key) + '_Fw_OH', '#FF00D4')
             f.write('\t'.join(result) + '\n')
         for key, value in rv_overhangs.items():
-            result = gff3_line(value[0], value[1], short_name(key) + "_Rv_OH", '#FF00D4')
+            result = gff3_line(value[0], value[1], DesignEblocks.short_name(key) + "_Rv_OH", '#FF00D4')
             f.write('\t'.join(result) + '\n')
         
         # Write all template binding region to file (color = green)
         for key, value in fw_templates.items():
-            result = gff3_line(value[0], value[1], short_name(key) + "_Fw_Template", '#06FF92')
+            result = gff3_line(value[0], value[1], DesignEblocks.short_name(key) + "_Fw_Template", '#06FF92')
             f.write('\t'.join(result) + '\n')
         for key, value in rv_templates.items():
-            result = gff3_line(value[0], value[1], short_name(key) + "_Rv_Template", '#06FF92')
+            result = gff3_line(value[0], value[1], DesignEblocks.short_name(key) + "_Rv_Template", '#06FF92')
             f.write('\t'.join(result) + '\n')
 
         for key, value in mutations.items():
