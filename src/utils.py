@@ -1,4 +1,5 @@
 import os
+import pickle
 import pandas as pd
 
 DNA_Codons = {
@@ -26,7 +27,7 @@ DNA_Codons = {
     "TAT": "Y", "TAC": "Y",
 }
 
-def read_codon_usage(fp="data/codon_usage_smegmatis.csv"):
+def read_codon_usage(fp):
     # Obtained from http://www.kazusa.or.jp/codon/cgi-bin/showcodon.cgi?species=246196
     codon_usage = {}
     codon_usage_no_U = {}
@@ -42,3 +43,16 @@ def extract_filename(fp):
     base=  os.path.basename(fp)
     fname = os.path.splitext(base)[0]
     return fname
+
+# def write_pickle(obj, outpath, fname="mut_gene_blocks.npy"):
+#     with open(os.path.join(outpath, fname), 'wb') as handle:
+#         pickle.dump(obj, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+def write_pickle(obj, out_fp, fname="mut_gene_blocks.npy"):
+    with open(os.path.join(out_fp, fname), 'wb') as handle:
+        pickle.dump(obj, handle)
+
+def load_pickle(fp):
+    with open(fp, 'rb') as handle:
+        obj = pickle.load(handle)
+    return obj
