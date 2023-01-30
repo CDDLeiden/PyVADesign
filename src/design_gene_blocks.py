@@ -38,6 +38,7 @@ class DesignEblocks:
         self.idt_max_length_fragment = idt_max_length_fragment
         self.idt_min_length_fragment = idt_min_length_fragment
         self.idt_min_order = idt_min_order
+        self.n_iterations = 100
         
         self.dna_seq = self.read_seq(sequence_fp)
         self.mutations, self.mutation_types = self.read_mutations(mutations_fp)  # Types > Mutation, Insert, Deletion
@@ -177,53 +178,6 @@ class DesignEblocks:
         else:
             print("It looks like the codon usage table for the specified organism is not present.")
             sys.exit()
-
-    def check_type_input_sequence(self, sequence):
-        """
-        Check that the type of sequence is DNA
-
-        Args:
-            sequence (str): sequence
-
-        Returns:
-            Bool: _description_
-        """    
-        valid = 'actg'
-        if all(i.lower() in valid for i in sequence):
-            return True
-        else:
-            print("Please provide a DNA sequence")
-            sys.exit()
-
-    def check_for_start_stop_codon(self, sequence):
-        # Make sure that the sequence starts with a start codon and ends with a stop codon
-        if (sequence[0:3] == "ATG".lower()) and ((sequence[-3:] == "TAA".lower()) | (sequence[-3:] == "TAG".lower()) | (sequence[-3:] =="TGA".lower())):
-            return True
-        else:
-            print("Sequence does not start with a start codon or end with an stop codon, \
-                this is very likely to result in a shifted reading frame. Please correct your input sequence.")
-            sys.exit()
-
-    def read_seq(self, fp):
-        """
-        Read DNA sequence in FASTA format using biopython
-
-        Args:
-            fp (str):   Location of the FASTA file
-
-        Returns:
-            sequence (str): DNA sequence
-        """
-        count = 0
-        for record in SeqIO.parse(fp, "fasta"):
-            sequence = record.seq
-            count += 1
-        result_type = self.check_type_input_sequence(sequence)  # Check that the sequence is of type DNA
-        result_start_stop = self.check_for_start_stop_codon(sequence)
-        if (count == 1) and (result_type) and (result_start_stop):      
-            return sequence
-        else:
-            print("Check input sequence")
 
     def index_mutations(self, mut_list, mut_types):
         """_summary_
@@ -427,7 +381,7 @@ class DesignEblocks:
 
         return bandwidth
         
-    def optimize_bins(self, x, bandwidth=200, num_iterations=1000):
+    def optimize_bins(self, x, bandwidth=200):
         """
         Optimize the bins using a meanshift algorithm
 
@@ -442,7 +396,7 @@ class DesignEblocks:
         lowest_cost = np.inf
         optimal_bandwidth = bandwidth
         
-        for i in range(num_iterations):
+        for i in range(self.n_iterations):
 
             # Start with default value
             clusters = self.meanshift(x, bandwidth)
@@ -539,11 +493,6 @@ class DesignEblocks:
                 mut_codons.append(key.lower())
         return mut_codons
 
-    def gene_block_range(self, gene_block_name):
-        begin_range = int(gene_block_name.split('_')[3])
-        end_range = int(gene_block_name.split('_')[4])
-        return begin_range, end_range
-
     def find_gene_block(self, gene_blocks, mutation_idx):
         for key, value in gene_blocks.items():
             begin_range, end_range = self.gene_block_range(key)
@@ -626,3 +575,59 @@ class DesignEblocks:
             return True
         else:
             return False
+    
+    @staticmethod
+    def check_type_input_sequence(sequence):
+        """
+        Check that the type of sequence is DNA
+
+        Args:
+            sequence (str): sequence
+
+        Returns:
+            Bool: _description_
+        """    
+        valid = 'actg'
+        if all(i.lower() in valid for i in sequence):
+            return True
+        else:
+            print("Please provide a DNA sequence")
+            sys.exit()
+        
+    @staticmethod
+    def check_for_start_stop_codon(sequence):
+        # Make sure that the sequence starts with a start codon and ends with a stop codon
+        if (sequence[0:3] == "ATG".lower()) and ((sequence[-3:] == "TAA".lower()) | (sequence[-3:] == "TAG".lower()) | (sequence[-3:] =="TGA".lower())):
+            return True
+        else:
+            print("Sequence does not start with a start codon or end with an stop codon, \
+                this is very likely to result in a shifted reading frame. Please correct your input sequence.")
+            sys.exit()
+
+    @staticmethod  
+    def read_seq(fp):
+        """
+        Read DNA sequence in FASTA format using biopython
+
+        Args:
+            fp (str):   Location of the FASTA file
+
+        Returns:
+            sequence (str): DNA sequence
+        """
+        count = 0
+        for record in SeqIO.parse(fp, "fasta"):
+            sequence = record.seq
+            count += 1
+        result_type = DesignEblocks.check_type_input_sequence(sequence)  # Check that the sequence is of type DNA
+        result_start_stop = DesignEblocks.check_for_start_stop_codon(sequence)
+        if (count == 1) and (result_type) and (result_start_stop):      
+            return sequence
+        else:
+            print("Check input sequence")
+
+    @staticmethod
+    def gene_block_range(gene_block_name):
+        begin_range = int(gene_block_name.split('_')[3])
+        end_range = int(gene_block_name.split('_')[4])
+        return begin_range, end_range

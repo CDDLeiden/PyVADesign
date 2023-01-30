@@ -1,40 +1,55 @@
 import os
 import sys
-import pickle
 import difflib
 import pandas as pd
-from utils import extract_filename
-from snapgene_output import short_name
 from Bio.SeqUtils import MeltingTemp as mt
-from design_gene_blocks import read_seq, gene_block_range
-from utils import load_pickle
-
+from design_gene_blocks import DesignEblocks
+from utils import load_pickle, extract_filename
 
 class DesignPrimers:
     """
     """
 
-    def __init__(self):
+    def __init__(self,
+                 wt_gene_blocks_fp: str,
+                 mut_gene_blocks_fp: str,
+                 output_location: str,
+                 input_gene_path: str,
+                 snapgene_file: str):
+    
+        self.wt_gene_blocks_fp = wt_gene_blocks_fp
+        self.mut_gene_blocks_fp = mut_gene_blocks_fp
+        self.output_location = output_location
+        self.input_gene_path = input_gene_path
+        self.snapgene_file = snapgene_file
 
         self.overhang_temp = 50
         self.template_temp = 60
 
-    def run(self, result_path, gene_path, output_path, snapgene_file):
+    def run(self):
         
         # Load input
-        gene_blocks = self.load_pickle(result_path)
-        fw_sequence = self.read_seq(gene_path)
+        gene_blocks = load_pickle(self.wt_gene_blocks_fp)
+        print(gene_blocks)
+        fw_sequence = DesignEblocks.read_seq(self.input_gene_path)
+        print(len(fw_sequence))
+        sys.exit()
         rv_sequence = self.reverse_complement(fw_sequence)
 
-        unique_gene_blocks = self.extract_unique_gene_blocks(gene_blocks)
+        # Extract unique gene blocks
+        # unique_gene_blocks = self.extract_unique_gene_blocks(gene_blocks)
 
         primers = {}
-        for gb in unique_gene_blocks:
+        for gb_name, gb in gene_blocks.items():
             
-            begin_pos, end_pos = gene_block_range(gb)
+            begin_pos, end_pos = DesignEblocks.gene_block_range(gb_name)
+
+            print(gb_name)
             
             # Design initial primers and optimize temperatures
             init_fw_oh = self.IVA_Fw_overhang(end_pos, fw_sequence)
+            print(init_fw_oh)
+            print("TEST")
             size = self.optimize_tm(self.overhang_temp, init_fw_oh, end_pos, 15, fw_sequence)
             final_fw_oh = self.IVA_Fw_overhang(end_pos, fw_sequence, size=size)
 
@@ -67,11 +82,11 @@ class DesignPrimers:
         self.check_complementarity_primers(df)
 
         # Write to file
-        df.to_csv(df, output_path)
+        self.df_to_csv(df, os.path.join(self.output_location))
 
         # Also write primers to file that snapgene can import
-        if snapgene_file:
-            self.write_primers_to_file(df, output_path, snapgene_file)
+        if self.snapgene_file:
+            self.write_primers_to_file(df, self.output_location, self.snapgene_file)
         
         print("Primers written to file")
         print("Make sure that primer binds nowhere else in sequence")
@@ -135,12 +150,13 @@ class DesignPrimers:
     def combine_primers(self, overhang, template_binding):
         return overhang + template_binding
         
-    def extract_unique_gene_blocks(self, gene_blocks):
-        unique_gene_blocks = []
-        for _, value in gene_blocks.items():
-            if not value[0] in unique_gene_blocks:
-                unique_gene_blocks.append(value[0])
-        return unique_gene_blocks
+    # def extract_unique_gene_blocks(self, gene_blocks):
+    #     unique_gene_blocks = []
+    #     for key, value in gene_blocks.items():
+    #         print(key)
+    #         if not key in unique_gene_blocks:
+    #             unique_gene_blocks.append(value[0])
+    #     return unique_gene_blocks
 
     def store_output_in_df(self, primers):
         
