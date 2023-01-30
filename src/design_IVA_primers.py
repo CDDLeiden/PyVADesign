@@ -1,37 +1,52 @@
 import os
 import sys
-import pickle
 import difflib
 import pandas as pd
-from utils import extract_filename
-from snapgene_output import short_name
 from Bio.SeqUtils import MeltingTemp as mt
-from design_gene_blocks import read_seq, gene_block_range
-from utils import load_pickle
-
+from design_gene_blocks import DesignEblocks
+from utils import load_pickle, extract_filename
 
 class DesignPrimers:
     """
     """
 
-    def __init__(self):
+    def __init__(self,
+                 wt_gene_blocks_fp: str,
+                 mut_gene_blocks_fp: str,
+                 output_location: str,
+                 input_gene_path: str,
+                 snapgene_file: str):
+    
+        self.wt_gene_blocks_fp = wt_gene_blocks_fp
+        self.mut_gene_blocks_fp = mut_gene_blocks_fp
+        self.output_location = output_location
+        self.input_gene_path = input_gene_path
+        self.snapgene_file = snapgene_file
 
         self.overhang_temp = 50
         self.template_temp = 60
 
-    def run(self, result_path, gene_path, output_path, snapgene_file):
+    def run(self):
         
         # Load input
-        gene_blocks = self.load_pickle(result_path)
-        fw_sequence = self.read_seq(gene_path)
+        wt_gene_blocks = load_pickle(self.wt_gene_blocks_fp)
+        mut_gene_blocks = load_pickle(self.mut_gene_blocks_fp)
+
+        unique_mut_gene_blocks = list(set([i[0] for i in mut_gene_blocks.values()]))
+        unique_gene_blocks = {}
+        for mut in unique_mut_gene_blocks:
+            if mut not in wt_gene_blocks:
+                print(f'WARNING: {mut} not in WT gene blocks')
+            else:
+                unique_gene_blocks[mut] = wt_gene_blocks[mut]
+
+        fw_sequence = DesignEblocks.read_seq(self.input_gene_path)
         rv_sequence = self.reverse_complement(fw_sequence)
 
-        unique_gene_blocks = self.extract_unique_gene_blocks(gene_blocks)
-
         primers = {}
-        for gb in unique_gene_blocks:
+        for gb_name, gb in unique_gene_blocks.items():
             
-            begin_pos, end_pos = gene_block_range(gb)
+            begin_pos, end_pos = DesignEblocks.gene_block_range(gb_name)
             
             # Design initial primers and optimize temperatures
             init_fw_oh = self.IVA_Fw_overhang(end_pos, fw_sequence)
@@ -56,7 +71,7 @@ class DesignPrimers:
             fw_combined = self.combine_primers(final_fw_oh, final_fw_template)
             rv_combined = self.combine_primers(final_rv_oh, final_rv_template)
 
-            primers[gb] = [final_fw_oh, final_fw_template, final_rv_oh, final_rv_template, fw_combined, rv_combined]
+            primers[gb_name] = [final_fw_oh, final_fw_template, final_rv_oh, final_rv_template, fw_combined, rv_combined]
             
         df = self.store_output_in_df(primers)
 
@@ -67,28 +82,17 @@ class DesignPrimers:
         self.check_complementarity_primers(df)
 
         # Write to file
-        df.to_csv(df, output_path)
+        self.df_to_csv(df, os.path.join(self.output_location))
 
         # Also write primers to file that snapgene can import
-        if snapgene_file:
-            self.write_primers_to_file(df, output_path, snapgene_file)
+        if self.snapgene_file:
+            self.write_primers_to_file(df, self.output_location, self.snapgene_file)
         
         print("Primers written to file")
         print("Make sure that primer binds nowhere else in sequence")
 
-    def reverse_complement(self, sequence):
-        pairs = {"a": "t", "c":"g", "t":"a", "g":"c"}
-        reverse = ""
-        for nucleotide in sequence:
-            rev_nucl = pairs[nucleotide]
-            reverse += rev_nucl
-        return reverse
-
     def melting_temperature(self, sequence):
         return round(mt.Tm_NN(sequence), 2)
-
-    def invert_sequence(self, sequence):
-        return sequence[::-1]
 
     def df_to_csv(self, df, outpath, fname="IVA_primers.csv"):
         df.to_csv(os.path.join(outpath, fname))
@@ -135,13 +139,6 @@ class DesignPrimers:
     def combine_primers(self, overhang, template_binding):
         return overhang + template_binding
         
-    def extract_unique_gene_blocks(self, gene_blocks):
-        unique_gene_blocks = []
-        for _, value in gene_blocks.items():
-            if not value[0] in unique_gene_blocks:
-                unique_gene_blocks.append(value[0])
-        return unique_gene_blocks
-
     def store_output_in_df(self, primers):
         
         gene_blocks = []
@@ -233,8 +230,8 @@ class DesignPrimers:
                 name = row['Gene Block']
                 fw_primer = row['Forward primer (5>3)']
                 rv_primer = row['Reverse primer (5>3)']
-                out.write(short_name(name) + '_Fw' + ';' + str(fw_primer) + '\n')
-                out.write(short_name(name) + '_Rv' + ';' + str(rv_primer) + '\n')
+                out.write(self.short_block_name(name) + '_Fw' + ';' + str(fw_primer) + '\n')
+                out.write(self.short_block_name(name) + '_Rv' + ';' + str(rv_primer) + '\n')
 
     def check_complementarity_primers(self, df, threshold=4):
         # Primer pairs should not have complementary regions
@@ -252,3 +249,20 @@ class DesignPrimers:
                 print(f"The overhang temperatures for Fw and Rv primer of {row['Gene Block']} exceed max Tm difference of {threshold} degrees")
             if row['dTm Templates'] > threshold:
                 print(f"The template temperatures for Fw and Rv primer of {row['Gene Block']} exceed max Tm difference {threshold} degrees")
+
+    @staticmethod
+    def invert_sequence(sequence):
+        return sequence[::-1]
+    
+    @staticmethod
+    def reverse_complement(sequence):
+        pairs = {"a": "t", "c":"g", "t":"a", "g":"c"}
+        reverse = ""
+        for nucleotide in sequence:
+            rev_nucl = pairs[nucleotide]
+            reverse += rev_nucl
+        return reverse
+
+    @staticmethod
+    def short_block_name(name):
+        return name.split('_')[0] + name.split('_')[1]
