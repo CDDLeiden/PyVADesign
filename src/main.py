@@ -1,9 +1,9 @@
 import os
 import sys
 import argparse
-# import snapgene_output as sno
 from design_gene_blocks import DesignEblocks
 from design_IVA_primers import DesignPrimers
+from snapgene_output import SnapGeneOutput
 
 def read_arguments():
     parser = argparse.ArgumentParser(description='')
@@ -46,18 +46,20 @@ if __name__ == "__main__":
                                    args.snapgene_file)
     design_primers.run()
 
-    sys.exit()
-
     # Also write results to files that SnapGene can open
     primers_fp = os.path.join(args.output_location, "IVA_primers.csv")
     gene_blocks_mutation_info_fp = os.path.join(args.output_location, "gene_blocks.txt")
+    
     if args.snapgene_file:
-        sno.main(wt_gene_blocks_fp,
-                 mut_gene_blocks_fp,
-                 primers_fp,
-                 args.output_location,
-                 args.snapgene_file,
-                 gene_blocks_mutation_info_fp)
+        snapgene_output = SnapGeneOutput(wt_gene_blocks_fp = wt_gene_blocks_fp,
+                                         mut_gene_blocks_fp = mut_gene_blocks_fp,
+                                         primers_fp = primers_fp,
+                                         output_location = args.output_location,
+                                         snapgene_file = args.snapgene_file,
+                                         gene_blocks_info_fp = gene_blocks_mutation_info_fp)
+        snapgene_output.run()
 
     # Finally; clean-up files when done
     cleanup(args)
+
+    print("Done!")
