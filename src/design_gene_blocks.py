@@ -14,6 +14,7 @@ from utils import read_codon_usage, DNA_Codons, write_pickle
 
 class DesignEblocks:
     """
+    Class to design eBlocks
     """
 
     def __init__(self, 
@@ -92,7 +93,7 @@ class DesignEblocks:
                 mut_gene_block = self.mutate_gene_block(mut_codon, idx, mut_gene_block_value, mut_type)
 
                 # Store output in dictionary
-                results[mut] = [mut_gene_block_name, mut_gene_block, idx, mut_codon]
+                results[mut] = [mut_gene_block_name, mut_gene_block, idx, mut_codon, mut_type]
 
             elif mut_type == self.type_insert:
 
@@ -111,8 +112,10 @@ class DesignEblocks:
                 # Mutate gene block
                 mut_gene_block = self.mutate_gene_block(codon_insert, idx, mut_gene_block_value, mut_type)
 
-                # Store output in dictionary
-                results[mut] = [mut_gene_block_name, mut_gene_block, idx, codon_insert]
+                # Check if eBlock is too long / too short
+                if self.check_eblock_length(mut_gene_block):
+                    # Store output in dictionary
+                    results[mut] = [mut_gene_block_name, mut_gene_block, idx, codon_insert, mut_type]
 
             elif mut_type == self.type_deletion:
 
@@ -126,14 +129,14 @@ class DesignEblocks:
                 # Mutate gene block
                 mut_gene_block = self.mutate_gene_block('', idx, mut_gene_block_value, mut_type, idx_end)
 
-                # Store output in dictionary
-                results[mut] = [mut_gene_block_name, mut_gene_block, idx, '']  # TODO Maybe do it based on a string to remove 
+                # Check if eBlock is too long / too short
+                if self.check_eblock_length(mut_gene_block):
+                    # Store output in dictionary
+                    results[mut] = [mut_gene_block_name, mut_gene_block, idx, '', mut_type]  # TODO Maybe do it based on a string to remove 
 
             elif mut_type == self.type_combined:
 
                 # TODO Check if the different mutations are in the same eblock
-
-                # Start with the first mutation and them perform the other mutation wiht the mutated gene block as input
 
                 # Find gene block and index of insert/deletion/mutation
                 mut_idx = idx_dna_tups[num][0][1]
@@ -146,6 +149,7 @@ class DesignEblocks:
                 for mut_i in idx_dna_tups[num]:
 
                     idx = self.find_mutation_index_in_gene_block(mut_gene_block_name, mut_idx)
+
                     idxs.append(idx)
                     mut_codons = self.extract_mut_codons(mut_i[0][-1])
                     # Find most occuring mutant codon based on codon usage for species
@@ -156,7 +160,7 @@ class DesignEblocks:
                     mut_gene_block_value = self.mutate_gene_block(mut_codon, idx, mut_gene_block_value, mut_type)
 
                 # Store output in dictionary
-                results[mut] = [mut_gene_block_name, mut_gene_block_value, idx, mut_codon]
+                results[mut] = [mut_gene_block_name, mut_gene_block_value, idx, mut_codon, mut_type]
             
         # Store output
         self.write_gene_blocks_to_txt(results, self.output_fp)
@@ -178,6 +182,17 @@ class DesignEblocks:
         else:
             print("It looks like the codon usage table for the specified organism is not present.")
             sys.exit()
+
+    def check_eblock_length(self, mut_gene_block):
+            # Make sure that the codon insert is not too long or too short for eBlock
+            if len(mut_gene_block) > self.idt_max_length_fragment:
+                print("Codon insert is too long for eBlock")
+                sys.exit()
+            elif len(mut_gene_block) < self.idt_min_length_fragment:
+                print("Codon insert is too short for eBlock")
+                sys.exit()
+            else:
+                return True
 
     def index_mutations(self, mut_list, mut_types):
         """_summary_
@@ -531,13 +546,13 @@ class DesignEblocks:
     def write_gene_blocks_to_txt(self, gene_block_dict, 
                                 outpath, 
                                 fname="gene_blocks.txt"):
-        header = ['mutation', 'gene block name', 'length gene block', 'gene block sequence', 'index mutation', 'mut codon']
+        header = ['mutation', 'gene block name', 'length gene block', 'gene block sequence', 'index mutation', 'mut codon', 'type']
         outfile = os.path.join(outpath, fname)
         with open(outfile, 'w+') as out:
             out.write('\t'.join(header) + '\n')
             for key, value in gene_block_dict.items():
                 len_gene_block = len(value[1])
-                out.write(key + '\t' + value[0] + '\t' + str(len_gene_block) + '\t' + value[1] + '\t' + str(value[2]) + '\t' + value[3] + '\n')
+                out.write(key + '\t' + value[0] + '\t' + str(len_gene_block) + '\t' + value[1] + '\t' + str(value[2]) + '\t' + value[3] + '\t' + value[4] + '\n')
 
     def extract_wells_from_template(self, template='data\eblocks-plate-upload-template-96.xlsx'):
         df = pd.read_excel(template)
