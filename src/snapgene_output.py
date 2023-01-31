@@ -6,9 +6,6 @@ from design_gene_blocks import DesignEblocks
 from design_IVA_primers import DesignPrimers
 from utils import extract_filename, load_pickle
 
-# TODO Think about how to use different colors for different types of mutations in the snapgene output
-# Combination of mutations use different colors
-# instead of mutation, color by type! (insert e.g. blue but name as mutation)
 
 class SnapGeneOutput:
     """
@@ -29,6 +26,20 @@ class SnapGeneOutput:
         self.output_location = output_location
         self.snapgene_file = snapgene_file
         self.gene_blocks_info_fp = gene_blocks_info_fp
+
+        self.type_mutation = "Mutation"
+        self.type_insert = "Insert"
+        self.type_deletion = "Deletion"
+        self.type_combined = "Combined"
+
+        self.color_mutation = '#FF0000'
+        self.color_combination = '#D8FF00'
+        self.color_insert = '#0017FF'
+        self.color_deletion = '#FF5900'
+        self.color_gene_block = '#939393'
+        # self.color_primer = ''
+        self.color_primer_OH = '#FF00D4'
+        self.color_primer_template = '#06FF92'
 
     def run(self):
         
@@ -136,13 +147,15 @@ class SnapGeneOutput:
 
     def write_mutations_to_gff3(self, fp, gene_block_indexes, hex_color="#FF0000"):
         df = pd.read_csv(fp, sep='\t', header=0)
-        results = {}  # d[mutation] = [begin, end]
+        results = {}  # d[mutation] = [begin, end, color]
         for idx, row in df.iterrows():
             for key, value in gene_block_indexes.items():
                 if row['gene block name'] == key:
                     begin = gene_block_indexes[key][0] + row['index mutation']
                     end = gene_block_indexes[key][0] + row['index mutation'] + 2
-                    results[row['mutation']] = [begin, end, hex_color]
+                    type = row['type']
+                    color = self.mutation_colors(type)
+                    results[row['mutation']] = [begin, end, color]
                     continue
         return results
 
@@ -170,3 +183,14 @@ class SnapGeneOutput:
                 print(f"{column}: {primer} not found in vector sequence")
                 print(primer)
         return primer_indexes
+    
+    def mutation_colors(self, mutation_type):
+        if mutation_type == self.type_mutation:
+            return self.color_mutation
+        elif mutation_type == self.type_insert:
+            return self.color_insert
+        elif mutation_type == self.type_deletion:
+            return self.color_deletion
+        elif mutation_type == self.type_combined:
+            return self.color_combination
+        
