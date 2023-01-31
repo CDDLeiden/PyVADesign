@@ -44,10 +44,6 @@ def extract_filename(fp):
     fname = os.path.splitext(base)[0]
     return fname
 
-# def write_pickle(obj, outpath, fname="mut_gene_blocks.npy"):
-#     with open(os.path.join(outpath, fname), 'wb') as handle:
-#         pickle.dump(obj, handle, protocol=pickle.HIGHEST_PROTOCOL)
-
 def write_pickle(obj, out_fp, fname="mut_gene_blocks.npy"):
     with open(os.path.join(out_fp, fname), 'wb') as handle:
         pickle.dump(obj, handle)

@@ -1,7 +1,6 @@
 import os
 import sys
 import random
-import pickle
 # import openpyxl
 import numpy as np
 import pandas as pd
@@ -39,7 +38,7 @@ class DesignEblocks:
         self.idt_max_length_fragment = idt_max_length_fragment
         self.idt_min_length_fragment = idt_min_length_fragment
         self.idt_min_order = idt_min_order
-        self.n_iterations = 100
+        self.n_iterations = 500
         
         self.dna_seq = self.read_seq(sequence_fp)
         self.mutations, self.mutation_types = self.read_mutations(mutations_fp)  # Types > Mutation, Insert, Deletion
