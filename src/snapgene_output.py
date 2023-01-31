@@ -145,7 +145,7 @@ class SnapGeneOutput:
                 result = self.gff3_line(value[0], value[1], key, value[2])
                 f.write('\t'.join(result) + '\n')
 
-    def write_mutations_to_gff3(self, fp, gene_block_indexes, hex_color="#FF0000"):
+    def write_mutations_to_gff3(self, fp, gene_block_indexes):
         df = pd.read_csv(fp, sep='\t', header=0)
         results = {}  # d[mutation] = [begin, end, color]
         for idx, row in df.iterrows():
