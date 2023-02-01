@@ -235,13 +235,13 @@ class DesignEblocks:
         for mut, type in zip(mutations, mutation_types):
             print(mut, type)
             if type == self.type_mutation:
-                if not self.check_mut_format(mut):
+                if not self.check_mut_format(mut, self.type_mutation):
                     print(f"Input {mut} contain non-natural amino acids or incorrect formatting")
                     sys.exit()
             elif type == self.type_insert:
                 mut_format = mut.split('-')[0]
                 added_residues = mut.split('-')[1]
-                if not self.check_mut_format(mut_format):
+                if not self.check_mut_format(mut_format, self.type_insert):
                         print(f"Input {mut} contain non-natural amino acids or incorrect formatting")
                         sys.exit()
                 for i in added_residues:
@@ -251,16 +251,16 @@ class DesignEblocks:
             elif type == self.type_deletion:
                 mut_start = mut.split('-')[0]
                 mut_end = mut.split('-')[0]
-                if not self.check_mut_format(mut_start):
+                if not self.check_mut_format(mut_start, self.type_deletion):
                     print(f"Input {mut_start} contain non-natural amino acids or incorrect formatting")
                     sys.exit()
-                if not self.check_mut_format(mut_end):
+                if not self.check_mut_format(mut_end, self.type_deletion):
                     print(f"Input {mut_end} contain non-natural amino acids or incorrect formatting")
                     sys.exit()
             elif type == self.type_combined:
                 mut_list = mut.split('-')
                 for i in mut_list:
-                    if not self.check_mut_format(i):
+                    if not self.check_mut_format(i, self.type_combined):
                         print(f"Input {i} contain non-natural amino acids or incorrect formatting")
                         sys.exit()
             else:
@@ -583,10 +583,14 @@ class DesignEblocks:
         return short_name
     
     @staticmethod
-    def check_mut_format(mut):
+    def check_mut_format(mut, mut_type):
         valid = 'acdefghiklmnpqrstvwy'
-        if (mut[0].lower() in valid) and (mut[-1].lower() in valid) and (isinstance(int(mut[1:-1]), int)):
-            return True
+        if (mut_type == "Mutation") or (mut_type == "Combined"):
+            if (mut[0].lower() in valid) and (mut[-1].lower() in valid) and (isinstance(int(mut[1:-1]), int)):
+                return True
+        elif (mut_type == 'Insert') or (mut_type == 'Deletion'):
+            if (mut[0].lower() in valid) and (isinstance(int(mut[1:]), int)):
+                return True
         else:
             return False
     
