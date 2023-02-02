@@ -38,12 +38,12 @@ class DesignEblocks:
         self.idt_max_length_fragment = idt_max_length_fragment
         self.idt_min_length_fragment = idt_min_length_fragment
         self.idt_min_order = idt_min_order
-        self.n_iterations = 500
+        self.n_iterations = 100
+        self.gene_blocks = None
         
         self.dna_seq = self.read_seq(sequence_fp)
         self.mutations, self.mutation_types = self.read_mutations(mutations_fp)  # Types > Mutation, Insert, Deletion
         self.codon_usage = self.check_existance_codon_usage_table()  # Check if codon usage table is present for selected species
-
 
     def run(self):
 
@@ -65,106 +65,145 @@ class DesignEblocks:
         
         # Make gene blocks (WT DNA sequences cut to the correct size)
         gene_blocks = self.make_gene_block(bins, self.dna_seq)
-        write_pickle(gene_blocks, self.output_fp, fname="wt_gene_blocks.npy")
+        self.gene_blocks = gene_blocks
 
         # Make histogram with bins
         labels = gene_blocks.keys()
         self.make_histogram(idx_dna, self.output_fp, bins, labels)
 
+        # TODO Maybe first check for all gene blocks whether the mutation is in a correct place, e.g. not the beginning or end of a gene block
+        # TODO Restart option is error was found?
+
+        # should_restart = True
+        # while should_restart:
+        # should_restart = False
+        # for i in xrange(10):
+        #     print i
+        #     if i == 5:
+        #     should_restart = True
+        #     break
+
+
         results = {}
-        for num, mut in enumerate(self.mutations):
+        should_restart = True
+        while should_restart:
+            should_restart = False
+            for num, mut in enumerate(self.mutations):
 
-            mut_type = self.mutation_types[num]
-
-            # Change gene block in selected position for mutation
-            if mut_type == self.type_mutation:
-
-                # Find gene block and index of insert/deletion/mutation
-                mut_idx = idx_dna_tups[num][1]
-                mut_gene_block_name, mut_gene_block_value = self.find_gene_block(gene_blocks, mut_idx)
-                idx = self.find_mutation_index_in_gene_block(mut_gene_block_name, mut_idx)
-
-                mut_codons = self.extract_mut_codons(mut[-1])
-                # Find most occuring mutant codon based on codon usage for species
-                mut_codon = self.select_mut_codon(mut_codons)
-
-                # Mutate gene block
-                mut_gene_block = self.mutate_gene_block(mut_codon, idx, mut_gene_block_value, mut_type)
-
-                # Store output in dictionary
-                results[mut] = [mut_gene_block_name, mut_gene_block, idx, mut_codon, mut_type]
-
-            elif mut_type == self.type_insert:
-
-                res_insert = mut.split('-')[1]
-                codon_insert = ''  # Sequence to insert in gene block
-                for res in res_insert:
-                    codons = self.extract_mut_codons(res)
-                    codon = self.select_mut_codon(codons)
-                    codon_insert += codon
-
-                # Find gene block and index of insert/deletion/mutation
-                mut_idx = idx_dna_tups[num][1]
-                mut_gene_block_name, mut_gene_block_value = self.find_gene_block(gene_blocks, mut_idx)
-                idx = self.find_mutation_index_in_gene_block(mut_gene_block_name, mut_idx)
-
-                # Mutate gene block
-                mut_gene_block = self.mutate_gene_block(codon_insert, idx, mut_gene_block_value, mut_type)
-
-                # Check if eBlock is too long / too short
-                if self.check_eblock_length(mut_gene_block):
-                    # Store output in dictionary
-                    results[mut] = [mut_gene_block_name, mut_gene_block, idx, codon_insert, mut_type]
-
-            elif mut_type == self.type_deletion:
-
-                idx_del_start = idx_dna_tups[num][1]
-                idx_del_end = int(mut.split('-')[1][1:-1]) * 3
-
-                mut_gene_block_name, mut_gene_block_value = self.find_gene_block(gene_blocks, idx_del_start)
-                idx = self.find_mutation_index_in_gene_block(mut_gene_block_name, idx_del_start)
-                idx_end = self.find_mutation_index_in_gene_block(mut_gene_block_name, idx_del_end)
-
-                # Mutate gene block
-                mut_gene_block = self.mutate_gene_block('', idx, mut_gene_block_value, mut_type, idx_end)
-
-                # Check if eBlock is too long / too short
-                if self.check_eblock_length(mut_gene_block):
-                    # Store output in dictionary
-                    results[mut] = [mut_gene_block_name, mut_gene_block, idx, '', mut_type]  # TODO Maybe do it based on a string to remove 
-
-            elif mut_type == self.type_combined:
-
-                # TODO Check if the different mutations are in the same eblock
-
-                # Find gene block and index of insert/deletion/mutation
-                mut_idx = idx_dna_tups[num][0][1]
-
-                mut_gene_block_name, mut_gene_block_value = self.find_gene_block(gene_blocks, mut_idx)
-
-                idxs = []
-                codons = []
+                mut_type = self.mutation_types[num]
                 
-                for mut_i in idx_dna_tups[num]:
+                print(mut, mut_type)
 
+                # Change gene block in selected position for mutation
+                if mut_type == self.type_mutation:
+
+                    # Find gene block and index of insert/deletion/mutation
+                    mut_idx = idx_dna_tups[num][1]
+                    mut_gene_block_name, mut_gene_block_value = self.find_gene_block(gene_blocks, mut_idx)
                     idx = self.find_mutation_index_in_gene_block(mut_gene_block_name, mut_idx)
 
-                    idxs.append(idx)
-                    mut_codons = self.extract_mut_codons(mut_i[0][-1])
+                    # Check if WT codon at index is same residue as mutation
+                    self.check_wt_codon(mut_gene_block_value, idx, mut[0])
+                    
+                    mut_codons = self.extract_mut_codons(mut[-1])
                     # Find most occuring mutant codon based on codon usage for species
                     mut_codon = self.select_mut_codon(mut_codons)
-                    codons.append(mut_codon)
 
                     # Mutate gene block
-                    mut_gene_block_value = self.mutate_gene_block(mut_codon, idx, mut_gene_block_value, mut_type)
+                    mut_gene_block = self.mutate_gene_block(mut_codon, idx, mut_gene_block_value, mut_type)
 
-                # Store output in dictionary
-                results[mut] = [mut_gene_block_name, mut_gene_block_value, idx, mut_codon, mut_type]
+                    # Store output in dictionary
+                    results[mut] = [mut_gene_block_name, mut_gene_block, idx, mut_codon, mut_type]
+
+                elif mut_type == self.type_insert:
+
+                    res_insert = mut.split('-')[1]
+                    codon_insert = ''  # Sequence to insert in gene block
+                    for res in res_insert:
+                        codons = self.extract_mut_codons(res)
+                        codon = self.select_mut_codon(codons)
+                        codon_insert += codon
+
+                    # Find gene block and index of insert/deletion/mutation
+                    mut_idx = idx_dna_tups[num][1]
+                    mut_gene_block_name, mut_gene_block_value = self.find_gene_block(gene_blocks, mut_idx)
+                    idx = self.find_mutation_index_in_gene_block(mut_gene_block_name, mut_idx)
+
+                    # Check if WT codon at index is same residue as mutation
+                    self.check_wt_codon(mut_gene_block_value, idx, mut[0])
+
+                    # Mutate gene block
+                    mut_gene_block = self.mutate_gene_block(codon_insert, idx, mut_gene_block_value, mut_type)
+
+                    # Check if eBlock is too long / too short
+                    if self.check_eblock_length(mut_gene_block):
+                        # Store output in dictionary
+                        results[mut] = [mut_gene_block_name, mut_gene_block, idx, codon_insert, mut_type]
+
+                elif mut_type == self.type_deletion:
+
+                    idx_del_start = idx_dna_tups[num][1]
+                    idx_del_end = int(mut.split('-')[1][1:-1]) * 3
+
+                    mut_gene_block_name, mut_gene_block_value = self.find_gene_block(gene_blocks, idx_del_start)
+                    idx = self.find_mutation_index_in_gene_block(mut_gene_block_name, idx_del_start)
+                    idx_end = self.find_mutation_index_in_gene_block(mut_gene_block_name, idx_del_end)
+
+                    # Check if WT codon at index is same residue as mutation
+                    self.check_wt_codon(mut_gene_block_value, idx, mut[0])
+
+                    # Mutate gene block
+                    mut_gene_block = self.mutate_gene_block('', idx, mut_gene_block_value, mut_type, idx_end)
+
+                    # Check if eBlock is too long / too short
+                    if self.check_eblock_length(mut_gene_block):
+                        # Store output in dictionary
+                        results[mut] = [mut_gene_block_name, mut_gene_block, idx, '', mut_type]  # TODO Maybe do it based on a string to remove 
+
+                elif mut_type == self.type_combined:
+
+                    # TODO Check if the different mutations are in the same eblock
+
+                    # Find gene block and index of insert/deletion/mutation
+                    mut_idx = idx_dna_tups[num][0][1]
+
+                    mut_gene_block_name, mut_gene_block_value = self.find_gene_block(gene_blocks, mut_idx)
+
+                    idxs = []
+                    codons = []
+                    
+                    for mut_i in idx_dna_tups[num]:
+
+                        idx = self.find_mutation_index_in_gene_block(mut_gene_block_name, mut_idx)
+
+                        idxs.append(idx)
+                        mut_codons = self.extract_mut_codons(mut_i[0][-1])
+                        # Find most occuring mutant codon based on codon usage for species
+                        mut_codon = self.select_mut_codon(mut_codons)
+                        codons.append(mut_codon)
+
+                        # Check if WT codon at index is same residue as mutation
+                        self.check_wt_codon(mut_gene_block_value, idx, mut[0])
+
+                        # Mutate gene block
+                        mut_gene_block_value = self.mutate_gene_block(mut_codon, idx, mut_gene_block_value, mut_type)
+
+                    # Store output in dictionary
+                    results[mut] = [mut_gene_block_name, mut_gene_block_value, idx, mut_codon, mut_type]
             
         # Store output
         self.write_gene_blocks_to_txt(results, self.output_fp)
         self.write_gene_blocks_to_template(results, self.output_fp)
         write_pickle(results, self.output_fp)
+        write_pickle(gene_blocks, self.output_fp, fname="wt_gene_blocks.npy")
+
+    def check_wt_codon(self, gene_block_value, idx, mut):
+        for key, value in DNA_Codons.items():
+                if key.lower() == gene_block_value[idx-3:idx]:
+                    result = value
+        if not result == mut[0]:
+            print(f"WT codon does not match residue {mut}, but is {result}, the codon is {gene_block_value[idx-3:idx]}")
+            sys.exit()
 
     def check_existance_codon_usage_table(self):
         codon_usage_present = [file for file in os.listdir(r"data/codon_usage")]
@@ -188,7 +227,7 @@ class DesignEblocks:
                 print("Codon insert is too long for eBlock")
                 sys.exit()
             elif len(mut_gene_block) < self.idt_min_length_fragment:
-                print("Codon insert is too short for eBlock")
+                print(f"Codon insert is too short for eBlock, length is {len(mut_gene_block)}")
                 sys.exit()
             else:
                 return True
@@ -311,8 +350,14 @@ class DesignEblocks:
         # (1) Check there are NO non-natural amino acids in the mutations
         # (2) Check that there are enough mutations to process
         # (3) Check formatting of mutations
+        # (4) check that there are no duplicate mutations
+        if len(mutations) != len(set(mutations)):
+            # TODO print duplicate mutations
+            print("Duplicate mutations detected. Please remove and rerun.")
+            sys.exit()
         if (self.check_input_mutations(mutations, mutation_types)) and (self.check_number_input_mutations(mutations)):  
             return mutations, mutation_types
+
 
     def translate_sequence(self, dna_seq):    
         """
@@ -506,7 +551,7 @@ class DesignEblocks:
             if value == res:
                 mut_codons.append(key.lower())
         return mut_codons
-
+    
     def find_gene_block(self, gene_blocks, mutation_idx):
         for key, value in gene_blocks.items():
             begin_range, end_range = self.gene_block_range(key)
@@ -517,17 +562,28 @@ class DesignEblocks:
     def check_position_gene_block(self, gene_block, idx_mutation):
         begin_range, end_range = self.gene_block_range(gene_block)
         if (idx_mutation - begin_range) > self.idt_min_length_fragment:
-            print("Mutation is too close to beginning of gene block")
-            sys.exit()
+            self.alter_gene_block_range(gene_block, 'extend_begin')
+            # TODO CHANGE
+            # print("Mutation is too close to beginning of gene block")
+            # sys.exit()
         elif (end_range - idx_mutation) < self.idt_min_length_fragment:
             print("Mutation is too close to final part of gene block")
             sys.exit()
+
+    def alter_gene_block_range(self, gene_block, alteration):
+        if alteration == 'extend_begin':
+            pass
+            # TODO Add 20 nucleotides to beginning of gene block
+            # TODO: Make this more general
+            # TODO: Then check again if size is ok
+            # TODO: If correct, then return new range
+
         
     def find_mutation_index_in_gene_block(self, gene_block, idx_mutation):
         begin_range, _ = self.gene_block_range(gene_block)
         # Find index of mutation within geneblock
         index = idx_mutation - begin_range
-        # Check that mutation is not in the first or final 15 residues of the gene block (this would make it very difficult to design IVA primers)
+        # Check that mutation is not in the first or final X residues of the gene block (this would make it very difficult to design IVA primers)
         self.check_position_gene_block(gene_block, index)
         return index
 

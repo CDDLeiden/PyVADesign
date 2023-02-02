@@ -1,7 +1,7 @@
 ### Specific for this directory
 
-tests/T1_out/*
-!tests/T1_out/.gitkeep 
+# tests/T1_out/*
+# !tests/T1_out/.gitkeep 
 doc/problems.txt
 doc/TODO.txt
 
