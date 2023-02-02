@@ -38,7 +38,7 @@ class DesignEblocks:
         self.idt_max_length_fragment = idt_max_length_fragment
         self.idt_min_length_fragment = idt_min_length_fragment
         self.idt_min_order = idt_min_order
-        self.n_iterations = 500
+        self.n_iterations = 1000
         
         self.dna_seq = self.read_seq(sequence_fp)
         self.mutations, self.mutation_types = self.read_mutations(mutations_fp)  # Types > Mutation, Insert, Deletion
@@ -75,6 +75,7 @@ class DesignEblocks:
         for num, mut in enumerate(self.mutations):
 
             mut_type = self.mutation_types[num]
+            print(mut, mut_type)
 
             # Change gene block in selected position for mutation
             if mut_type == self.type_mutation:
@@ -188,7 +189,7 @@ class DesignEblocks:
                 print("Codon insert is too long for eBlock")
                 sys.exit()
             elif len(mut_gene_block) < self.idt_min_length_fragment:
-                print("Codon insert is too short for eBlock")
+                print(f"Codon insert is too short for eBlock, length is {len(mut_gene_block)}")
                 sys.exit()
             else:
                 return True
@@ -311,8 +312,14 @@ class DesignEblocks:
         # (1) Check there are NO non-natural amino acids in the mutations
         # (2) Check that there are enough mutations to process
         # (3) Check formatting of mutations
+        # (4) check that there are no duplicate mutations
+        if len(mutations) != len(set(mutations)):
+            # TODO print duplicate mutations
+            print("Duplicate mutations detected. Please remove and rerun.")
+            sys.exit()
         if (self.check_input_mutations(mutations, mutation_types)) and (self.check_number_input_mutations(mutations)):  
             return mutations, mutation_types
+
 
     def translate_sequence(self, dna_seq):    
         """
