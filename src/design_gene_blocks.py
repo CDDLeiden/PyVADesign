@@ -38,7 +38,7 @@ class DesignEblocks:
         self.idt_max_length_fragment = idt_max_length_fragment
         self.idt_min_length_fragment = idt_min_length_fragment
         self.idt_min_order = idt_min_order
-        self.n_iterations = 100
+        self.n_iterations = 100  # Number of iterations to run mean shift clustering
         self.gene_blocks = None
         
         self.dna_seq = self.read_seq(sequence_fp)
@@ -66,7 +66,6 @@ class DesignEblocks:
         
         # Make gene blocks (WT DNA sequences cut to the correct size)
         gene_blocks = self.make_gene_block(bins, self.dna_seq)
-        print(gene_blocks)
         self.gene_blocks = gene_blocks
 
         # Make histogram with bins
@@ -75,15 +74,6 @@ class DesignEblocks:
 
         # TODO Maybe first check for all gene blocks whether the mutation is in a correct place, e.g. not the beginning or end of a gene block
         # TODO Restart option is error was found?
-
-        # should_restart = True
-        # while should_restart:
-        # should_restart = False
-        # for i in xrange(10):
-        #     print i
-        #     if i == 5:
-        #     should_restart = True
-        #     break
 
         results = {}
         should_restart = True
@@ -144,7 +134,9 @@ class DesignEblocks:
                 elif mut_type == self.type_deletion:
 
                     idx_del_start = idx_dna_tups[num][1]
-                    idx_del_end = int(mut.split('-')[1][1:-1]) * 3
+                    idx_del_end = int(mut.split('-')[1][1:]) * 3
+                    print(idx_del_start, idx_del_end)
+                    
 
                     mut_gene_block_name, mut_gene_block_value = self.find_gene_block(gene_blocks, idx_del_start)
                     idx = self.find_mutation_index_in_gene_block(mut_gene_block_name, idx_del_start)
@@ -251,8 +243,9 @@ class DesignEblocks:
                 idx_dna_tups.append([mut, int(mut[1:-1]) * 3])
             elif (type == self.type_insert) or (type == self.type_deletion):
                 mut_i = mut.split('-')[0]
-                idx_dna.append(int(mut_i[1:-1]) * 3)  # A residue consists of 3 nucleotides
-                idx_dna_tups.append([mut_i, int(mut_i[1:-1]) * 3])
+                print(mut_i)
+                idx_dna.append(int(mut_i[1:]) * 3)  # A residue consists of 3 nucleotides
+                idx_dna_tups.append([mut_i, int(mut_i[1:]) * 3])
             elif type == self.type_combined:
                 muts = mut.split('-')
                 tmp = []

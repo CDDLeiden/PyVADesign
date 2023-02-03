@@ -1,0 +1,37 @@
+##gff-version 3.2.1
+##sequence-region myseq 1 7871
+myseq	.	gene	-1	685	.	.	.	Name=Block0;color=#939393
+myseq	.	gene	1257	2036	.	.	.	Name=Block2;color=#939393
+myseq	.	gene	2427	2885	.	.	.	Name=Block4;color=#939393
+myseq	.	gene	2021	2036	.	.	.	Name=Block2_Fw_OH;color=#FF00D4
+myseq	.	gene	2872	2885	.	.	.	Name=Block4_Fw_OH;color=#FF00D4
+myseq	.	gene	1257	1272	.	.	.	Name=Block2_Rv_OH;color=#FF00D4
+myseq	.	gene	2427	2442	.	.	.	Name=Block4_Rv_OH;color=#FF00D4
+myseq	.	gene	2036	2059	.	.	.	Name=Block2_Fw_Template;color=#06FF92
+myseq	.	gene	2885	2902	.	.	.	Name=Block4_Fw_Template;color=#06FF92
+myseq	.	gene	1234	1257	.	.	.	Name=Block2_Rv_Template;color=#06FF92
+myseq	.	gene	2404	2427	.	.	.	Name=Block4_Rv_Template;color=#06FF92
+myseq	.	gene	111	113	.	.	.	Name=Y77S;color=#FF0000
+myseq	.	gene	201	203	.	.	.	Name=Y107G;color=#FF0000
+myseq	.	gene	297	299	.	.	.	Name=W139F;color=#FF0000
+myseq	.	gene	564	566	.	.	.	Name=D228G;color=#FF0000
+myseq	.	gene	660	662	.	.	.	Name=F260A;color=#FF0000
+myseq	.	gene	1813	1815	.	.	.	Name=I599A-I600L;color=#D8FF00
+myseq	.	gene	2452	2454	.	.	.	Name=M813C;color=#FF0000
+myseq	.	gene	2566	2568	.	.	.	Name=H851A;color=#FF0000
+myseq	.	gene	2860	2862	.	.	.	Name=Q949A;color=#FF0000
+myseq	.	gene	1432	1434	.	.	.	Name=F473G;color=#FF0000
+myseq	.	gene	1429	1431	.	.	.	Name=F473G-N472F;color=#D8FF00
+myseq	.	gene	1564	1566	.	.	.	Name=E512Q-R517D;color=#D8FF00
+myseq	.	gene	1564	1566	.	.	.	Name=R517D;color=#FF0000
+myseq	.	gene	1624	1626	.	.	.	Name=E537R;color=#FF0000
+myseq	.	gene	1942	1944	.	.	.	Name=D643E;color=#FF0000
+myseq	.	gene	24	26	.	.	.	Name=T486-K495;color=#FF5900
+myseq	.	gene	1282	1284	.	.	.	Name=D431S-P423D;color=#D8FF00
+myseq	.	gene	2491	2493	.	.	.	Name=K826L;color=#FF0000
+myseq	.	gene	2713	2715	.	.	.	Name=I900D;color=#FF0000
+myseq	.	gene	2011	2013	.	.	.	Name=L666F;color=#FF0000
+myseq	.	gene	2617	2619	.	.	.	Name=R868A;color=#FF0000
+myseq	.	gene	1711	1713	.	.	.	Name=R566A;color=#FF0000
+myseq	.	gene	1411	1413	.	.	.	Name=K466A;color=#FF0000
+myseq	.	gene	1414	1416	.	.	.	Name=D467A;color=#FF0000
