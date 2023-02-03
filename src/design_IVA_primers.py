@@ -56,18 +56,16 @@ class DesignPrimers:
             final_fw_oh = self.IVA_Fw_overhang(end_pos, fw_sequence, size=size)
 
             init_fw_template = self.IVA_Fw_template(end_pos, fw_sequence)
-            size = self.optimize_tm(self.IVA_template_temp, init_fw_template, end_pos, 15, fw_sequence, self.IVA_Fw_template)
+            size = self.optimize_tm(self.IVA_template_temp, init_fw_template, end_pos, 15, fw_sequence, self.IVA_Fw_overhang)
             final_fw_template = self.IVA_Fw_template(end_pos, fw_sequence, size)
 
-            # print("problem")
-
             init_rv_oh = self.IVA_Rv_overhang(begin_pos, rv_sequence)
-            size = self.optimize_tm(self.IVA_overhang_temp, init_rv_oh, begin_pos, 15, rv_sequence, self.IVA_Rv_overhang)
+            size = self.optimize_tm(self.IVA_overhang_temp, init_rv_oh, begin_pos, 15, rv_sequence, self.IVA_Fw_overhang)
             final_rv_oh = self.IVA_Rv_overhang(begin_pos, rv_sequence, size)
             final_rv_oh = self.invert_sequence(final_rv_oh)
 
             init_rv_template = self.IVA_Rv_template(begin_pos, rv_sequence)
-            size = self.optimize_tm(self.IVA_template_temp, init_rv_template, begin_pos, 15, rv_sequence, self.IVA_Rv_template)
+            size = self.optimize_tm(self.IVA_template_temp, init_rv_template, begin_pos, 15, rv_sequence, self.IVA_Fw_overhang)
             final_rv_template = self.IVA_Rv_template(begin_pos, rv_sequence, size)
             final_rv_template = self.invert_sequence(final_rv_template)
 

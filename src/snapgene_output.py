@@ -54,6 +54,7 @@ class SnapGeneOutput:
         
         # Start and end position of the gene block in the vector (=needed to create features later)
         gene_block_indexes = self.gene_block_indexes_in_vector(record.seq, gene_blocks)
+        print(gene_block_indexes)
 
         # Read primer data
         df = pd.read_csv(self.primers_fp)
@@ -150,8 +151,9 @@ class SnapGeneOutput:
         for idx, row in df.iterrows():
             for key, value in gene_block_indexes.items():
                 if row['gene block name'] == key:
-                    begin = gene_block_indexes[key][0] + row['index mutation']
-                    end = gene_block_indexes[key][0] + row['index mutation'] + 2
+                    begin = gene_block_indexes[key][0] + row['index mutation'] -3
+                    end = gene_block_indexes[key][0] + row['index mutation'] -1
+                    print(begin, end)
                     type = row['type']
                     color = self.mutation_colors(type)
                     results[row['mutation']] = [begin, end, color]
@@ -159,11 +161,14 @@ class SnapGeneOutput:
         return results
 
     def gene_block_indexes_in_vector(self, vector_sequence, gene_blocks):
-        gene_block_indexes = {}  # d[gene_block_name] =[begin position in vector, end position in vector]
+        gene_block_indexes = {}  # d[gene_block_name] = [begin position in vector, end position in vector]
         for key, value in gene_blocks.items():
             begin_idx = self.find_index(str(vector_sequence), value)  # Position in vector, NOT in target gene
             end_idx = begin_idx + len(value)
-            gene_block_indexes[key] = [begin_idx, end_idx]
+            if (begin_idx == -1) or (end_idx == -1):
+                print(f"Gene block {key} not found in vector sequence. Check whether your target gene is correct in your vector.")
+                sys.exit()
+            gene_block_indexes[key] = [begin_idx + 1, end_idx + 1]
         return gene_block_indexes
 
     def extract_primer_index(self, df, column, sequence, gene_block_indexes):
