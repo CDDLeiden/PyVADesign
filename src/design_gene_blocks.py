@@ -169,8 +169,10 @@ class DesignEblocks:
 
                     # Find gene block and index of insert/deletion/mutation
                     mut_idx = idx_dna_tups[num][0][1]
+                    print(mut_idx)
 
                     mut_gene_block_name, mut_gene_block_value = self.find_gene_block(gene_blocks, mut_idx)
+                    print(mut_gene_block_name, mut_gene_block_value)
 
                     idxs = []
                     codons = []
@@ -186,7 +188,7 @@ class DesignEblocks:
                         codons.append(mut_codon)
 
                         # Check if WT codon at index is same residue as mutation
-                        self.check_wt_codon(mut_gene_block_value, idx, mut[0])
+                        self.check_wt_codon(mut_gene_block_value, idx, mut_i[0])
 
                         # Mutate gene block
                         mut_gene_block_value = self.mutate_gene_block(mut_codon, idx, mut_gene_block_value, mut_type)
