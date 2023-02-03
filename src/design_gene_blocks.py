@@ -59,12 +59,14 @@ class DesignEblocks:
         optimal_bandwidth, lowest_cost = self.optimize_bins(idx_dna)
 
         clusters = self.meanshift(idx_dna, optimal_bandwidth)
+        print(clusters)
         print("Lowest cost: ", str(lowest_cost), f"with {len(clusters)} clusters")
 
         bins = self.make_bins(clusters)
         
         # Make gene blocks (WT DNA sequences cut to the correct size)
         gene_blocks = self.make_gene_block(bins, self.dna_seq)
+        print(gene_blocks)
         self.gene_blocks = gene_blocks
 
         # Make histogram with bins
@@ -82,7 +84,6 @@ class DesignEblocks:
         #     if i == 5:
         #     should_restart = True
         #     break
-
 
         results = {}
         should_restart = True
@@ -162,7 +163,7 @@ class DesignEblocks:
 
                 elif mut_type == self.type_combined:
 
-                    # TODO Check if the different mutations are in the same eblock
+                    # TODO Check if the different mutations are in the same eblock, otherwise throw error
 
                     # Find gene block and index of insert/deletion/mutation
                     mut_idx = idx_dna_tups[num][0][1]
@@ -174,7 +175,7 @@ class DesignEblocks:
                     
                     for mut_i in idx_dna_tups[num]:
 
-                        idx = self.find_mutation_index_in_gene_block(mut_gene_block_name, mut_idx)
+                        idx = self.find_mutation_index_in_gene_block(mut_gene_block_name, mut_i[1])
 
                         idxs.append(idx)
                         mut_codons = self.extract_mut_codons(mut_i[0][-1])
@@ -464,6 +465,8 @@ class DesignEblocks:
             cost = self.calculate_cost(clusters)
             new_bandwidth = self.check_fragment_sizes(clusters, bandwidth)
             
+            print(new_bandwidth, cost)
+            
             if bandwidth == new_bandwidth:
                 if lowest_cost > cost:
                     lowest_cost = cost
@@ -561,14 +564,18 @@ class DesignEblocks:
         
     def check_position_gene_block(self, gene_block, idx_mutation):
         begin_range, end_range = self.gene_block_range(gene_block)
-        if (idx_mutation - begin_range) > self.idt_min_length_fragment:
-            self.alter_gene_block_range(gene_block, 'extend_begin')
-            # TODO CHANGE
-            # print("Mutation is too close to beginning of gene block")
-            # sys.exit()
-        elif (end_range - idx_mutation) < self.idt_min_length_fragment:
-            print("Mutation is too close to final part of gene block")
-            sys.exit()
+        # SHOULD NOT BE NECCESSARY
+
+        # print(begin_range, end_range, idx_mutation)
+        # # TODO CHANGE
+        # if (idx_mutation - begin_range) > self.idt_min_length_fragment:
+        #     # self.alter_gene_block_range(gene_block, 'extend_begin')
+        #     print("Mutation is too close to beginning of gene block")
+        #     sys.exit()
+        # elif (end_range - idx_mutation) < self.idt_min_length_fragment:
+        #     print(end_range - idx_mutation)
+        #     print("Mutation is too close to final part of gene block")
+        #     sys.exit()
 
     def alter_gene_block_range(self, gene_block, alteration):
         if alteration == 'extend_begin':
