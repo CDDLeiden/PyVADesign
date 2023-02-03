@@ -23,8 +23,8 @@ class DesignPrimers:
         self.input_gene_path = input_gene_path
         self.snapgene_file = snapgene_file
 
-        self.overhang_temp = 50
-        self.template_temp = 60
+        self.IVA_overhang_temp = 50
+        self.IVA_template_temp = 60
 
     def run(self):
         
@@ -45,25 +45,29 @@ class DesignPrimers:
 
         primers = {}
         for gb_name, gb in unique_gene_blocks.items():
+
+            print(gb_name)
             
             begin_pos, end_pos = DesignEblocks.gene_block_range(gb_name)
             
             # Design initial primers and optimize temperatures
             init_fw_oh = self.IVA_Fw_overhang(end_pos, fw_sequence)
-            size = self.optimize_tm(self.overhang_temp, init_fw_oh, end_pos, 15, fw_sequence)
+            size = self.optimize_tm(self.IVA_overhang_temp, init_fw_oh, end_pos, 15, fw_sequence, self.IVA_Fw_overhang)
             final_fw_oh = self.IVA_Fw_overhang(end_pos, fw_sequence, size=size)
 
             init_fw_template = self.IVA_Fw_template(end_pos, fw_sequence)
-            size = self.optimize_tm(self.template_temp, init_fw_template, end_pos, 15, fw_sequence)
+            size = self.optimize_tm(self.IVA_template_temp, init_fw_template, end_pos, 15, fw_sequence, self.IVA_Fw_template)
             final_fw_template = self.IVA_Fw_template(end_pos, fw_sequence, size)
 
+            # print("problem")
+
             init_rv_oh = self.IVA_Rv_overhang(begin_pos, rv_sequence)
-            size = self.optimize_tm(self.overhang_temp, init_rv_oh, begin_pos, 15, rv_sequence)
+            size = self.optimize_tm(self.IVA_overhang_temp, init_rv_oh, begin_pos, 15, rv_sequence, self.IVA_Rv_overhang)
             final_rv_oh = self.IVA_Rv_overhang(begin_pos, rv_sequence, size)
             final_rv_oh = self.invert_sequence(final_rv_oh)
 
             init_rv_template = self.IVA_Rv_template(begin_pos, rv_sequence)
-            size = self.optimize_tm(self.template_temp, init_rv_template, begin_pos, 15, rv_sequence)
+            size = self.optimize_tm(self.IVA_template_temp, init_rv_template, begin_pos, 15, rv_sequence, self.IVA_Rv_template)
             final_rv_template = self.IVA_Rv_template(begin_pos, rv_sequence, size)
             final_rv_template = self.invert_sequence(final_rv_template)
 
@@ -97,12 +101,16 @@ class DesignPrimers:
     def df_to_csv(self, df, outpath, fname="IVA_primers.csv"):
         df.to_csv(os.path.join(outpath, fname))
 
-    def optimize_tm(self, optimum, primer, pos, size, sequence, nsteps=20):
+    def optimize_tm(self, optimum, primer, pos, size, sequence, function, nsteps=20):
 
         best_tm = self.melting_temperature(primer)
         best_diff = round(abs(optimum - best_tm), 2)
 
+        # print("primer before loop", primer)
+
         for i in range(nsteps):
+
+            # print("primer", i, primer, pos)
 
             tm = self.melting_temperature(primer)
             diff = round(abs(optimum - tm), 2)
@@ -112,12 +120,14 @@ class DesignPrimers:
                 best_diff = diff
 
             if tm > optimum:
+                # print("tm > optimum")
                 size -= 1
-                primer = self.IVA_Fw_overhang(pos, sequence, size)
+                primer = function(pos, sequence, size)
             elif tm < optimum:
+                # print("tm < optimum")
                 size += 1
-                primer = self.IVA_Fw_overhang(pos, sequence, size)
-
+                primer = function(pos, sequence, size)
+  
         return size
 
     def IVA_Fw_overhang(self, block_end, fw_sequence, size=15):

@@ -34,7 +34,6 @@ if __name__ == "__main__":
                                    output_fp=args.output_location,
                                    species=args.species)
     design_eblocks.run()
-    sys.exit()
 
     # Next; design IVA primers
     mut_gene_blocks_fp = os.path.join(args.output_location, "mut_gene_blocks.npy")
