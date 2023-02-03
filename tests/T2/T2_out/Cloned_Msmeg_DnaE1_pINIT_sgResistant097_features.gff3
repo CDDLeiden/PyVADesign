@@ -1,19 +1,19 @@
 ##gff-version 3.2.1
 ##sequence-region myseq 1 7871
-myseq	.	gene	220	819	.	.	.	Name=Block0;color=#939393
 myseq	.	gene	1282	2037	.	.	.	Name=Block2;color=#939393
+myseq	.	gene	220	819	.	.	.	Name=Block0;color=#939393
 myseq	.	gene	2428	2886	.	.	.	Name=Block4;color=#939393
-myseq	.	gene	799	818	.	.	.	Name=Block0_Fw_OH;color=#FF00D4
 myseq	.	gene	2021	2036	.	.	.	Name=Block2_Fw_OH;color=#FF00D4
+myseq	.	gene	799	818	.	.	.	Name=Block0_Fw_OH;color=#FF00D4
 myseq	.	gene	2872	2885	.	.	.	Name=Block4_Fw_OH;color=#FF00D4
-myseq	.	gene	219	234	.	.	.	Name=Block0_Rv_OH;color=#FF00D4
 myseq	.	gene	1281	1294	.	.	.	Name=Block2_Rv_OH;color=#FF00D4
+myseq	.	gene	219	234	.	.	.	Name=Block0_Rv_OH;color=#FF00D4
 myseq	.	gene	2427	2444	.	.	.	Name=Block4_Rv_OH;color=#FF00D4
-myseq	.	gene	818	843	.	.	.	Name=Block0_Fw_Template;color=#06FF92
 myseq	.	gene	2036	2053	.	.	.	Name=Block2_Fw_Template;color=#06FF92
+myseq	.	gene	818	843	.	.	.	Name=Block0_Fw_Template;color=#06FF92
 myseq	.	gene	2885	2902	.	.	.	Name=Block4_Fw_Template;color=#06FF92
-myseq	.	gene	198	219	.	.	.	Name=Block0_Rv_Template;color=#06FF92
 myseq	.	gene	1266	1281	.	.	.	Name=Block2_Rv_Template;color=#06FF92
+myseq	.	gene	198	219	.	.	.	Name=Block0_Rv_Template;color=#06FF92
 myseq	.	gene	2404	2427	.	.	.	Name=Block4_Rv_Template;color=#06FF92
 myseq	.	gene	251	253	.	.	.	Name=P80-S106;color=#FF5900
 myseq	.	gene	242	244	.	.	.	Name=Y77S;color=#FF0000
