@@ -139,7 +139,6 @@ class DesignEblocks:
                     idx_del_end = int(mut.split('-')[1][1:]) * 3
                     print(idx_del_start, idx_del_end)
                     
-
                     mut_gene_block_name, mut_gene_block_value = self.find_gene_block(gene_blocks, idx_del_start)
                     idx = self.find_mutation_index_in_gene_block(mut_gene_block_name, idx_del_start)
                     idx_end = self.find_mutation_index_in_gene_block(mut_gene_block_name, idx_del_end)

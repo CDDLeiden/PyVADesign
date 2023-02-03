@@ -60,6 +60,6 @@ if __name__ == "__main__":
         snapgene_output.run()
 
     # Finally; clean-up files when done
-    cleanup(args)
+    # cleanup(args)
 
     print("Done!")
