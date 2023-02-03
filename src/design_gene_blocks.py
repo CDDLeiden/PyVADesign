@@ -386,7 +386,8 @@ class DesignEblocks:
         # TODO ADD LABELS TO HISTOGRAM
         # TODO ADD COUNTS TO HISTOGRAM
         outname = os.path.join(outpath, fname)
-        plt.hist(data, bins=bins, align=('mid'), label=labels)
+        _, _, bars = plt.hist(data, bins=bins, align=('mid'))
+        plt.bar_label(bars, labels)
         # plt.set_xticks(labels)
         plt.savefig(outname)
 
