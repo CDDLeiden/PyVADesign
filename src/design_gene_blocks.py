@@ -64,6 +64,11 @@ class DesignEblocks:
         print(clusters)
         print("Lowest cost: ", str(lowest_cost), f"with {len(clusters)} clusters")
 
+        # Write expected cost to file
+        with open(os.path.join(self.output_fp, "expected_cost.txt"), "w") as f:
+            f.write(f"expected costs: {str(lowest_cost)}" + '\n')
+            f.write(f"number of cluters: {str(len(clusters))}" + '\n')
+
         bins = self.make_bins(clusters)
         
         # Make gene blocks (WT DNA sequences cut to the correct size)

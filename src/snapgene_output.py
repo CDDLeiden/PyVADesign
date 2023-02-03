@@ -40,6 +40,8 @@ class SnapGeneOutput:
         self.color_primer_OH = '#FF00D4'
         self.color_primer_template = '#06FF92'
 
+    # TODO Move all +1/+2 to the designIVA class
+
     def run(self):
         
         # Read snapgene vector and extract length (=needed for gff3 file)
