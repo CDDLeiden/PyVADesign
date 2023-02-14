@@ -1,20 +1,10 @@
 import os
 import sys
-import numpy as np
-import pandas as pd
+import argparse
 from Bio import SeqIO
-from utils import read_codon_usage, DNA_Codons
+from utils import DNA_Codons
 from design_gene_blocks import DesignEblocks
 
-# Read DNA sequence
-# Read mutations
-# Calculate number of mutations needed to get from DNA sequence to mutated DNA sequence using codon usage Mtb (and how often do these codons occur in Mtb)
-    # For each mutation:
-        # Find codon in DNA sequence (index)
-        # Find codon in mutated DNA sequence (index)
-        # Find codon usage in Mtb (index)
-        # Calculate number of mutations needed to get from codon to codon usage in Mtb
-        # Calculate how often codon usage in Mtb occurs in Mtb
 
 def read_fasta(fp):
     count = 0
@@ -27,6 +17,10 @@ def read_fasta(fp):
         print("More than one sequence in fasta file")
         sys.exit()
 
+# TODO ADD OPTION TO ALSO INCLUDE MUT SEQ IN DNA FORMAT
+# TODO USE THIS TO INSPECT RESISTANCE MUTATIONS IN MMPL3
+# TODO NUMBER OF POSSIBILITIES WITH ONLY ONE NUCLEOTIDE CHANGE
+
 def main(dna_sequence_fp, mutations_list_fp, prot_sequence_fp):
 
     eblocks = DesignEblocks(sequence_fp=dna_sequence_fp, 
@@ -37,12 +31,12 @@ def main(dna_sequence_fp, mutations_list_fp, prot_sequence_fp):
     # Read DNA/protein sequence
     dna_sequence = eblocks.read_seq(dna_sequence_fp)
     prot_sequence = read_fasta(prot_sequence_fp)
-    num_mutations = 0
-
+    
     # Find number of mutations needed to get from DNA sequence to mutated DNA
     # Find number of mutations
     count = 1
     i = 3  # Skip start codon
+    num_mutations = 0
     mutation_idexes = {}  # Mutation_index = {G1: [TAA], ...} (key:mutation, value:WT codon)
     while True:
         codon = dna_sequence[i:i+3]
@@ -54,11 +48,11 @@ def main(dna_sequence_fp, mutations_list_fp, prot_sequence_fp):
             num_mutations += 1
         i += 3
         count += 1
-    
-    print(num_mutations)
-    print(mutation_idexes)
+
+    print("Number of mutations in sequence: ", num_mutations)
 
     # Find number of mutations needed to get from DNA sequence to mutated DNA
+    total_dna_mutations = 0
     for mutation, wt_codon in mutation_idexes.items():
         
         # Find all codons that encode the same amino acid as the mutation
@@ -69,26 +63,45 @@ def main(dna_sequence_fp, mutations_list_fp, prot_sequence_fp):
         
         # Find out how many mutations are needed to get from wt_codon to mut_codon
         mut_codons_operations_needed = []
+        mut_codon_operations = []
         for mut_codon in mut_codons:
-            num_mutations = 0
+            num_operations = 0
+            operations = []
             for i in range(3):
                 if mut_codon[i] != wt_codon[0][i]:
-                    num_mutations += 1
-            mut_codons_operations_needed.append(num_mutations)
+                    num_operations += 1
+                    operations.append(f'{mut_codon[i]}>{wt_codon[0][i]}')
+            mut_codons_operations_needed.append(num_operations)
+            mut_codon_operations.append(operations)
 
-        # Minimum number of point mutations in the DNA needed to change the amino acid
-        # TODO USE THIS TO INSPECT RESISTANCE MUTATIONS IN MMPL3    
+        # Minimum number of point mutations in the DNA needed to change the amino acid 
         min_number_of_mutations = min(mut_codons_operations_needed)
 
-        print(mutation, wt_codon, mut_codons, min_number_of_mutations)
+        # tmp = []
+        # for num, mut_codon in enumerate(mut_codons_operations_needed):
+        #     if num == min_number_of_mutations:
+        #         tmp.append(mut_codons)
 
+        total_dna_mutations += min_number_of_mutations
 
+        print(mutation, wt_codon, mut_codons, min_number_of_mutations, mut_codon_operations)
+
+    print("Total number of mutations in DNA sequence: ", total_dna_mutations)
+    
+
+def read_arguments():
+    parser = argparse.ArgumentParser(description='')
+    parser.add_argument("-wt", "--wt_dna_seq", required=True, help="FASTA file containing the wt gene of interest (dna)")
+    parser.add_argument("-mut", "--mut_prot_seq", required=True, help="FASTA file containing the mutated sequence (prot)")
+    parser.add_argument("-mut_list", "--mut_list", required=True, help="List of mutations (needed for input eblocks class but not used in scrtip)")
+    args = parser.parse_args()
+    return args
 
         
-
 if __name__ == '__main__':
 
-    dna_sequence_fp = r"C:\Users\Rosan\Documents\projects\two-entopy-analysis\data\Mtb_DnaE1_DNA.txt"
-    mutations_list_fp = r"C:\Users\Rosan\Documents\git\my_repositories\design_gene_blocks\tests\T1\T1_in\mutations_ed.txt"
-    prot_sequence_fp = r"C:\Users\Rosan\Documents\projects\two-entopy-analysis\data\Mtb_DnaE1_prot_mut.txt"
-    main(dna_sequence_fp, mutations_list_fp, prot_sequence_fp)
+    args = read_arguments()
+    # dna_sequence_fp = r"C:\Users\Rosan\Documents\projects\two-entopy-analysis\data\Mtb_DnaE1_DNA.txt"
+    # mutations_list_fp = r"C:\Users\Rosan\Documents\git\my_repositories\design_gene_blocks\tests\T1\T1_in\mutations_ed.txt"
+    # prot_sequence_fp = r"C:\Users\Rosan\Documents\projects\two-entopy-analysis\data\Mtb_DnaE1_prot_mut.txt"
+    main(args.wt_dna_seq, args.mut_list, args.mut_prot_seq)
