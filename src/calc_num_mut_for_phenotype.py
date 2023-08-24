@@ -17,6 +17,9 @@ def read_fasta(fp):
         print("More than one sequence in fasta file")
         sys.exit()
 
+# TODO ADD OPTION TO ALSO INCLUDE MUT SEQ IN DNA FORMAT
+# TODO USE THIS TO INSPECT RESISTANCE MUTATIONS IN MMPL3
+# TODO NUMBER OF POSSIBILITIES WITH ONLY ONE NUCLEOTIDE CHANGE
 
 def main(dna_sequence_fp, mutations_list_fp, prot_sequence_fp):
 
@@ -60,19 +63,28 @@ def main(dna_sequence_fp, mutations_list_fp, prot_sequence_fp):
         
         # Find out how many mutations are needed to get from wt_codon to mut_codon
         mut_codons_operations_needed = []
+        mut_codon_operations = []
         for mut_codon in mut_codons:
-            num_mutations = 0
+            num_operations = 0
+            operations = []
             for i in range(3):
                 if mut_codon[i] != wt_codon[0][i]:
-                    num_mutations += 1
-            mut_codons_operations_needed.append(num_mutations)
+                    num_operations += 1
+                    operations.append(f'{mut_codon[i]}>{wt_codon[0][i]}')
+            mut_codons_operations_needed.append(num_operations)
+            mut_codon_operations.append(operations)
 
-        # Minimum number of point mutations in the DNA needed to change the amino acid
-        # TODO USE THIS TO INSPECT RESISTANCE MUTATIONS IN MMPL3    
+        # Minimum number of point mutations in the DNA needed to change the amino acid 
         min_number_of_mutations = min(mut_codons_operations_needed)
+
+        # tmp = []
+        # for num, mut_codon in enumerate(mut_codons_operations_needed):
+        #     if num == min_number_of_mutations:
+        #         tmp.append(mut_codons)
+
         total_dna_mutations += min_number_of_mutations
 
-        print(mutation, wt_codon, mut_codons, min_number_of_mutations)
+        print(mutation, wt_codon, mut_codons, min_number_of_mutations, mut_codon_operations)
 
     print("Total number of mutations in DNA sequence: ", total_dna_mutations)
     
