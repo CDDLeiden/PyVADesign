@@ -46,6 +46,8 @@ This script will use the codon usage of _M. smegmatis_, if you wish to use the c
 
 Describe tutorial
 
+# DESCIVBE THE DIFFERENT OUTPUT FILES THAT ARE GENERATED
+
 
 ## Mutations input format (.txt) file
 
