@@ -61,7 +61,13 @@ class DesignEblocks:
         optimal_bandwidth, lowest_cost = self.optimize_bins(idx_dna)
 
         clusters = self.meanshift(idx_dna, optimal_bandwidth)
+        print(clusters)
         print("Lowest cost: ", str(lowest_cost), f"with {len(clusters)} clusters")
+
+        # Write expected cost to file
+        with open(os.path.join(self.output_fp, "expected_cost.txt"), "w") as f:
+            f.write(f"expected costs: {str(lowest_cost)}" + '\n')
+            f.write(f"number of cluters: {str(len(clusters))}" + '\n')
 
         bins = self.make_bins(clusters)
         
@@ -75,16 +81,6 @@ class DesignEblocks:
 
         # TODO Maybe first check for all gene blocks whether the mutation is in a correct place, e.g. not the beginning or end of a gene block
         # TODO Restart option is error was found?
-
-        # should_restart = True
-        # while should_restart:
-        # should_restart = False
-        # for i in xrange(10):
-        #     print i
-        #     if i == 5:
-        #     should_restart = True
-        #     break
-
 
         results = {}
         should_restart = True
@@ -145,8 +141,9 @@ class DesignEblocks:
                 elif mut_type == self.type_deletion:
 
                     idx_del_start = idx_dna_tups[num][1]
-                    idx_del_end = int(mut.split('-')[1][1:-1]) * 3
-
+                    idx_del_end = int(mut.split('-')[1][1:]) * 3
+                    print(idx_del_start, idx_del_end)
+                    
                     mut_gene_block_name, mut_gene_block_value = self.find_gene_block(gene_blocks, idx_del_start)
                     idx = self.find_mutation_index_in_gene_block(mut_gene_block_name, idx_del_start)
                     idx_end = self.find_mutation_index_in_gene_block(mut_gene_block_name, idx_del_end)
@@ -164,19 +161,21 @@ class DesignEblocks:
 
                 elif mut_type == self.type_combined:
 
-                    # TODO Check if the different mutations are in the same eblock
+                    # TODO Check if the different mutations are in the same eblock, otherwise throw error
 
                     # Find gene block and index of insert/deletion/mutation
                     mut_idx = idx_dna_tups[num][0][1]
+                    print(mut_idx)
 
                     mut_gene_block_name, mut_gene_block_value = self.find_gene_block(gene_blocks, mut_idx)
+                    print(mut_gene_block_name, mut_gene_block_value)
 
                     idxs = []
                     codons = []
                     
                     for mut_i in idx_dna_tups[num]:
 
-                        idx = self.find_mutation_index_in_gene_block(mut_gene_block_name, mut_idx)
+                        idx = self.find_mutation_index_in_gene_block(mut_gene_block_name, mut_i[1])
 
                         idxs.append(idx)
                         mut_codons = self.extract_mut_codons(mut_i[0][-1])
@@ -185,7 +184,7 @@ class DesignEblocks:
                         codons.append(mut_codon)
 
                         # Check if WT codon at index is same residue as mutation
-                        self.check_wt_codon(mut_gene_block_value, idx, mut[0])
+                        self.check_wt_codon(mut_gene_block_value, idx, mut_i[0])
 
                         # Mutate gene block
                         mut_gene_block_value = self.mutate_gene_block(mut_codon, idx, mut_gene_block_value, mut_type)
@@ -250,8 +249,9 @@ class DesignEblocks:
                 idx_dna_tups.append([mut, int(mut[1:-1]) * 3])
             elif (type == self.type_insert) or (type == self.type_deletion):
                 mut_i = mut.split('-')[0]
-                idx_dna.append(int(mut_i[1:-1]) * 3)  # A residue consists of 3 nucleotides
-                idx_dna_tups.append([mut_i, int(mut_i[1:-1]) * 3])
+                print(mut_i)
+                idx_dna.append(int(mut_i[1:]) * 3)  # A residue consists of 3 nucleotides
+                idx_dna_tups.append([mut_i, int(mut_i[1:]) * 3])
             elif type == self.type_combined:
                 muts = mut.split('-')
                 tmp = []
@@ -466,6 +466,8 @@ class DesignEblocks:
             cost = self.calculate_cost(clusters)
             new_bandwidth = self.check_fragment_sizes(clusters, bandwidth)
             
+            print(new_bandwidth, cost)
+            
             if bandwidth == new_bandwidth:
                 if lowest_cost > cost:
                     lowest_cost = cost
@@ -563,15 +565,18 @@ class DesignEblocks:
         
     def check_position_gene_block(self, gene_block, idx_mutation):
         begin_range, end_range = self.gene_block_range(gene_block)
-        if (idx_mutation - begin_range) > self.idt_min_length_fragment:
-            self.alter_gene_block_range(gene_block, 'extend_begin')
-            # TODO CHANGE
-            # print("Mutation is too close to beginning of gene block")
-            # sys.exit()
-        elif (end_range - idx_mutation) < self.idt_min_length_fragment:
-            print("Mutation is too close to final part of gene block")
-            # TODO 
-            sys.exit()
+        # SHOULD NOT BE NECCESSARY
+
+        # print(begin_range, end_range, idx_mutation)
+        # # TODO CHANGE
+        # if (idx_mutation - begin_range) > self.idt_min_length_fragment:
+        #     # self.alter_gene_block_range(gene_block, 'extend_begin')
+        #     print("Mutation is too close to beginning of gene block")
+        #     sys.exit()
+        # elif (end_range - idx_mutation) < self.idt_min_length_fragment:
+        #     print(end_range - idx_mutation)
+        #     print("Mutation is too close to final part of gene block")
+        #     sys.exit()
 
     def alter_gene_block_range(self, gene_block, alteration):
         if alteration == 'extend_begin':
@@ -583,9 +588,7 @@ class DesignEblocks:
         elif alteration == 'extend_end':
             pass
             # TODO Add 20 nucleotides to end of gene block
-            
-
-        
+                    
     def find_mutation_index_in_gene_block(self, gene_block, idx_mutation):
         begin_range, _ = self.gene_block_range(gene_block)
         # Find index of mutation within geneblock
