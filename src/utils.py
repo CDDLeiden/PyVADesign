@@ -52,3 +52,22 @@ def load_pickle(fp):
     with open(fp, 'rb') as handle:
         obj = pickle.load(handle)
     return obj
+
+def log_to_file_and_console(logfile, *messages):
+    with open(logfile, 'a') as log_file:
+        for message in messages:
+            # Write each message to the log file
+            log_file.write(message)
+    # Print all messages to the console
+    print(*messages, end='')
+
+def create_or_clear_file(file_path):
+    try:
+        # Check if the file exists
+        with open(file_path, 'r') as file:
+            # Close the file
+            pass
+    except FileNotFoundError:
+        # If the file doesn't exist, create it
+        with open(file_path, 'w'):
+            pass

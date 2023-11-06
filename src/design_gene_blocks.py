@@ -8,7 +8,7 @@ from Bio import SeqIO
 from operator import add, sub
 import matplotlib.pyplot as plt
 from sklearn.cluster import MeanShift
-from utils import read_codon_usage, DNA_Codons, write_pickle
+from utils import read_codon_usage, DNA_Codons, write_pickle, log_to_file_and_console, create_or_clear_file
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 template_path = os.path.join(script_dir, 'data/eblocks-plate-upload-template-96.xlsx')
@@ -44,6 +44,14 @@ class DesignEblocks:
         self.codon_usage_fp = codon_usage_fp
         self.n_iterations = 100  # Number of iterations to run mean shift clustering
         self.gene_blocks = None
+        self.logfile = os.path.join(self.output_fp, "design_gene_blocks.log")
+
+        # TODO CHANGE THIS AND INCLUDE LOGFILE
+        # # Create or clear log file
+        # create_or_clear_file(self.logfile)
+
+        # # Redirect stdout to the log file
+        # sys.stdout = open(self.logfile, 'a')
         
         self.dna_seq = self.read_seq(sequence_fp)
         self.mutations, self.mutation_types = self.read_mutations(mutations_fp)  # Types = {Mutation, Insert, Deletion}
@@ -63,8 +71,8 @@ class DesignEblocks:
         optimal_bandwidth, lowest_cost = self.optimize_bins(idx_dna)
 
         clusters = self.meanshift(idx_dna, optimal_bandwidth)
-        print(clusters)
-        print("Lowest cost: ", str(lowest_cost), f"with {len(clusters)} clusters")
+        print( str(clusters))
+        print( "Lowest cost: ", str(lowest_cost), f"with {len(clusters)} clusters")
 
         # Write expected cost to file
         with open(os.path.join(self.output_fp, "expected_cost.txt"), "w") as f:
@@ -92,7 +100,8 @@ class DesignEblocks:
 
                 mut_type = self.mutation_types[num]
                 
-                print(mut, mut_type)
+                print( mut)
+                print( mut_type)
 
                 # Change gene block in selected position for mutation
                 if mut_type == self.type_mutation:
@@ -144,7 +153,8 @@ class DesignEblocks:
 
                     idx_del_start = idx_dna_tups[num][1]
                     idx_del_end = int(mut.split('-')[1][1:]) * 3
-                    print(idx_del_start, idx_del_end)
+                    print( idx_del_start)
+                    print( idx_del_end)
                     
                     mut_gene_block_name, mut_gene_block_value = self.find_gene_block(gene_blocks, idx_del_start)
                     idx = self.find_mutation_index_in_gene_block(mut_gene_block_name, idx_del_start)
@@ -167,10 +177,11 @@ class DesignEblocks:
 
                     # Find gene block and index of insert/deletion/mutation
                     mut_idx = idx_dna_tups[num][0][1]
-                    print(mut_idx)
+                    print( mut_idx)
 
                     mut_gene_block_name, mut_gene_block_value = self.find_gene_block(gene_blocks, mut_idx)
-                    print(mut_gene_block_name, mut_gene_block_value)
+                    print( mut_gene_block_name)
+                    log_to_file_and_console(self.logile, mut_gene_block_value)
 
                     idxs = []
                     codons = []
@@ -200,12 +211,17 @@ class DesignEblocks:
         write_pickle(results, self.output_fp)
         write_pickle(gene_blocks, self.output_fp, fname="wt_gene_blocks.npy")
 
+        # Restore stdout to the original value
+        # TODO FIX THIS
+        # sys.stdout = sys.__stdout__
+        # self.logfile.close()
+
     def check_wt_codon(self, gene_block_value, idx, mut):
         for key, value in DNA_Codons.items():
                 if key.lower() == gene_block_value[idx-3:idx]:
                     result = value
         if not result == mut[0]:
-            print(f"WT codon does not match residue {mut}, but is {result}, the codon is {gene_block_value[idx-3:idx]}")
+            print( f"WT codon does not match residue {mut}, but is {result}, the codon is {gene_block_value[idx-3:idx]}")
             sys.exit()
 
     def check_existance_codon_usage_table(self):
@@ -221,16 +237,16 @@ class DesignEblocks:
             i = organisms_present_format.index(self.species.lower())
             return os.path.join(self.codon_usage_fp, codon_usage_present[i])
         else:
-            print("It looks like the codon usage table for the specified organism is not present.")
+            print( "It looks like the codon usage table for the specified organism is not present.")
             sys.exit()
 
     def check_eblock_length(self, mut_gene_block):
             # Make sure that the codon insert is not too long or too short for eBlock
             if len(mut_gene_block) > self.idt_max_length_fragment:
-                print("Codon insert is too long for eBlock")
+                print( "Codon insert is too long for eBlock")
                 sys.exit()
             elif len(mut_gene_block) < self.idt_min_length_fragment:
-                print(f"Codon insert is too short for eBlock, length is {len(mut_gene_block)}")
+                print( f"Codon insert is too short for eBlock, length is {len(mut_gene_block)}")
                 sys.exit()
             else:
                 return True
@@ -251,7 +267,7 @@ class DesignEblocks:
                 idx_dna_tups.append([mut, int(mut[1:-1]) * 3])
             elif (type == self.type_insert) or (type == self.type_deletion):
                 mut_i = mut.split('-')[0]
-                print(mut_i)
+                print( mut_i)
                 idx_dna.append(int(mut_i[1:]) * 3)  # A residue consists of 3 nucleotides
                 idx_dna_tups.append([mut_i, int(mut_i[1:]) * 3])
             elif type == self.type_combined:
@@ -276,44 +292,45 @@ class DesignEblocks:
         """
         valid = 'acdefghiklmnpqrstvwy'
         for mut, type in zip(mutations, mutation_types):
-            print(mut, type)
+            print( mut)
+            print( type)
             if type == self.type_mutation:
                 if not self.check_mut_format(mut, self.type_mutation):
-                    print(f"Input {mut} contain non-natural amino acids or incorrect formatting")
+                    print( f"Input {mut} contain non-natural amino acids or incorrect formatting")
                     sys.exit()
             elif type == self.type_insert:
                 mut_format = mut.split('-')[0]
                 added_residues = mut.split('-')[1]
                 if not self.check_mut_format(mut_format, self.type_insert):
-                        print(f"Input {mut} contain non-natural amino acids or incorrect formatting")
+                        print( f"Input {mut} contain non-natural amino acids or incorrect formatting")
                         sys.exit()
                 for i in added_residues:
                     if not i.lower() in valid:
-                        print(f"Input {i} contain non-natural amino acids or incorrect formatting")
+                        print( f"Input {i} contain non-natural amino acids or incorrect formatting")
                         sys.exit()
             elif type == self.type_deletion:
                 mut_start = mut.split('-')[0]
                 mut_end = mut.split('-')[0]
                 if not self.check_mut_format(mut_start, self.type_deletion):
-                    print(f"Input {mut_start} contain non-natural amino acids or incorrect formatting")
+                    print( f"Input {mut_start} contain non-natural amino acids or incorrect formatting")
                     sys.exit()
                 if not self.check_mut_format(mut_end, self.type_deletion):
-                    print(f"Input {mut_end} contain non-natural amino acids or incorrect formatting")
+                    print( f"Input {mut_end} contain non-natural amino acids or incorrect formatting")
                     sys.exit()
             elif type == self.type_combined:
                 mut_list = mut.split('-')
                 for i in mut_list:
                     if not self.check_mut_format(i, self.type_combined):
-                        print(f"Input {i} contain non-natural amino acids or incorrect formatting")
+                        print( f"Input {i} contain non-natural amino acids or incorrect formatting")
                         sys.exit()
             else:
-                print("Input contains non standard mutation")
+                print( "Input contains non standard mutation")
                 sys.exit()
         return True
 
     def check_number_input_mutations(self, mutations):
         if len(mutations) < self.idt_min_order:
-            print(f"Minimum number of mutations {len(mutations)} is lower than the minimum amount of {self.idt_min_order}. \
+            print( f"Minimum number of mutations {len(mutations)} is lower than the minimum amount of {self.idt_min_order}. \
                     Please make sure you have enough mutations in your input.")
             sys.exit()
         elif len(mutations) >= self.idt_min_order:
@@ -349,15 +366,15 @@ class DesignEblocks:
                     mutation_types.append(self.type_combined)
                     mutations.append(line[1])
                 else:
-                    print(f"Please check format of mutation {line}, one mutation should be written per line and for inserts and deletions check the requirements.")
+                    print( f"Please check format of mutation {line}, one mutation should be written per line and for inserts and deletions check the requirements.")
                     sys.exit() 
         # (1) Check there are NO non-natural amino acids in the mutations
         # (2) Check that there are enough mutations to process
         # (3) Check formatting of mutations
         # (4) check that there are no duplicate mutations
         if len(mutations) != len(set(mutations)):
-            # TODO print duplicate mutations
-            print("Duplicate mutations detected. Please remove and rerun.")
+            # TODO log_to_file_and_console duplicate mutations
+            print( "Duplicate mutations detected. Please remove and rerun.")
             sys.exit()
         if (self.check_input_mutations(mutations, mutation_types)) and (self.check_number_input_mutations(mutations)):  
             return mutations, mutation_types
@@ -387,11 +404,16 @@ class DesignEblocks:
         return bins
 
     def make_histogram(self, data, outpath, bins, labels, fname="hist.png"):
-        # TODO ADD LABELS TO HISTOGRAM
-        # TODO ADD COUNTS TO HISTOGRAM
+        # TODO Remove empty bins from histogram
+        # Only take eblock number as label
+        labels = [i.split('_')[0:2] for i in labels]
+        labels = [' '.join(i) for i in labels]
         outname = os.path.join(outpath, fname)
         _, _, bars = plt.hist(data, bins=bins, align=('mid'))
         plt.bar_label(bars, labels)
+        plt.xlabel('Sequence index')
+        plt.ylabel('eBlock count')
+
         # plt.set_xticks(labels)
         plt.savefig(outname)
 
@@ -469,7 +491,8 @@ class DesignEblocks:
             cost = self.calculate_cost(clusters)
             new_bandwidth = self.check_fragment_sizes(clusters, bandwidth)
             
-            print(new_bandwidth, cost)
+            print( str(new_bandwidth))
+            print( str(cost))
             
             if bandwidth == new_bandwidth:
                 if lowest_cost > cost:
@@ -579,15 +602,15 @@ class DesignEblocks:
             sys.exit()
         # SHOULD NOT BE NECCESSARY
 
-        # print(begin_range, end_range, idx_mutation)
+        # log_to_file_and_console(begin_range, end_range, idx_mutation)
         # # TODO CHANGE
         # if (idx_mutation - begin_range) > self.idt_min_length_fragment:
         #     # self.alter_gene_block_range(gene_block, 'extend_begin')
-        #     print("Mutation is too close to beginning of gene block")
+        #     log_to_file_and_console("Mutation is too close to beginning of gene block")
         #     sys.exit()
         # elif (end_range - idx_mutation) < self.idt_min_length_fragment:
-        #     print(end_range - idx_mutation)
-        #     print("Mutation is too close to final part of gene block")
+        #     log_to_file_and_console(end_range - idx_mutation)
+        #     log_to_file_and_console("Mutation is too close to final part of gene block")
         #     sys.exit()
 
     def alter_gene_block_range(self, gene_block, alteration):
