@@ -10,6 +10,8 @@ import matplotlib.pyplot as plt
 from sklearn.cluster import MeanShift
 from utils import read_codon_usage, DNA_Codons, write_pickle
 
+script_dir = os.path.dirname(os.path.abspath(__file__))
+template_path = os.path.join(script_dir, 'data/eblocks-plate-upload-template-96.xlsx')
 
 class DesignEblocks:
     """
@@ -630,7 +632,7 @@ class DesignEblocks:
                 len_gene_block = len(value[1])
                 out.write(key + '\t' + value[0] + '\t' + str(len_gene_block) + '\t' + value[1] + '\t' + str(value[2]) + '\t' + value[3] + '\t' + value[4] + '\n')
 
-    def extract_wells_from_template(self, template='data\eblocks-plate-upload-template-96.xlsx'):
+    def extract_wells_from_template(self, template=template_path):
         df = pd.read_excel(template)
         wells = df['Well Position'].tolist()
         return wells
