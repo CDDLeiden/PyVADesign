@@ -21,6 +21,7 @@ class DesignEblocks:
                  mutations_fp: str,
                  output_fp: str,  # Path to store output files
                  species: str,
+                 codon_usage_fp: str,
                  min_bin_overlap = 25,
                  idt_max_length_fragment = 1500,
                  idt_min_length_fragment = 300,
@@ -38,11 +39,12 @@ class DesignEblocks:
         self.idt_max_length_fragment = idt_max_length_fragment
         self.idt_min_length_fragment = idt_min_length_fragment
         self.idt_min_order = idt_min_order
+        self.codon_usage_fp = codon_usage_fp
         self.n_iterations = 100
         self.gene_blocks = None
         
         self.dna_seq = self.read_seq(sequence_fp)
-        self.mutations, self.mutation_types = self.read_mutations(mutations_fp)  # Types > Mutation, Insert, Deletion
+        self.mutations, self.mutation_types = self.read_mutations(mutations_fp)  # Types = {Mutation, Insert, Deletion}
         self.codon_usage = self.check_existance_codon_usage_table()  # Check if codon usage table is present for selected species
 
     def run(self):
@@ -206,7 +208,7 @@ class DesignEblocks:
             sys.exit()
 
     def check_existance_codon_usage_table(self):
-        codon_usage_present = [file for file in os.listdir(r"data/codon_usage")]
+        codon_usage_present = [file for file in os.listdir(self.codon_usage_fp)]
         organisms_present = [file.split('.')[0:-1] for file in codon_usage_present]
         organisms_present = [i[0] for i in organisms_present]
         organisms_present_format = []
@@ -216,7 +218,7 @@ class DesignEblocks:
             organisms_present_format.append(inew.lower())
         if self.species.lower() in organisms_present_format:
             i = organisms_present_format.index(self.species.lower())
-            return os.path.join(r"data/codon_usage", codon_usage_present[i])
+            return os.path.join(self.codon_usage_fp, codon_usage_present[i])
         else:
             print("It looks like the codon usage table for the specified organism is not present.")
             sys.exit()
@@ -568,6 +570,7 @@ class DesignEblocks:
             # sys.exit()
         elif (end_range - idx_mutation) < self.idt_min_length_fragment:
             print("Mutation is too close to final part of gene block")
+            # TODO 
             sys.exit()
 
     def alter_gene_block_range(self, gene_block, alteration):
@@ -577,6 +580,10 @@ class DesignEblocks:
             # TODO: Make this more general
             # TODO: Then check again if size is ok
             # TODO: If correct, then return new range
+        elif alteration == 'extend_end':
+            pass
+            # TODO Add 20 nucleotides to end of gene block
+            
 
         
     def find_mutation_index_in_gene_block(self, gene_block, idx_mutation):
