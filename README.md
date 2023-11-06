@@ -78,7 +78,7 @@ For combined mutants, use "Combined" followed by the mutations you want to combi
 
 Combined I477D-A484S
 
-The order of the input does not matter, so an example file could be
+The order of the input does not matter, so an example file could be e.g.
 
 G432E\
 R436Q\
