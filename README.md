@@ -55,38 +55,38 @@ This section outlines the format for specifying selected mutations using a text 
 
 For single mutations, each mutation should be specified on a separate line. The format for a single mutation is exemplified below:
 
-G432E
-R436Q
-I451A
-A484S
+G432E\
+R436Q\
+I451A\
+A484S\
 
 ### Inserts
 
 To specify an insert, start with "Insert," followed by the residue after which the new residues should be inserted, and then list the residues to be inserted. For instance, if you wish to insert 3 residues (PLR) after residue 'A770,' use the following format:
 
-Insert A770-PLR
+Insert A770-PLR\
 
 ### Deletions
 
 To specify a deletion, begin with "Deletion," followed by the start and end residues to be deleted. For example, if you want to delete residues from I537 to K562, use the following format:
 
-Deletion I537-K562
+Deletion I537-K562\
 
 ### Double mutations
 
 For combined mutants, use "Combined" followed by the mutations you want to combine. If you, for instance, want to combine I447D and A484S in a single eBlock, use the format below:
 
-Combined I477D-A484S
+Combined I477D-A484S\
 
 The order of the input does not matter, so an example file could be
 
-G432E
-R436Q
-Combined I477D-A484S
-A484S
-Deletion I537-K562
-A540L
-Insert A770-PLR
+G432E\
+R436Q\
+Combined I477D-A484S\
+A484S\
+Deletion I537-K562\
+A540L\
+Insert A770-PLR\
 
 Mixing inserts, deletions, single and double mutations
 
