@@ -181,7 +181,7 @@ class DesignEblocks:
 
                     mut_gene_block_name, mut_gene_block_value = self.find_gene_block(gene_blocks, mut_idx)
                     print( mut_gene_block_name)
-                    log_to_file_and_console(self.logile, mut_gene_block_value)
+                    log_to_file_and_console(self.logfile, mut_gene_block_value)
 
                     idxs = []
                     codons = []
