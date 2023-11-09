@@ -16,14 +16,28 @@ template_path = os.path.join(script_dir, 'data/eblocks-plate-upload-template-96.
 class DesignEblocks:
     """
     Class to design eBlocks
+
+    Args:
+        sequence_fp (str): Path to FASTA file with DNA sequence
+        mutations_fp (str): Path to TXT file with mutations
+        output_fp (str): Path to store output files
+        species (str): Species for which codon usage table is available
+        codon_usage_fp (str): Path to folder with codon usage tables
+        min_bin_overlap (int): Minimum overlap between bins
+        idt_max_length_fragment (int): Maximum length of gene block
+        idt_min_length_fragment (int): Minimum length of gene block
+        idt_min_order (int): Minimum number of mutations to process
+
+    Returns:
+        _type_: _description_
     """
 
     def __init__(self, 
                  sequence_fp: str, 
                  mutations_fp: str,
-                 output_fp: str,  # Path to store output files
-                 species: str,
+                 output_fp: str,
                  codon_usage_fp: str,
+                 species = "Escherichia coli",
                  min_bin_overlap = 25,
                  idt_max_length_fragment = 1500,
                  idt_min_length_fragment = 300,
@@ -44,6 +58,7 @@ class DesignEblocks:
         self.codon_usage_fp = codon_usage_fp
         self.n_iterations = 100
         self.gene_blocks = None
+
         self.logfile = os.path.join(self.output_fp, "design_gene_blocks.log")
 
         # TODO CHANGE THIS AND INCLUDE LOGFILE
@@ -58,39 +73,48 @@ class DesignEblocks:
         self.codon_usage = self.check_existance_codon_usage_table()  # Check if codon usage table is present for selected species
 
     def run(self):
-
-        # TODO Describe somewhere how this should be formatted in input and describe which codon usage tables are present at the moment
-        # TODO Add an option to include own codon usage table in CLI
-        # TODO Also add option for default codon usage table?
+        """
+        Run the design of eBlocks
+        """
 
         # Find indexes in sequence where mutation occures
         idx_dna, idx_dna_tups = self.index_mutations(self.mutations, self.mutation_types)
 
-        # Optimize bin size and bin position using meanshift
+        # Optimize bin size and bin position using meanshift algorithm
         print("Optimizing bin sizes ...")
         optimal_bandwidth, lowest_cost = self.optimize_bins(idx_dna)
+        # TODO What is the optimal bandwith?
+        print("Optimal bandwidth: ", str(optimal_bandwidth))
 
         clusters = self.meanshift(idx_dna, optimal_bandwidth)
-        print( str(clusters))
-        print( "Lowest cost: ", str(lowest_cost), f"with {len(clusters)} clusters")
+        print("Clusters: ", str(clusters))
 
-        # Write expected cost to file
+        # Write expected cost to file (based on IDT pricing)
         with open(os.path.join(self.output_fp, "expected_cost.txt"), "w") as f:
             f.write(f"expected costs: {str(lowest_cost)}" + '\n')
             f.write(f"number of cluters: {str(len(clusters))}" + '\n')
 
         bins = self.make_bins(clusters)
+        print("Bins: ", str(bins))
         
         # Make gene blocks (WT DNA sequences cut to the correct size)
-        gene_blocks = self.make_gene_block(bins, self.dna_seq)
-        self.gene_blocks = gene_blocks
+        all_gene_blocks = self.make_gene_block(bins, self.dna_seq)
+        print("all_gene_blocks ", all_gene_blocks)
 
+        # Delete gene_blocks that are not used for mutations
+        self.gene_blocks = self.clean_gene_blocks(idx_dna, bins, all_gene_blocks)
+        print("gene_blocks ", self.gene_blocks)
+        
         # Make histogram with bins
-        labels = gene_blocks.keys()
-        self.make_histogram(idx_dna, self.output_fp, bins, labels)
+        # TODO Use the counts of before
+        labels = self.gene_blocks.keys()
+        self.make_barplot(idx_dna, self.output_fp, labels)
+
+        sys.exit()
+
+        # TODO Check for size of gene blocks, if too small or too large, then change bandwidth and rerun?
 
         # TODO Maybe first check for all gene blocks whether the mutation is in a correct place, e.g. not the beginning or end of a gene block
-        # TODO Restart option is error was found?
 
         results = {}
         should_restart = True
@@ -100,9 +124,6 @@ class DesignEblocks:
 
                 mut_type = self.mutation_types[num]
                 
-                print( mut)
-                print( mut_type)
-
                 # Change gene block in selected position for mutation
                 if mut_type == self.type_mutation:
 
@@ -145,6 +166,7 @@ class DesignEblocks:
                     mut_gene_block = self.mutate_gene_block(codon_insert, idx, mut_gene_block_value, mut_type)
 
                     # Check if eBlock is too long / too short
+                    # TODO This part should be moved more to the beginning
                     if self.check_eblock_length(mut_gene_block):
                         # Store output in dictionary
                         results[mut] = [mut_gene_block_name, mut_gene_block, idx, codon_insert, mut_type]
@@ -153,8 +175,6 @@ class DesignEblocks:
 
                     idx_del_start = idx_dna_tups[num][1]
                     idx_del_end = int(mut.split('-')[1][1:]) * 3
-                    print( idx_del_start)
-                    print( idx_del_end)
                     
                     mut_gene_block_name, mut_gene_block_value = self.find_gene_block(gene_blocks, idx_del_start)
                     idx = self.find_mutation_index_in_gene_block(mut_gene_block_name, idx_del_start)
@@ -177,11 +197,8 @@ class DesignEblocks:
 
                     # Find gene block and index of insert/deletion/mutation
                     mut_idx = idx_dna_tups[num][0][1]
-                    print( mut_idx)
 
                     mut_gene_block_name, mut_gene_block_value = self.find_gene_block(gene_blocks, mut_idx)
-                    print( mut_gene_block_name)
-                    log_to_file_and_console(self.logfile, mut_gene_block_value)
 
                     idxs = []
                     codons = []
@@ -216,6 +233,39 @@ class DesignEblocks:
         # sys.stdout = sys.__stdout__
         # self.logfile.close()
 
+    def clean_gene_blocks(self, idx_dna, bins, gene_blocks):
+        """
+        Delete gene blocks that are not used for mutations
+        """
+        counts = {}
+        for num, bin in enumerate(bins):
+            if num < len(bins) - 1:
+                counts[f"Block_{num}_pos_{str(bin)}_{str(bins[num + 1])}"] = 0
+        
+        for idx in idx_dna:
+            for key, value in counts.items():
+                if int(key.split('_')[3]) < idx < int(key.split('_')[4]):
+                    counts[key] += 1
+
+        # Delete gene blocks that are not used for mutations
+        for key, value in counts.items():
+            if value == 0:
+                del gene_blocks[f'{key}']
+
+        # Rename the gene blocks (starting from 1)
+        nkeys = []
+        nkey_gene_blocks = {}
+        count = 1
+        for key in gene_blocks.keys():
+            splitkey = key.split('_')
+            nkey = f'Block_{count}_pos_{splitkey[3]}_{splitkey[4]}'
+            nkeys.append(nkey)
+            count += 1
+        for key, nkey in zip(gene_blocks.keys(), nkeys):
+            nkey_gene_blocks[nkey] = gene_blocks[key]
+        
+        return nkey_gene_blocks
+
     def check_wt_codon(self, gene_block_value, idx, mut):
         for key, value in DNA_Codons.items():
                 if key.lower() == gene_block_value[idx-3:idx]:
@@ -246,7 +296,7 @@ class DesignEblocks:
                 print( "Codon insert is too long for eBlock")
                 sys.exit()
             elif len(mut_gene_block) < self.idt_min_length_fragment:
-                print( f"Codon insert is too short for eBlock, length is {len(mut_gene_block)}")
+                print( f"Codon insert is too short for mutation eBlock, length is {len(mut_gene_block)}, minimum length is {self.idt_min_length_fragment}")
                 sys.exit()
             else:
                 return True
@@ -267,7 +317,6 @@ class DesignEblocks:
                 idx_dna_tups.append([mut, int(mut[1:-1]) * 3])
             elif (type == self.type_insert) or (type == self.type_deletion):
                 mut_i = mut.split('-')[0]
-                print( mut_i)
                 idx_dna.append(int(mut_i[1:]) * 3)  # A residue consists of 3 nucleotides
                 idx_dna_tups.append([mut_i, int(mut_i[1:]) * 3])
             elif type == self.type_combined:
@@ -292,8 +341,6 @@ class DesignEblocks:
         """
         valid = 'acdefghiklmnpqrstvwy'
         for mut, type in zip(mutations, mutation_types):
-            print( mut)
-            print( type)
             if type == self.type_mutation:
                 if not self.check_mut_format(mut, self.type_mutation):
                     print( f"Input {mut} contain non-natural amino acids or incorrect formatting")
@@ -324,13 +371,13 @@ class DesignEblocks:
                         print( f"Input {i} contain non-natural amino acids or incorrect formatting")
                         sys.exit()
             else:
-                print( "Input contains non standard mutation")
+                print("Input contains non standard mutation")
                 sys.exit()
         return True
 
     def check_number_input_mutations(self, mutations):
         if len(mutations) < self.idt_min_order:
-            print( f"Minimum number of mutations {len(mutations)} is lower than the minimum amount of {self.idt_min_order}. \
+            print(f"Minimum number of mutations {len(mutations)} is lower than the minimum amount of {self.idt_min_order}. \
                     Please make sure you have enough mutations in your input.")
             sys.exit()
         elif len(mutations) >= self.idt_min_order:
@@ -340,6 +387,12 @@ class DesignEblocks:
         """
         Read mutations file in TXT format. 
         Each line of the file should contain one amino acid in the format [WT residue][index][mutant residue], such as G432W
+
+        Following checks are performed:
+        - Check there are NO non-natural amino acids in the mutations
+        - Check that there are enough mutations to process
+        - Check formatting of mutations
+        - check that there are no duplicate mutations
         
         Args:
             fp (string): filepath of input mutations TXT
@@ -366,15 +419,10 @@ class DesignEblocks:
                     mutation_types.append(self.type_combined)
                     mutations.append(line[1])
                 else:
-                    print( f"Please check format of mutation {line}, one mutation should be written per line and for inserts and deletions check the requirements.")
+                    print(f"Please check format of mutation {line}, one mutation should be written per line and for inserts and deletions check the requirements.")
                     sys.exit() 
-        # (1) Check there are NO non-natural amino acids in the mutations
-        # (2) Check that there are enough mutations to process
-        # (3) Check formatting of mutations
-        # (4) check that there are no duplicate mutations
         if len(mutations) != len(set(mutations)):
-            # TODO log_to_file_and_console duplicate mutations
-            print( "Duplicate mutations detected. Please remove and rerun.")
+            print("Duplicate mutations detected. Please remove and rerun.")
             sys.exit()
         if (self.check_input_mutations(mutations, mutation_types)) and (self.check_number_input_mutations(mutations)):  
             return mutations, mutation_types
@@ -403,19 +451,22 @@ class DesignEblocks:
         bins.sort()
         return bins
 
-    def make_histogram(self, data, outpath, bins, labels, fname="hist.png"):
-        # TODO Remove empty bins from histogram
-        # Only take eblock number as label
-        labels = [i.split('_')[0:2] for i in labels]
-        labels = [' '.join(i) for i in labels]
-        outname = os.path.join(outpath, fname)
-        _, _, bars = plt.hist(data, bins=bins, align=('mid'))
-        plt.bar_label(bars, labels)
-        plt.xlabel('Sequence index')
-        plt.ylabel('eBlock count')
+    def make_barplot(self, data, outpath, labels, fname="barplot.png"):
+        """
+        Make barplot of bins
+        """
+        pass
+        # labels = [i.split('_')[0:2] for i in labels]
+        # labels = [' '.join(i) for i in labels]
+        # # TODO Fix the bins
+        # outname = os.path.join(outpath, fname)
+        # _, _, bars = plt.hist(data, align=('mid'))
+        # plt.bar_label(bars, labels)
+        # plt.xlabel('Sequence index')
+        # plt.ylabel('eBlock count')
 
         # plt.set_xticks(labels)
-        plt.savefig(outname)
+        # plt.savefig(outname)
 
     def calculate_cost(self, clusters: dict) -> float:
         """
@@ -490,10 +541,7 @@ class DesignEblocks:
             # Calculate costs and check size of fragments
             cost = self.calculate_cost(clusters)
             new_bandwidth = self.check_fragment_sizes(clusters, bandwidth)
-            
-            print( str(new_bandwidth))
-            print( str(cost))
-            
+                   
             if bandwidth == new_bandwidth:
                 if lowest_cost > cost:
                     lowest_cost = cost
