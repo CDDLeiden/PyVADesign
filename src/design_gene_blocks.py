@@ -8,6 +8,7 @@ from Bio import SeqIO
 from operator import add, sub
 import matplotlib.pyplot as plt
 from sklearn.cluster import MeanShift
+from dna_features_viewer import GraphicFeature, GraphicRecord
 from utils import read_codon_usage, DNA_Codons, write_pickle, log_to_file_and_console, create_or_clear_file
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -79,6 +80,10 @@ class DesignEblocks:
 
         # Find indexes in sequence where mutation occures
         idx_dna, idx_dna_tups = self.index_mutations(self.mutations, self.mutation_types)
+        print("idx_dna ", idx_dna)
+        print("idx_dna_tups ", idx_dna_tups)
+        # TODO ADD IDX_DNA_TUPS TO THE EBLOCKS PLOT
+        print(len(idx_dna), len(idx_dna_tups))
 
         # Optimize bin size and bin position using meanshift algorithm
         print("Optimizing bin sizes ...")
@@ -104,6 +109,10 @@ class DesignEblocks:
         # Delete gene_blocks that are not used for mutations
         self.gene_blocks = self.clean_gene_blocks(idx_dna, bins, all_gene_blocks)
         print("gene_blocks ", self.gene_blocks)
+
+        # Plot gene blocks
+        record = self.plot_eblocks_mutations()
+        record.plot(figure_width=20)
         
         # Make histogram with bins
         # TODO Use the counts of before
@@ -450,12 +459,43 @@ class DesignEblocks:
             bins.append(max(value) + self.min_bin_overlap)
         bins.sort()
         return bins
+    
+    def eblock_plot_colors(self):
+        """
+        Create dictionary with colors for plotting eBlocks
+        """
+        # TODO Update this to nice colors, maybe specific color palette from sns or so
+        colors = {}
+        for i in range(100):
+            colors[i] = '#%06X' % random.randint(0, 0xFFFFFF)
+        return colors
+
+    def plot_eblocks_mutations(self):
+        """
+        Plot mutations and selected eBlocks
+        """
+        hex_colors = self.eblock_plot_colors()
+        features = []
+        for num, key in enumerate(self.gene_blocks.keys()):
+            features.append(GraphicFeature(start=int(key.split('_')[3]), 
+                                           end=int(key.split('_')[4]), 
+                                           strand=+1, 
+                                           color=hex_colors[num], 
+                                           label=f"Block {key.split('_')[1]}"))
+        # TODO Add mutations to plot as features as well. For this create an mapping between the mutations and gene blocks
+        # TODO PLOT THE DIFFERENT KIND OF MUTATIONS IN A DIFFERENT COLOR (E.g. point mutation black, insert red, deletion blue
+        # TODO This way you can also quickly check if double mutations are placed well.)
+        # for num, mut in enumerate(self.mutations):
+        record = GraphicRecord(sequence_length=len(self.dna_seq), features=features)
+        return record
 
     def make_barplot(self, data, outpath, labels, fname="barplot.png"):
         """
         Make barplot of bins
         """
         pass
+        # TODO FOR BARPLOT ALSO COUNTS OF MUTATIONS ARE NEEDED
+        # TODO HISTOGRAM WITH EMPTY BINS
         # labels = [i.split('_')[0:2] for i in labels]
         # labels = [' '.join(i) for i in labels]
         # # TODO Fix the bins
