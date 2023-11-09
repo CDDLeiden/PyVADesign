@@ -28,12 +28,11 @@ DNA_Codons = {
 }
 
 def read_codon_usage(fp):
-    # Obtained from http://www.kazusa.or.jp/codon/cgi-bin/showcodon.cgi?species=246196
     codon_usage = {}
     codon_usage_no_U = {}
     df = pd.read_csv(fp, sep=';')
     for _, row in df.iterrows():
-        codon_usage[row['Triplet']] = row['frequency_number']
+        codon_usage[row['Triplet']] = row['Number']
     for key, value in codon_usage.items():
         newkey = key.replace('U', 'T').lower()
         codon_usage_no_U[newkey] = value
