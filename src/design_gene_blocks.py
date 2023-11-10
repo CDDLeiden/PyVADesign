@@ -7,6 +7,7 @@ import pandas as pd
 from Bio import SeqIO
 from operator import add, sub
 import matplotlib.pyplot as plt
+from sklearn.cluster import DBSCAN
 from sklearn.cluster import MeanShift
 from dna_features_viewer import GraphicFeature, GraphicRecord
 from utils import read_codon_usage, DNA_Codons, write_pickle, log_to_file_and_console, create_or_clear_file
@@ -39,6 +40,7 @@ class DesignEblocks:
                  output_fp: str,
                  codon_usage_fp: str,
                  species = "Escherichia coli",
+                 gene_name = None,
                  min_bin_overlap = 25,
                  idt_max_length_fragment = 1500,
                  idt_min_length_fragment = 300,
@@ -53,6 +55,7 @@ class DesignEblocks:
         self.output_fp = output_fp
         self.species = species
         self.min_bin_overlap = min_bin_overlap
+        self.gene_name = gene_name
         self.idt_max_length_fragment = idt_max_length_fragment
         self.idt_min_length_fragment = idt_min_length_fragment
         self.idt_min_order = idt_min_order
@@ -82,22 +85,26 @@ class DesignEblocks:
         """
 
         # Find indexes in sequence where mutation occures
-        idx_dna, idx_dna_tups = self.index_mutations(self.mutations, self.mutation_types)
+        # TODO Change this function so that you obtain for deletions and insertions all indexes (so the full range of mutations)
+        idx_dna, idx_dna_tups, idx_test = self.index_mutations(self.mutations, self.mutation_types)
+
         # TODO in the tuple also add the type of mutation
-        
-        print("idx_dna ", idx_dna)
-        print("idx_dna_tups ", idx_dna_tups)
-        # TODO ADD IDX_DNA_TUPS TO THE EBLOCKS PLOT
-        print(len(idx_dna), len(idx_dna_tups))
+        # Do clusterin with dbscan
+        # TODO OPTIMIZE epsilon value
+        print(idx_test)
+        clusters = self.dbscan_clustering(data=idx_test, epsilon=0.3)
+        print("clusters: ", clusters)
+        sys.exit()
+
 
         # Optimize bin size and bin position using meanshift algorithm
         print("Optimizing bin sizes ...")
         optimal_bandwidth, lowest_cost = self.optimize_bins(idx_dna)
         # TODO What is the optimal bandwith?
-        print("Optimal bandwidth: ", str(optimal_bandwidth))
+        # print("Optimal bandwidth: ", str(optimal_bandwidth))
 
         clusters = self.meanshift(idx_dna, optimal_bandwidth)
-        print("Clusters: ", str(clusters))
+        # print("Clusters: ", str(clusters))
 
         # Write expected cost to file (based on IDT pricing)
         with open(os.path.join(self.output_fp, "expected_cost.txt"), "w") as f:
@@ -105,29 +112,43 @@ class DesignEblocks:
             f.write(f"number of cluters: {str(len(clusters))}" + '\n')
 
         bins = self.make_bins(clusters)
-        print("Bins: ", str(bins))
+        # print("Bins: ", str(bins))
         
         # Make gene blocks (WT DNA sequences cut to the correct size)
         all_gene_blocks = self.make_gene_block(bins, self.dna_seq)
-        print("all_gene_blocks ", all_gene_blocks)
+        # print("all_gene_blocks ", all_gene_blocks)
 
         # Delete gene_blocks that are not used for mutations
-        self.gene_blocks = self.clean_gene_blocks(idx_dna, bins, all_gene_blocks)
-        print("gene_blocks ", self.gene_blocks)
+        self.gene_blocks, _ = self.clean_gene_blocks(idx_dna, bins, all_gene_blocks)
+        # print("gene_blocks ", self.gene_blocks)
 
         # Plot gene blocks
-        # TODO MAKE SURE THAT YOU CAN ALSO CHOOSE BETWEEN COLORS THAT YOU lIKE
-        record = self.plot_eblocks_mutations(idx_dna_tups=idx_dna_tups, eblocks=True, mutations=True)
+        # TODO MAKE SURE THAT YOU CAN ALSO CHOOSE BETWEEN COLORS THAT YOU lIKE FOR THE EBLOCKS IN THE PLOT
+        eblock_hex_colors = self.eblock_colors()
+        record, legend = self.plot_eblocks_mutations(idx_dna_tups=idx_dna_tups, eblocks=True, mutations=True, genename=self.gene_name, eblock_colors=eblock_hex_colors)
         record.plot(figure_width=20)
         
         # Make histogram with bins
-        # TODO Use the counts of before
-        labels = self.gene_blocks.keys()
-        self.make_barplot(idx_dna, self.output_fp, labels)
+        # Count the number of mutations in each eblock
+        counts = {}
+        for i in self.gene_blocks.keys():
+            bbegin = int(i.split('_')[3])
+            bend = int(i.split('_')[4])
+            for idx in idx_dna:
+                if bbegin < idx < bend:
+                    if i in counts.keys():
+                        counts[i] += 1
+                    else:
+                        counts[i] = 1
+        # print("counts ", counts)
+        colors = list(eblock_hex_colors.values())[0:len(counts)]
+        self.make_barplot(counts, self.output_fp, color=colors)
 
-        sys.exit()
-
-        # TODO Check for size of gene blocks, if too small or too large, then change bandwidth and rerun?
+        # TODO Plot the lengths of the gene blocks
+        
+        # Check for size of gene blocks, if too small or too large, then change bandwidth and rerun?
+        for key, value in self.gene_blocks.items():
+            print(key, len(value))
 
         # TODO Maybe first check for all gene blocks whether the mutation is in a correct place, e.g. not the beginning or end of a gene block
 
@@ -144,7 +165,7 @@ class DesignEblocks:
 
                     # Find gene block and index of insert/deletion/mutation
                     mut_idx = idx_dna_tups[num][1]
-                    mut_gene_block_name, mut_gene_block_value = self.find_gene_block(gene_blocks, mut_idx)
+                    mut_gene_block_name, mut_gene_block_value = self.find_gene_block(self.gene_blocks, mut_idx)
                     idx = self.find_mutation_index_in_gene_block(mut_gene_block_name, mut_idx)
 
                     # Check if WT codon at index is same residue as mutation
@@ -171,7 +192,7 @@ class DesignEblocks:
 
                     # Find gene block and index of insert/deletion/mutation
                     mut_idx = idx_dna_tups[num][1]
-                    mut_gene_block_name, mut_gene_block_value = self.find_gene_block(gene_blocks, mut_idx)
+                    mut_gene_block_name, mut_gene_block_value = self.find_gene_block(self.gene_blocks, mut_idx)
                     idx = self.find_mutation_index_in_gene_block(mut_gene_block_name, mut_idx)
 
                     # Check if WT codon at index is same residue as mutation
@@ -191,7 +212,7 @@ class DesignEblocks:
                     idx_del_start = idx_dna_tups[num][1]
                     idx_del_end = int(mut.split('-')[1][1:]) * 3
                     
-                    mut_gene_block_name, mut_gene_block_value = self.find_gene_block(gene_blocks, idx_del_start)
+                    mut_gene_block_name, mut_gene_block_value = self.find_gene_block(self.gene_blocks, idx_del_start)
                     idx = self.find_mutation_index_in_gene_block(mut_gene_block_name, idx_del_start)
                     idx_end = self.find_mutation_index_in_gene_block(mut_gene_block_name, idx_del_end)
 
@@ -213,7 +234,7 @@ class DesignEblocks:
                     # Find gene block and index of insert/deletion/mutation
                     mut_idx = idx_dna_tups[num][0][1]
 
-                    mut_gene_block_name, mut_gene_block_value = self.find_gene_block(gene_blocks, mut_idx)
+                    mut_gene_block_name, mut_gene_block_value = self.find_gene_block(self.gene_blocks, mut_idx)
 
                     idxs = []
                     codons = []
@@ -241,7 +262,9 @@ class DesignEblocks:
         self.write_gene_blocks_to_txt(results, self.output_fp)
         self.write_gene_blocks_to_template(results, self.output_fp)
         write_pickle(results, self.output_fp)
-        write_pickle(gene_blocks, self.output_fp, fname="wt_gene_blocks.npy")
+        write_pickle(self.gene_blocks, self.output_fp, fname="wt_gene_blocks.npy")
+
+        print("Designed eBlocks and stored output in ", self.output_fp)
 
         # Restore stdout to the original value
         # TODO FIX THIS
@@ -278,8 +301,8 @@ class DesignEblocks:
             count += 1
         for key, nkey in zip(gene_blocks.keys(), nkeys):
             nkey_gene_blocks[nkey] = gene_blocks[key]
-        
-        return nkey_gene_blocks
+            
+        return nkey_gene_blocks, counts
 
     def check_wt_codon(self, gene_block_value, idx, mut):
         for key, value in DNA_Codons.items():
@@ -325,19 +348,31 @@ class DesignEblocks:
         Returns:
             _type_: _description_
         """    
-        idx_dna, idx_dna_tups = [], []
+        idx_dna, idx_dna_tups, idx_test = [], [], []
         for mut, type in zip(mut_list, mut_types):
             if type == self.type_mutation:
                 idx_dna.append(int(mut[1:-1]) * 3)  # A residue consists of 3 nucleotides
                 idx_dna_tups.append([mut, int(mut[1:-1]) * 3])
+                idx_test.append(int(mut[1:-1]) * 3)
             elif (type == self.type_insert):
                 mut_i = mut.split('-')[0]
                 idx_dna.append(int(mut_i[1:]) * 3)  # A residue consists of 3 nucleotides
                 idx_dna_tups.append([f"{mut}", int(mut_i[1:]) * 3])
+                # length_insert = len(mut.split('-')[1])
+                # begin = int(mut_i[1:]) * 3
+                # end = begin + length_insert * 3
+                # idx_test.append(range(begin, end, 3))
             elif (type == self.type_deletion):
-                mut_i = mut.split('-')[0]
-                idx_dna.append(int(mut_i[1:]) * 3)
-                idx_dna_tups.append([f"{mut}", int(mut_i[1:]) * 3])
+                mut_b = mut.split('-')[0]
+                mut_e = mut.split('-')[1]
+                idx_dna.append(int(mut_b[1:]) * 3)
+                idx_dna_tups.append([f"{mut}", int(mut_b[1:]) * 3])
+                length = int(mut_e[1:]) - int(mut_b[1:])
+                idx_begin = int(int(mut_b[1:])*3)
+                idx_end = idx_begin + (int(length)*3)
+                tmp = range(int(mut_b[1:]) * 3, idx_end, 3)
+                tmp_list = list(tmp)
+                idx_test.append(tmp_list)
             elif type == self.type_combined:
                 muts = mut.split('-')
                 tmp = []
@@ -345,7 +380,11 @@ class DesignEblocks:
                     idx_dna.append(int(i[1:-1]) * 3)  # A residue consists of 3 nucleotides
                     tmp.append([i, int(i[1:-1]) * 3])
                 idx_dna_tups.append(tmp)
-        return idx_dna, idx_dna_tups
+                tmp = []
+                for i in muts:
+                    tmp.append(int(i[1:-1]) * 3)
+                idx_test.append(tmp)
+        return idx_dna, idx_dna_tups, idx_test
     
     def check_input_mutations(self, mutations, mutation_types):
         """
@@ -470,15 +509,41 @@ class DesignEblocks:
         bins.sort()
         return bins
     
-    def plot_eblocks_mutations(self, idx_dna_tups=None, eblocks=True, mutations=True):
+    def plot_legend(self, legend_alpha=0.2, font_size='x-large', marker_size=10, linestyle='None', marker='o', loc='center', bbox_to_anchor=(0.5, 0.5)):
+        """
+        Plot legend for eBlocks plot
+        """
+        mutation_type_colors = self.mutation_type_colors()
+        # Create an empty plot with no data points
+        fig, ax = plt.subplots(figsize=(2, 1))
+        # Add mutation type colors to the legend
+        handles = []
+        for k, v in mutation_type_colors.items():
+            handle = plt.Line2D([0], [0], marker=marker, color=f'{v}', label=f'{k}', markersize=marker_size, linestyle=linestyle, alpha=legend_alpha)
+            handles.append(handle) 
+        legend = ax.legend(handles=handles, loc=loc, bbox_to_anchor=bbox_to_anchor, fontsize=font_size, framealpha=legend_alpha)
+        # Hide the axes
+        ax.axis('off')
+        return fig
+    
+    def plot_eblocks_mutations(self, idx_dna_tups=None, eblocks=True, mutations=True, genename=None, genecolor="#d3d3d3", eblock_colors=None):
         """
         Plot mutations and selected eBlocks
         """
-        eblock_hex_colors = self.eblock_colors()
         mutation_type_colors = self.mutation_type_colors()
         features = []
+
         if not idx_dna_tups:
-            _, idx_dna_tups = self.index_mutations(self.mutations, self.mutation_types)
+            _, idx_dna_tups, _ = self.index_mutations(self.mutations, self.mutation_types)
+
+        # Add gene to plot
+        if genename:
+            features.append(GraphicFeature(start=0, 
+                                        end=len(self.dna_seq), 
+                                        strand=+1, 
+                                        color=genecolor, 
+                                        label=f"{genename}"))
+
         # Add mutations to plot
         if mutations:
             for num, mut in enumerate(idx_dna_tups):
@@ -502,30 +567,33 @@ class DesignEblocks:
                 features.append(GraphicFeature(start=int(key.split('_')[3]), 
                                             end=int(key.split('_')[4]), 
                                             strand=+1, 
-                                            color=eblock_hex_colors[num], 
+                                            color=eblock_colors[num], 
                                             label=f"Block {key.split('_')[1]}"))
             
         record = GraphicRecord(sequence_length=len(self.dna_seq), features=features)
-        return record
 
-    def make_barplot(self, data, outpath, labels, fname="barplot.png"):
+        # Also create legend for the plot
+        legend = self.plot_legend()
+
+        return record, legend
+
+    def make_barplot(self, data, outpath, color, fname="barplot.png"):
         """
         Make barplot of bins
         """
-        pass
-        # TODO FOR BARPLOT ALSO COUNTS OF MUTATIONS ARE NEEDED
-        # TODO HISTOGRAM WITH EMPTY BINS
-        # labels = [i.split('_')[0:2] for i in labels]
-        # labels = [' '.join(i) for i in labels]
-        # # TODO Fix the bins
-        # outname = os.path.join(outpath, fname)
-        # _, _, bars = plt.hist(data, align=('mid'))
-        # plt.bar_label(bars, labels)
-        # plt.xlabel('Sequence index')
-        # plt.ylabel('eBlock count')
-
-        # plt.set_xticks(labels)
-        # plt.savefig(outname)
+        # TODO Match colors of barplot with eBlocks plot
+        fig, ax = plt.subplots(figsize=(5, 2))
+        labels = []
+        for k, v in data.items():
+            kn = k.split('_')[0] + ' ' + k.split('_')[1]
+            labels.append(kn)
+        ax.bar(range(len(data)), list(data.values()), align='center', color=color)
+        ax.set_xticks(range(len(data)), labels)
+        ax.set_ylabel('Number of mutants per eBlock')
+        ax.set_xlabel('eBlock')
+        ax.set_title('Number of mutants per eBlock')
+        ax.bar_label(ax.containers[0])
+        fig.savefig(os.path.join(outpath, fname))
 
     def calculate_cost(self, clusters: dict) -> float:
         """
@@ -614,6 +682,24 @@ class DesignEblocks:
                 bandwidth = new_bandwidth
 
         return optimal_bandwidth, lowest_cost
+    
+    def dbscan_clustering(self, data, epsilon):
+        # Flatten the list of ranges to individual numbers
+        print(data)
+        flattened_data = [item if isinstance(item, int) else item for sublist in data for item in (sublist if isinstance(sublist, list) else [sublist])]
+        print(flattened_data)
+                
+        X = np.array(flattened_data).reshape(-1, 1)
+        dbscan = DBSCAN(eps=epsilon, min_samples=2, metric='euclidean')
+        labels = dbscan.fit_predict(X)
+
+        clusters = {}
+        for idx, label in enumerate(labels):
+            if label not in clusters:
+                clusters[label] = []
+            clusters[label].append(flattened_data[idx])
+
+        return clusters
 
 
     def meanshift(self, x: list, bandwidth: int):

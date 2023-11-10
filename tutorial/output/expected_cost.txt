@@ -1,2 +1,2 @@
-expected costs: 1139.4
-number of cluters: 4
+expected costs: inf
+number of cluters: 6
