@@ -1,2 +1,2 @@
 expected costs: inf
-number of cluters: 7
+number of cluters: 6
