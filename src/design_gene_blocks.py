@@ -60,6 +60,7 @@ class DesignEblocks:
         self.n_iterations = 100
         self.gene_blocks = None
 
+        # TODO ADD LOGFILE
         self.logfile = os.path.join(self.output_fp, "design_gene_blocks.log")
 
         # TODO CHANGE THIS AND INCLUDE LOGFILE
@@ -73,14 +74,17 @@ class DesignEblocks:
         self.mutations, self.mutation_types = self.read_mutations(mutations_fp)  # Types = {Mutation, Insert, Deletion}
         self.codon_usage = self.check_existance_codon_usage_table()  # Check if codon usage table is present for selected species
 
+        # TODO ADD THE PLOT HERE WITHOUT THE EBLOCKS, JUST THE MUTATIONS
+
     def run(self):
         """
         Run the design of eBlocks
         """
 
         # Find indexes in sequence where mutation occures
-        # TODO in the tuple also add the type of mutation
         idx_dna, idx_dna_tups = self.index_mutations(self.mutations, self.mutation_types)
+        # TODO in the tuple also add the type of mutation
+        
         print("idx_dna ", idx_dna)
         print("idx_dna_tups ", idx_dna_tups)
         # TODO ADD IDX_DNA_TUPS TO THE EBLOCKS PLOT
@@ -112,7 +116,8 @@ class DesignEblocks:
         print("gene_blocks ", self.gene_blocks)
 
         # Plot gene blocks
-        record = self.plot_eblocks_mutations(idx_dna_tups=idx_dna_tups)
+        # TODO MAKE SURE THAT YOU CAN ALSO CHOOSE BETWEEN COLORS THAT YOU lIKE
+        record = self.plot_eblocks_mutations(idx_dna_tups=idx_dna_tups, eblocks=True, mutations=True)
         record.plot(figure_width=20)
         
         # Make histogram with bins
@@ -465,69 +470,41 @@ class DesignEblocks:
         bins.sort()
         return bins
     
-    # TODO STATIC METHOD
-    def eblock_colors(self):
-        """
-        Create dictionary with colors for plotting eBlocks
-        """
-        # TODO Update this to nice colors, maybe specific color palette from sns or so
-        colors = {}
-        for i in range(100):
-            colors[i] = '#%06X' % random.randint(0, 0xFFFFFF)
-        return colors
-    
-    def mutation_type_colors(self):
-        """
-        Create dictionary with colors for plotting mutation types
-        """
-        colors = {}
-        colors['Mutation'] = 'black'
-        colors['Insert'] = 'red'
-        colors['Deletion'] = 'blue'
-        colors['Combined'] = 'green'
-        return colors
-
-    def plot_eblocks_mutations(self, idx_dna_tups):
+    def plot_eblocks_mutations(self, idx_dna_tups=None, eblocks=True, mutations=True):
         """
         Plot mutations and selected eBlocks
         """
         eblock_hex_colors = self.eblock_colors()
         mutation_type_colors = self.mutation_type_colors()
         features = []
+        if not idx_dna_tups:
+            _, idx_dna_tups = self.index_mutations(self.mutations, self.mutation_types)
+        # Add mutations to plot
+        if mutations:
+            for num, mut in enumerate(idx_dna_tups):
+                if type(mut[1]) == int:
+                    features.append(GraphicFeature(start=int(mut[1]), 
+                                                end=int(mut[1]) + 3, # TODO MAKE MORE SPECIFIC FOR INSERTS ETC
+                                                strand=+1, 
+                                                color=mutation_type_colors[self.mutation_types[num]], 
+                                                label=f"{mut[0]}"))
+                elif type(mut[1]) == list:
+                        for m in mut:
+                            features.append(GraphicFeature(start=int(m[1]), 
+                                                    end=int(m[1]) + 3, # TODO MAKE MORE SPECIFIC FOR INSERTS ETC
+                                                    strand=+1, 
+                                                    color=mutation_type_colors['Combined'], 
+                                                    label=f"{m[0]}"))
 
         # Add eBlocks to plot
-        for num, key in enumerate(self.gene_blocks.keys()):
-            features.append(GraphicFeature(start=int(key.split('_')[3]), 
-                                           end=int(key.split('_')[4]), 
-                                           strand=+1, 
-                                           color=eblock_hex_colors[num], 
-                                           label=f"Block {key.split('_')[1]}"))
-            
-        # Add mutations to plot
-        # print(idx_dna_tups[1])
-        # print("start: ", int(idx_dna_tups[0][0][1]))
-        # print("end: ", int(idx_dna_tups[0][-1][1]))
-
-        for num, mut in enumerate(idx_dna_tups):
-            if type(mut[1]) == int:
-                features.append(GraphicFeature(start=int(mut[1]), 
-                                            end=int(mut[1]) + 3, # TODO MAKE MORE SPECIFIC FOR INSERTS ETC
+        if eblocks:
+            for num, key in enumerate(self.gene_blocks.keys()):
+                features.append(GraphicFeature(start=int(key.split('_')[3]), 
+                                            end=int(key.split('_')[4]), 
                                             strand=+1, 
-                                            color=mutation_type_colors[self.mutation_types[num]], 
-                                            label=f"{mut[0]}"))
-            elif type(mut[1]) == list:
-                    for m in mut:
-                        features.append(GraphicFeature(start=int(m[1]), 
-                                                end=int(m[1]) + 3, # TODO MAKE MORE SPECIFIC FOR INSERTS ETC
-                                                strand=+1, 
-                                                color=mutation_type_colors['Combined'], 
-                                                label=f"{m[0]}"))
-
-        # Self.mutation_types also needed
-        # TODO Add mutations to plot as features as well. For this create an mapping between the mutations and gene blocks
-        # TODO PLOT THE DIFFERENT KIND OF MUTATIONS IN A DIFFERENT COLOR (E.g. point mutation black, insert red, deletion blue
-        # TODO This way you can also quickly check if double mutations are placed well.)
-        # for num, mut in enumerate(self.mutations):
+                                            color=eblock_hex_colors[num], 
+                                            label=f"Block {key.split('_')[1]}"))
+            
         record = GraphicRecord(sequence_length=len(self.dna_seq), features=features)
         return record
 
@@ -871,3 +848,30 @@ class DesignEblocks:
         begin_range = int(gene_block_name.split('_')[3])
         end_range = int(gene_block_name.split('_')[4])
         return begin_range, end_range
+    
+    @staticmethod
+    def eblock_colors():
+        """
+        Create dictionary with colors for plotting eBlocks
+        """
+        # TODO Update this to nice colors, maybe specific color palette from sns or so
+        colors = {}
+        for i in range(100):
+            colors[i] = '#%06X' % random.randint(0, 0xFFFFFF)
+        return colors
+    
+    @staticmethod
+    def mutation_type_colors():
+        """
+        Create dictionary with colors for plotting mutation types
+
+        Returns:
+            dict: dictionary with colors for plotting mutation types
+        """
+        colors = {}
+        colors['Mutation'] = 'black'
+        colors['Insert'] = 'red'
+        colors['Deletion'] = 'blue'
+        colors['Combined'] = 'green'
+        return colors
+
