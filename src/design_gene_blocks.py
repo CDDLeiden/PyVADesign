@@ -9,6 +9,7 @@ from operator import add, sub
 import matplotlib.pyplot as plt
 from sklearn.cluster import DBSCAN
 from sklearn.cluster import MeanShift
+from sklearn.cluster import KMeans
 from dna_features_viewer import GraphicFeature, GraphicRecord
 from utils import read_codon_usage, DNA_Codons, write_pickle, log_to_file_and_console, create_or_clear_file
 
@@ -86,25 +87,46 @@ class DesignEblocks:
 
         # Find indexes in sequence where mutation occures
         # TODO Change this function so that you obtain for deletions and insertions all indexes (so the full range of mutations)
-        idx_dna, idx_dna_tups, idx_test = self.index_mutations(self.mutations, self.mutation_types)
+        idx_dna, idx_dna_tups, idx_test, paired = self.index_mutations(self.mutations, self.mutation_types)
+        
+        print("paired: ", paired)
+        print("idx_dna: ", idx_dna)
+        print("idx_dna_tups: ", idx_dna_tups)
+        print("idx_test: ", idx_test)
+        print("----------------------------------")
+
+        idx_all = []
+        for i in idx_test:
+            if type(i) == list:
+                idx_all.extend(i)
+            else:
+                idx_all.append(i)
+        print("idx_all: ", idx_all)
 
         # TODO in the tuple also add the type of mutation
         # Do clusterin with dbscan
         # TODO OPTIMIZE epsilon value
-        print(idx_test)
-        clusters = self.dbscan_clustering(data=idx_test, epsilon=0.3)
-        print("clusters: ", clusters)
+        # print(idx_test)
+        # start_eps = 100
+        # clusters = self.dbscan_clustering(data=idx_test, epsilon=200)
+        # print("dbscan clusters: ", clusters)
+        
+        clusters = self.make_clusters(idx_all, paired)
+        # TODO clusters_oh = pass # Add overhang to clusters (on both sides)
         sys.exit()
 
+        # TODO Check length of clusters, if too small or too large, then change epsilon and rerun?
 
-        # Optimize bin size and bin position using meanshift algorithm
-        print("Optimizing bin sizes ...")
-        optimal_bandwidth, lowest_cost = self.optimize_bins(idx_dna)
-        # TODO What is the optimal bandwith?
-        # print("Optimal bandwidth: ", str(optimal_bandwidth))
 
-        clusters = self.meanshift(idx_dna, optimal_bandwidth)
-        # print("Clusters: ", str(clusters))
+        # # Optimize bin size and bin position using meanshift algorithm
+        # print("Optimizing bin sizes ...")
+        # optimal_bandwidth, lowest_cost = self.optimize_bins(idx_dna)
+        # # TODO What is the optimal bandwith?
+        # # print("Optimal bandwidth: ", str(optimal_bandwidth))
+
+        # clusters = self.meanshift(idx_dna, optimal_bandwidth)
+        # print("meanshift Clusters: ", str(clusters))
+        # sys.exit()
 
         # Write expected cost to file (based on IDT pricing)
         with open(os.path.join(self.output_fp, "expected_cost.txt"), "w") as f:
@@ -348,7 +370,7 @@ class DesignEblocks:
         Returns:
             _type_: _description_
         """    
-        idx_dna, idx_dna_tups, idx_test = [], [], []
+        idx_dna, idx_dna_tups, idx_test, paired = [], [], [], []
         for mut, type in zip(mut_list, mut_types):
             if type == self.type_mutation:
                 idx_dna.append(int(mut[1:-1]) * 3)  # A residue consists of 3 nucleotides
@@ -361,7 +383,7 @@ class DesignEblocks:
                 # length_insert = len(mut.split('-')[1])
                 # begin = int(mut_i[1:]) * 3
                 # end = begin + length_insert * 3
-                # idx_test.append(range(begin, end, 3))
+                # paire.append(range(begin, end, 3))
             elif (type == self.type_deletion):
                 mut_b = mut.split('-')[0]
                 mut_e = mut.split('-')[1]
@@ -372,7 +394,9 @@ class DesignEblocks:
                 idx_end = idx_begin + (int(length)*3)
                 tmp = range(int(mut_b[1:]) * 3, idx_end, 3)
                 tmp_list = list(tmp)
+                tmp_tuple = tuple(tmp_list)
                 idx_test.append(tmp_list)
+                paired.append(tmp_tuple)
             elif type == self.type_combined:
                 muts = mut.split('-')
                 tmp = []
@@ -384,7 +408,9 @@ class DesignEblocks:
                 for i in muts:
                     tmp.append(int(i[1:-1]) * 3)
                 idx_test.append(tmp)
-        return idx_dna, idx_dna_tups, idx_test
+                tmp_tuple = tuple(tmp)
+                paired.append(tmp_tuple)
+        return idx_dna, idx_dna_tups, idx_test, paired
     
     def check_input_mutations(self, mutations, mutation_types):
         """
@@ -595,7 +621,7 @@ class DesignEblocks:
         ax.bar_label(ax.containers[0])
         fig.savefig(os.path.join(outpath, fname))
 
-    def calculate_cost(self, clusters: dict) -> float:
+    def calculate_cost(self, clusters: dict, bp_price=0.05) -> float:
         """
         Calculate the total cost of all fragments, based on clusters
 
@@ -604,13 +630,13 @@ class DesignEblocks:
 
         Returns:
             float: cost in euros
-        """    
+        """
         total_cost = 0
         for _, value in clusters.items():
             min_val = min(value)
             max_val = max(value)
             len_gene_block = (max_val - min_val) + 2 * self.min_bin_overlap  # on both size of the gene block there should be a number of non-mutated basepairs for IVA primer design
-            cost = len_gene_block * 0.05 * len(value)  # 0.05 euros per base pair
+            cost = len_gene_block * bp_price * len(value)
             total_cost += cost
         return round(total_cost, 2)
 
@@ -700,6 +726,87 @@ class DesignEblocks:
             clusters[label].append(flattened_data[idx])
 
         return clusters
+    
+    def make_clusters(self, idxs, paired_mutations):
+        
+        possibilities = {}
+        n = 1
+        valid_clusters = True
+
+        # TODO Take into account the OH on both sides of the gene block, so decrease max size with 40 (20 on both sides)
+        # TODO CHECK IF PAIRED MUTATIONS ARE CORRECTLY ADDED TO THE CLUSTER
+        # TODO GIVE SUMMARY OF OPTIONS AND LET THE USER DECIDE WHICH ONE TO USE
+        # TODO PEROFRM DIFFERENT RANDOM STATES AS WELL?
+
+        while valid_clusters:
+            
+            print(f"Clustering with {n} clusters ...")
+
+            clusters = {}
+            cluster_labels = self.kmeans_clustering(idxs, paired_mutations, n)
+
+            # Calculate the size of each cluster
+            for i, j in zip(cluster_labels, idxs):
+                if i not in clusters:
+                    clusters[i] = []
+                clusters[i].append(j)
+
+            # Check if the size of the clusters is within bounds
+            cluster_sizes = [max(v) - min(v) for v in clusters.values()]
+            print("Cluster sizes: ", cluster_sizes)
+
+            max_cluster_size = max(cluster_sizes)
+            min_cluster_size = min(cluster_sizes)
+
+            if max_cluster_size > (self.idt_max_length_fragment - 2 * self.min_bin_overlap):
+                print("Cluster size is still too large, increasing the number of clusters")
+                n += 1
+            elif min_cluster_size < (self.idt_min_length_fragment - 2 * self.min_bin_overlap):
+                print("Cluster size is too small, stop increasing the number of clusters")
+                valid_clusters = False
+            else:
+                possibilities[f'cluster N={n}'] = clusters # TODO ADD CLUSTERING PARAMS HERE? 
+                # Calculate costs and check size of fragments
+                cost = self.calculate_cost(clusters)
+                print(f"Costs of cluster N={n}: {cost}")
+                n += 1
+
+        print(f"Found {len(possibilities)} possible clusterings")
+        for key, value in possibilities.items():
+            print(key, value)
+
+        return possibilities
+
+    def kmeans_clustering(self, mutation_indices, paired_mutations, num_clusters, visaualize=False):
+        # Create connected mutation indices based on pairs
+        connected_indices = []
+        for pair in paired_mutations:
+            avg_position = np.mean(pair)
+            connected_indices.extend(list(pair) + [avg_position])
+
+        # Create a matrix where each row contains the distances to each point
+        mutation_matrix = np.concatenate([mutation_indices, connected_indices]).reshape(-1, 1)
+
+        # Initialize KMeans with the number of clusters
+        kmeans = KMeans(n_clusters=num_clusters, random_state=42)
+
+        # Fit the model and obtain cluster labels for connected indices
+        cluster_labels = kmeans.fit_predict(mutation_matrix)
+
+        # Extract cluster centers
+        cluster_centers = kmeans.cluster_centers_
+
+        # Visualize the clusters
+        if visaualize:
+            plt.scatter(mutation_matrix, np.zeros_like(mutation_matrix),
+                        c=cluster_labels, cmap='viridis')
+            plt.scatter(cluster_centers, np.zeros_like(cluster_centers), c='red', marker='X', s=100, label='Cluster Centers')
+            plt.xlabel('Mutation Indices')
+            plt.title('K-means Clustering with Connected Mutations')
+            plt.legend()
+            plt.show()
+        return cluster_labels
+
 
 
     def meanshift(self, x: list, bandwidth: int):
