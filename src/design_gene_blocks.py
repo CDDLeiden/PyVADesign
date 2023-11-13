@@ -40,8 +40,8 @@ class DesignEblocks:
                  mutations_fp: str,
                  output_fp: str,
                  codon_usage_fp: str,
+                 optimize: str, # TODO SOMETHING GOES WRONG HERE
                  species = "Escherichia coli",
-                 optimize = "cost", # TODO SOMETHING GOES WRONG HERE
                  gene_name = None,
                  min_bin_overlap = 25,
                  idt_max_length_fragment = 1500,
@@ -545,7 +545,7 @@ class DesignEblocks:
         features = []
 
         if not idx_dna_tups:
-            _, idx_dna_tups, _ = self.index_mutations(self.mutations, self.mutation_types)
+            _, idx_dna_tups, _, _ = self.index_mutations(self.mutations, self.mutation_types)
 
         # Add gene to plot
         if genename:
