@@ -41,6 +41,7 @@ class DesignEblocks:
                  output_fp: str,
                  codon_usage_fp: str,
                  species = "Escherichia coli",
+                 optimize = "cost", # TODO SOMETHING GOES WRONG HERE
                  gene_name = None,
                  min_bin_overlap = 25,
                  idt_max_length_fragment = 1500,
@@ -55,6 +56,7 @@ class DesignEblocks:
 
         self.output_fp = output_fp
         self.species = species
+        self.optimization = optimize
         self.min_bin_overlap = min_bin_overlap
         self.gene_name = gene_name
         self.idt_max_length_fragment = idt_max_length_fragment
