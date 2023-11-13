@@ -40,6 +40,7 @@ class DesignEblocks:
                  mutations_fp: str,
                  output_fp: str,
                  codon_usage_fp: str,
+                 optimize: str, # TODO SOMETHING GOES WRONG HERE
                  species = "Escherichia coli",
                  gene_name = None,
                  min_bin_overlap = 25,
@@ -55,6 +56,7 @@ class DesignEblocks:
 
         self.output_fp = output_fp
         self.species = species
+        self.optimization = optimize
         self.min_bin_overlap = min_bin_overlap
         self.gene_name = gene_name
         self.idt_max_length_fragment = idt_max_length_fragment
@@ -86,6 +88,7 @@ class DesignEblocks:
         """
 
         # Find indexes in sequence where mutation occures
+        # TODO Remove idx test
         # TODO Change this function so that you obtain for deletions and insertions all indexes (so the full range of mutations)
         idx_dna, idx_dna_tups, idx_test, paired = self.index_mutations(self.mutations, self.mutation_types)
         
@@ -101,40 +104,22 @@ class DesignEblocks:
                 idx_all.extend(i)
             else:
                 idx_all.append(i)
+
         print("idx_all: ", idx_all)
+        print("----------------------------------")
 
-        # TODO in the tuple also add the type of mutation
-        # Do clusterin with dbscan
-        # TODO OPTIMIZE epsilon value
-        # print(idx_test)
-        # start_eps = 100
-        # clusters = self.dbscan_clustering(data=idx_test, epsilon=200)
-        # print("dbscan clusters: ", clusters)
-        
-        clusters = self.make_clusters(idx_all, paired)
-        # TODO clusters_oh = pass # Add overhang to clusters (on both sides)
-        sys.exit()
-
-        # TODO Check length of clusters, if too small or too large, then change epsilon and rerun?
-
-
-        # # Optimize bin size and bin position using meanshift algorithm
-        # print("Optimizing bin sizes ...")
-        # optimal_bandwidth, lowest_cost = self.optimize_bins(idx_dna)
-        # # TODO What is the optimal bandwith?
-        # # print("Optimal bandwidth: ", str(optimal_bandwidth))
-
-        # clusters = self.meanshift(idx_dna, optimal_bandwidth)
-        # print("meanshift Clusters: ", str(clusters))
-        # sys.exit()
+        # TODO LET THE USER DECIDE WHICH CLUSTERING TO USE (CHEAPEST, FEWEST EBLOCKS?)
+        # length of ebLock is already checked here
+        clusters = self.make_clusters(idx_all, paired) # or 'amount', 'cost'	# TODO ADD TO DESIGN EBLOCKS INIT
+        print("clusters: ", clusters)
 
         # Write expected cost to file (based on IDT pricing)
-        with open(os.path.join(self.output_fp, "expected_cost.txt"), "w") as f:
-            f.write(f"expected costs: {str(lowest_cost)}" + '\n')
-            f.write(f"number of cluters: {str(len(clusters))}" + '\n')
+        # with open(os.path.join(self.output_fp, "expected_cost.txt"), "w") as f:
+        #     f.write(f"expected costs: {str(lowest_cost)}" + '\n')
+        #     f.write(f"number of cluters: {str(len(clusters))}" + '\n')
 
-        bins = self.make_bins(clusters)
-        # print("Bins: ", str(bins))
+        bins = self.make_bins(clusters) # Here the OH is added to both sides of the gene block
+        print("Bins: ", str(bins))
         
         # Make gene blocks (WT DNA sequences cut to the correct size)
         all_gene_blocks = self.make_gene_block(bins, self.dna_seq)
@@ -173,6 +158,7 @@ class DesignEblocks:
             print(key, len(value))
 
         # TODO Maybe first check for all gene blocks whether the mutation is in a correct place, e.g. not the beginning or end of a gene block
+        # TODO SIZES ALREADY HAVE BEEN CHECKED, SO NO NEED TO CHECK AGAIN HERE
 
         results = {}
         should_restart = True
@@ -527,7 +513,7 @@ class DesignEblocks:
 
         Returns:
             list: list of bins
-        """    
+        """
         bins = []
         for _, value in clusters.items():
             bins.append(min(value) - self.min_bin_overlap)
@@ -541,7 +527,7 @@ class DesignEblocks:
         """
         mutation_type_colors = self.mutation_type_colors()
         # Create an empty plot with no data points
-        fig, ax = plt.subplots(figsize=(2, 1))
+        fig, ax = plt.subplots(figsize=(3, 2))
         # Add mutation type colors to the legend
         handles = []
         for k, v in mutation_type_colors.items():
@@ -560,7 +546,7 @@ class DesignEblocks:
         features = []
 
         if not idx_dna_tups:
-            _, idx_dna_tups, _ = self.index_mutations(self.mutations, self.mutation_types)
+            _, idx_dna_tups, _, _ = self.index_mutations(self.mutations, self.mutation_types)
 
         # Add gene to plot
         if genename:
@@ -597,11 +583,7 @@ class DesignEblocks:
                                             label=f"Block {key.split('_')[1]}"))
             
         record = GraphicRecord(sequence_length=len(self.dna_seq), features=features)
-
-        # Also create legend for the plot
-        legend = self.plot_legend()
-
-        return record, legend
+        return record
 
     def make_barplot(self, data, outpath, color, fname="barplot.png"):
         """
@@ -728,12 +710,12 @@ class DesignEblocks:
         return clusters
     
     def make_clusters(self, idxs, paired_mutations):
+        # OTHER OPTIMIZE Possibilty = 'amount'
         
         possibilities = {}
         n = 1
         valid_clusters = True
 
-        # TODO Take into account the OH on both sides of the gene block, so decrease max size with 40 (20 on both sides)
         # TODO CHECK IF PAIRED MUTATIONS ARE CORRECTLY ADDED TO THE CLUSTER
         # TODO GIVE SUMMARY OF OPTIONS AND LET THE USER DECIDE WHICH ONE TO USE
         # TODO PEROFRM DIFFERENT RANDOM STATES AS WELL?
@@ -758,7 +740,7 @@ class DesignEblocks:
             max_cluster_size = max(cluster_sizes)
             min_cluster_size = min(cluster_sizes)
 
-            if max_cluster_size > (self.idt_max_length_fragment - 2 * self.min_bin_overlap):
+            if max_cluster_size > (self.idt_max_length_fragment - 2 * self.min_bin_overlap): # Take into account the OH on both sides of the gene block, so decrease max size with 2 times min length of OH
                 print("Cluster size is still too large, increasing the number of clusters")
                 n += 1
             elif min_cluster_size < (self.idt_min_length_fragment - 2 * self.min_bin_overlap):
@@ -768,6 +750,7 @@ class DesignEblocks:
                 possibilities[f'cluster N={n}'] = clusters # TODO ADD CLUSTERING PARAMS HERE? 
                 # Calculate costs and check size of fragments
                 cost = self.calculate_cost(clusters)
+                n_eblocks = len(clusters)
                 print(f"Costs of cluster N={n}: {cost}")
                 n += 1
 
@@ -775,7 +758,26 @@ class DesignEblocks:
         for key, value in possibilities.items():
             print(key, value)
 
-        return possibilities
+        if self.optimization == 'cost':
+            # Find the clustering with the lowest cost
+            lowest_cost = np.inf
+            for key, value in possibilities.items():
+                cost = self.calculate_cost(value)
+                if cost < lowest_cost:
+                    lowest_cost = cost
+                    best_clustering = value
+            print(f"Lowest cost: {lowest_cost}")
+            return best_clustering
+        
+        elif self.optimization == 'amount':
+            # Find the clustering with the lowest number of eBlocks
+            fewest_blocks = np.inf
+            for key, value in possibilities.items():
+                n_blocks = len(value)
+                if n_blocks < fewest_blocks:
+                    fewest_blocks = n_blocks
+                    best_clustering = value
+            return best_clustering
 
     def kmeans_clustering(self, mutation_indices, paired_mutations, num_clusters, visaualize=False):
         # Create connected mutation indices based on pairs
@@ -838,6 +840,7 @@ class DesignEblocks:
         return f'Block_{num}_pos_{bins[num]}_{bins[num+1]}'
 
     def make_gene_block(self, bins, dna_sequence):
+        # TODO Add overhang on both sides of the gene block 
         gene_blocks = {}
         for num in range(len(bins) - 1):
             name = self.name_block(num, bins)
