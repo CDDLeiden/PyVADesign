@@ -1,6 +1,0 @@
-Block2_Fw;gccccggtccgatgggcatgaacgcccacaac
-Block2_Rv;gatgtcgatatcgggcgcggacggacgc
-Block0_Fw;gacggctacttcctcaagtccgccgaggagatgcgggcgctgtg
-Block0_Rv;atcccgatgatgggtttgatgccggccttggtcgcc
-Block4_Fw;gggggcggcgaggacaccgggaccgacgcg
-Block4_Rv;cggccggatagttggccttgaggtaggccgtccagtacga

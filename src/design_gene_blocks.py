@@ -1,5 +1,6 @@
 import os
 import sys
+import math
 import random
 # import openpyxl
 import numpy as np
@@ -14,7 +15,10 @@ from dna_features_viewer import GraphicFeature, GraphicRecord
 from utils import read_codon_usage, DNA_Codons, write_pickle, log_to_file_and_console, create_or_clear_file
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
-template_path = os.path.join(script_dir, 'data/eblocks-plate-upload-template-96.xlsx')
+
+# TODO Change this
+template_path_96 = os.path.join(script_dir, 'data/eblocks-plate-upload-template-96.xlsx')
+template_path_384 = os.path.join(script_dir, 'data/eblocks-plate-upload-template-384.xlsx')
 
 class DesignEblocks:
     """
@@ -35,13 +39,15 @@ class DesignEblocks:
         _type_: _description_
     """
 
+    # TODO Add all parameters here
     def __init__(self, 
                  sequence_fp: str, 
                  mutations_fp: str,
                  output_fp: str,
                  codon_usage_fp: str,
-                 optimize: str, # TODO SOMETHING GOES WRONG HERE
+                 optimize: str, 
                  species = "Escherichia coli",
+                 bp_price = 0.05,
                  gene_name = None,
                  min_bin_overlap = 25,
                  idt_max_length_fragment = 1500,
@@ -59,22 +65,14 @@ class DesignEblocks:
         self.optimization = optimize
         self.min_bin_overlap = min_bin_overlap
         self.gene_name = gene_name
+        self.bp_price = bp_price  # Based on IDT pricing
         self.idt_max_length_fragment = idt_max_length_fragment
         self.idt_min_length_fragment = idt_min_length_fragment
         self.idt_min_order = idt_min_order
         self.codon_usage_fp = codon_usage_fp
-        self.n_iterations = 100  # Number of iterations to run mean shift clustering
         self.gene_blocks = None
 
-        # TODO ADD LOGFILE
-        self.logfile = os.path.join(self.output_fp, "design_gene_blocks.log")
-
-        # TODO CHANGE THIS AND INCLUDE LOGFILE
-        # # Create or clear log file
-        # create_or_clear_file(self.logfile)
-
-        # # Redirect stdout to the log file
-        # sys.stdout = open(self.logfile, 'a')
+        self.colors = None
         
         self.dna_seq = self.read_seq(sequence_fp)
         self.mutations, self.mutation_types = self.read_mutations(mutations_fp)  # Types = {Mutation, Insert, Deletion}
@@ -82,82 +80,81 @@ class DesignEblocks:
 
         # TODO ADD THE PLOT HERE WITHOUT THE EBLOCKS, JUST THE MUTATIONS
 
-    def run(self):
+    def run(self, show=False):
         """
         Run the design of eBlocks
         """
 
         # Find indexes in sequence where mutation occures
-        # TODO Remove idx test
+        # TODO Remove/rename idx test
         # TODO Change this function so that you obtain for deletions and insertions all indexes (so the full range of mutations)
-        idx_dna, idx_dna_tups, idx_test, paired = self.index_mutations(self.mutations, self.mutation_types)
+        # Paired = double mutation and insertion
+        idx_dna, idx_dna_tups, idx_test, paired, idx_all, double_mut_pairs = self.index_mutations(self.mutations, self.mutation_types)
+
+        # print("idx_dna_tups", len(idx_dna_tups), idx_dna_tups)
+        # print("idx_dna", len(idx_dna), idx_dna)
+        # print("idx_test", len(idx_test), idx_test)
+        # print("paired", len(paired), paired)
+        # print("idx_all", len(idx_all), idx_all)
+        # print("double_mut_pairs", len(double_mut_pairs), double_mut_pairs)
         
-        print("paired: ", paired)
-        print("idx_dna: ", idx_dna)
-        print("idx_dna_tups: ", idx_dna_tups)
-        print("idx_test: ", idx_test)
-        print("----------------------------------")
+        # length of ebLock is already checked here and should be within bounds
+        # TODO Check here upon addition of the insert whether the gene block is still within bounds
+        clusters = self.make_clusters(idx_all, idx_dna_tups, idx_test, paired) # or 'amount', 'cost'
+        print(f"expected cost, counting {self.bp_price} cent per bp: {self.calculate_cost(clusters)} euros")
+        # print(clusters)
 
-        idx_all = []
-        for i in idx_test:
-            if type(i) == list:
-                idx_all.extend(i)
-            else:
-                idx_all.append(i)
+        bins = self.make_bins(clusters) # OH is added to both sides of the gene bloc
+        # print(bins)
+        # print(len(bins))
 
-        print("idx_all: ", idx_all)
-        print("----------------------------------")
-
-        # TODO LET THE USER DECIDE WHICH CLUSTERING TO USE (CHEAPEST, FEWEST EBLOCKS?)
-        # length of ebLock is already checked here
-        clusters = self.make_clusters(idx_all, paired) # or 'amount', 'cost'	# TODO ADD TO DESIGN EBLOCKS INIT
-        print("clusters: ", clusters)
-
-        # Write expected cost to file (based on IDT pricing)
-        # with open(os.path.join(self.output_fp, "expected_cost.txt"), "w") as f:
-        #     f.write(f"expected costs: {str(lowest_cost)}" + '\n')
-        #     f.write(f"number of cluters: {str(len(clusters))}" + '\n')
-
-        bins = self.make_bins(clusters) # Here the OH is added to both sides of the gene block
-        print("Bins: ", str(bins))
-        
         # Make gene blocks (WT DNA sequences cut to the correct size)
-        all_gene_blocks = self.make_gene_block(bins, self.dna_seq)
-        # print("all_gene_blocks ", all_gene_blocks)
-
-        # Delete gene_blocks that are not used for mutations
-        self.gene_blocks, _ = self.clean_gene_blocks(idx_dna, bins, all_gene_blocks)
-        # print("gene_blocks ", self.gene_blocks)
+        # Gene blocks are renumbered here
+        self.gene_blocks = self.make_gene_block(bins, self.dna_seq)
+        # print(self.gene_blocks)
 
         # Plot gene blocks
-        # TODO MAKE SURE THAT YOU CAN ALSO CHOOSE BETWEEN COLORS THAT YOU lIKE FOR THE EBLOCKS IN THE PLOT
-        eblock_hex_colors = self.eblock_colors()
-        record, legend = self.plot_eblocks_mutations(idx_dna_tups=idx_dna_tups, eblocks=True, mutations=True, genename=self.gene_name, eblock_colors=eblock_hex_colors)
-        record.plot(figure_width=20)
-        
+        # TODO Save plot to file?
+        # TODO Make legend and save to file
+        # TODO SEPARATE PLOTTING AND SAVING TO FILE
+        # TODO CHECK WHAT HAPPENS WHEN USING COMMANDLINE FOR RUNNING (SHOULD NOT SHOW)
+        # TODO Save colors of eblock to instance
+
+        # for k, v in self.gene_blocks.items():
+        #     print(k, len(v))
+
+        # Plot legend
+        legend = self.plot_legend(show=show)
+        legend.savefig(os.path.join(self.output_fp, 'legend.png'), dpi=100)
+
         # Make histogram with bins
-        # Count the number of mutations in each eblock
-        counts = {}
-        for i in self.gene_blocks.keys():
-            bbegin = int(i.split('_')[3])
-            bend = int(i.split('_')[4])
-            for idx in idx_dna:
-                if bbegin < idx < bend:
-                    if i in counts.keys():
-                        counts[i] += 1
-                    else:
-                        counts[i] = 1
-        # print("counts ", counts)
-        colors = list(eblock_hex_colors.values())[0:len(counts)]
-        self.make_barplot(counts, self.output_fp, color=colors)
+        # TODO Count double mutations in single eblock as single mutations in the histogram
+        counts = self.count_mutations_per_eblock(idx_dna_tups)
+
+        # TODO See if the total number of mutations adds to the value of the histogram
+        num_mutations = sum(counts.values())
+        # print("num mutations:", num_mutations)
+
+        if not self.colors:
+            eblock_hex_colors = self.eblock_colors()
+            self.colors = list(eblock_hex_colors.values())[0:len(counts)]
+        eblock_counts = self.make_barplot(counts, show=show)
+        eblock_counts.savefig(os.path.join(self.output_fp, 'barplot.png'), dpi=100)
+
+        record = self.plot_eblocks_mutations(idx_dna_tups=idx_dna_tups, eblocks=True, mutations=True, genename=self.gene_name)
+        record.plot(figure_width=20)[0].figure.savefig(os.path.join(self.output_fp, 'eblocks.png'), dpi=100)
+        if show:
+            record.plot(figure_width=20)
 
         # TODO Plot the lengths of the gene blocks
+        # for k, v in self.gene_blocks.items():
+        #     print(k, len(v))
         
-        # Check for size of gene blocks, if too small or too large, then change bandwidth and rerun?
+        # Create dictionary that contains the gene blocks and the mutations that are in the gene blocks
         for key, value in self.gene_blocks.items():
-            print(key, len(value))
+            pass
 
-        # TODO Maybe first check for all gene blocks whether the mutation is in a correct place, e.g. not the beginning or end of a gene block
+
         # TODO SIZES ALREADY HAVE BEEN CHECKED, SO NO NEED TO CHECK AGAIN HERE
 
         results = {}
@@ -167,13 +164,15 @@ class DesignEblocks:
             for num, mut in enumerate(self.mutations):
 
                 mut_type = self.mutation_types[num]
-                
+                                
                 # Change gene block in selected position for mutation
                 if mut_type == self.type_mutation:
 
                     # Find gene block and index of insert/deletion/mutation
                     mut_idx = idx_dna_tups[num][1]
-                    mut_gene_block_name, mut_gene_block_value = self.find_gene_block(self.gene_blocks, mut_idx)
+                    name_val, _ = self.find_gene_block(self.gene_blocks, mut_idx)
+                    mut_gene_block_name = list(name_val.keys())[0]
+                    mut_gene_block_value = name_val[mut_gene_block_name]
                     idx = self.find_mutation_index_in_gene_block(mut_gene_block_name, mut_idx)
 
                     # Check if WT codon at index is same residue as mutation
@@ -200,7 +199,9 @@ class DesignEblocks:
 
                     # Find gene block and index of insert/deletion/mutation
                     mut_idx = idx_dna_tups[num][1]
-                    mut_gene_block_name, mut_gene_block_value = self.find_gene_block(self.gene_blocks, mut_idx)
+                    name_val, _ = self.find_gene_block(self.gene_blocks, mut_idx)
+                    mut_gene_block_name = list(name_val.keys())[0]
+                    mut_gene_block_value = name_val[mut_gene_block_name]
                     idx = self.find_mutation_index_in_gene_block(mut_gene_block_name, mut_idx)
 
                     # Check if WT codon at index is same residue as mutation
@@ -213,6 +214,7 @@ class DesignEblocks:
                     # TODO This part should be moved more to the beginning
                     if self.check_eblock_length(mut_gene_block):
                         # Store output in dictionary
+                        # TODO Check here upon addition of the insert whether the gene block is still within bounds
                         results[mut] = [mut_gene_block_name, mut_gene_block, idx, codon_insert, mut_type]
 
                 elif mut_type == self.type_deletion:
@@ -220,7 +222,10 @@ class DesignEblocks:
                     idx_del_start = idx_dna_tups[num][1]
                     idx_del_end = int(mut.split('-')[1][1:]) * 3
                     
-                    mut_gene_block_name, mut_gene_block_value = self.find_gene_block(self.gene_blocks, idx_del_start)
+                    name_val, _ = self.find_gene_block(self.gene_blocks, idx_del_start)
+                    mut_gene_block_name = list(name_val.keys())[0]
+                    mut_gene_block_value = name_val[mut_gene_block_name]
+
                     idx = self.find_mutation_index_in_gene_block(mut_gene_block_name, idx_del_start)
                     idx_end = self.find_mutation_index_in_gene_block(mut_gene_block_name, idx_del_end)
 
@@ -231,28 +236,43 @@ class DesignEblocks:
                     mut_gene_block = self.mutate_gene_block('', idx, mut_gene_block_value, mut_type, idx_end)
 
                     # Check if eBlock is too long / too short
+                    # TODO Check here upon addition of the insert whether the gene block is still within bounds
                     if self.check_eblock_length(mut_gene_block):
                         # Store output in dictionary
                         results[mut] = [mut_gene_block_name, mut_gene_block, idx, '', mut_type]  # TODO Maybe do it based on a string to remove 
 
                 elif mut_type == self.type_combined:
 
-                    # TODO Check if the different mutations are in the same eblock, otherwise throw error
+                    # print(num, mut, mut_type)
+                    # print("idx_dna_tups", idx_dna_tups[num])
 
                     # Find gene block and index of insert/deletion/mutation
-                    mut_idx = idx_dna_tups[num][0][1]
+                    # TODO Assuming here that there are at least some mutations not overlapping with each other in different eblocks
+                    mut_gene_block_name = None
+                    mut_gene_block_value = None
 
-                    mut_gene_block_name, mut_gene_block_value = self.find_gene_block(self.gene_blocks, mut_idx)
+                    for mut_i in idx_dna_tups[num]:
+                        possible_gene_blocks, counts = self.find_gene_block(self.gene_blocks, mut_i[1])
+                        # print("possible_gene_blocks", possible_gene_blocks, counts)
+                        if counts == 1:
+                            mut_gene_block_name = list(possible_gene_blocks.keys())[0]
+                            mut_gene_block_value = possible_gene_blocks[mut_gene_block_name]
 
                     idxs = []
                     codons = []
                     
                     for mut_i in idx_dna_tups[num]:
 
+                        # print(mut_i, idx_dna_tups[num])
+                        # print("mut_gene_block_name:", mut_gene_block_name)
+                        # print("mut_gene_block_value:", mut_gene_block_value)
+
                         idx = self.find_mutation_index_in_gene_block(mut_gene_block_name, mut_i[1])
+                        # print(idx)
 
                         idxs.append(idx)
                         mut_codons = self.extract_mut_codons(mut_i[0][-1])
+                        
                         # Find most occuring mutant codon based on codon usage for species
                         mut_codon = self.select_mut_codon(mut_codons)
                         codons.append(mut_codon)
@@ -278,6 +298,27 @@ class DesignEblocks:
         # TODO FIX THIS
         # sys.stdout = sys.__stdout__
         # self.logfile.close()
+
+    def count_mutations_per_eblock(self, idx_dna_tups):
+        # Count the number of mutations in each eblock
+        counts = {}
+        for i in self.gene_blocks.keys():
+            bbegin = int(i.split('_')[3])
+            bend = int(i.split('_')[4])
+            for idx in idx_dna_tups:
+                if type(idx[1]) == int:
+                    if bbegin < idx[1] < bend:
+                        if i in counts.keys():
+                            counts[i] += 1
+                        else:
+                            counts[i] = 1
+                elif type(idx[1]) == list:  # just take the first mutation of a combined mutation, as they will all be in the same eblock
+                    if bbegin < idx[1][1] < bend:
+                        if i in counts.keys():
+                            counts[i] += 1
+                        else:
+                            counts[i] = 1
+        return counts
 
     def clean_gene_blocks(self, idx_dna, bins, gene_blocks):
         """
@@ -313,11 +354,13 @@ class DesignEblocks:
         return nkey_gene_blocks, counts
 
     def check_wt_codon(self, gene_block_value, idx, mut):
+        result = None
         for key, value in DNA_Codons.items():
                 if key.lower() == gene_block_value[idx-3:idx]:
                     result = value
         if not result == mut[0]:
             print( f"WT codon does not match residue {mut}, but is {result}, the codon is {gene_block_value[idx-3:idx]}")
+            print(f"This is probably due to the fact that paired mutations are not in same eBlock")
             sys.exit()
 
     def check_existance_codon_usage_table(self):
@@ -346,7 +389,7 @@ class DesignEblocks:
                 sys.exit()
             else:
                 return True
-
+                            
     def index_mutations(self, mut_list, mut_types):
         """_summary_
 
@@ -355,8 +398,10 @@ class DesignEblocks:
 
         Returns:
             _type_: _description_
-        """    
-        idx_dna, idx_dna_tups, idx_test, paired = [], [], [], []
+        """
+        # TODO CLEAN THIS FUNCTION
+        # TODO Add check for insertions and deletions (so that the full range of mutations is added)
+        idx_dna, idx_dna_tups, idx_test, paired, idx_all, double_mut_pairs = [], [], [], [], [], []
         for mut, type in zip(mut_list, mut_types):
             if type == self.type_mutation:
                 idx_dna.append(int(mut[1:-1]) * 3)  # A residue consists of 3 nucleotides
@@ -366,10 +411,7 @@ class DesignEblocks:
                 mut_i = mut.split('-')[0]
                 idx_dna.append(int(mut_i[1:]) * 3)  # A residue consists of 3 nucleotides
                 idx_dna_tups.append([f"{mut}", int(mut_i[1:]) * 3])
-                # length_insert = len(mut.split('-')[1])
-                # begin = int(mut_i[1:]) * 3
-                # end = begin + length_insert * 3
-                # paire.append(range(begin, end, 3))
+                idx_test.append(int(mut_i[1:]) * 3)
             elif (type == self.type_deletion):
                 mut_b = mut.split('-')[0]
                 mut_e = mut.split('-')[1]
@@ -396,7 +438,15 @@ class DesignEblocks:
                 idx_test.append(tmp)
                 tmp_tuple = tuple(tmp)
                 paired.append(tmp_tuple)
-        return idx_dna, idx_dna_tups, idx_test, paired
+                double_mut_pairs.append(tmp_tuple)
+
+        for i in idx_test:
+            if isinstance(i, list):
+                idx_all.extend(i)
+            else:
+                idx_all.append(i)
+
+        return idx_dna, idx_dna_tups, idx_test, paired, idx_all, double_mut_pairs
     
     def check_input_mutations(self, mutations, mutation_types):
         """
@@ -518,10 +568,9 @@ class DesignEblocks:
         for _, value in clusters.items():
             bins.append(min(value) - self.min_bin_overlap)
             bins.append(max(value) + self.min_bin_overlap)
-        bins.sort()
         return bins
     
-    def plot_legend(self, legend_alpha=0.2, font_size='x-large', marker_size=10, linestyle='None', marker='o', loc='center', bbox_to_anchor=(0.5, 0.5)):
+    def plot_legend(self, legend_alpha=0.2, font_size='x-large', marker_size=10, linestyle='None', marker='o', loc='center', bbox_to_anchor=(0.5, 0.5), show=False):
         """
         Plot legend for eBlocks plot
         """
@@ -536,9 +585,11 @@ class DesignEblocks:
         legend = ax.legend(handles=handles, loc=loc, bbox_to_anchor=bbox_to_anchor, fontsize=font_size, framealpha=legend_alpha)
         # Hide the axes
         ax.axis('off')
+        if not show:
+            plt.close()
         return fig
     
-    def plot_eblocks_mutations(self, idx_dna_tups=None, eblocks=True, mutations=True, genename=None, genecolor="#d3d3d3", eblock_colors=None):
+    def plot_eblocks_mutations(self, idx_dna_tups=None, eblocks=True, mutations=True, genename=None, genecolor="#d3d3d3"):
         """
         Plot mutations and selected eBlocks
         """
@@ -546,7 +597,7 @@ class DesignEblocks:
         features = []
 
         if not idx_dna_tups:
-            _, idx_dna_tups, _, _ = self.index_mutations(self.mutations, self.mutation_types)
+            _, idx_dna_tups, _, _, _, _ = self.index_mutations(self.mutations, self.mutation_types)
 
         # Add gene to plot
         if genename:
@@ -579,31 +630,32 @@ class DesignEblocks:
                 features.append(GraphicFeature(start=int(key.split('_')[3]), 
                                             end=int(key.split('_')[4]), 
                                             strand=+1, 
-                                            color=eblock_colors[num], 
+                                            color=self.colors[num], 
                                             label=f"Block {key.split('_')[1]}"))
             
         record = GraphicRecord(sequence_length=len(self.dna_seq), features=features)
         return record
 
-    def make_barplot(self, data, outpath, color, fname="barplot.png"):
+    def make_barplot(self, data, show):
         """
         Make barplot of bins
         """
-        # TODO Match colors of barplot with eBlocks plot
-        fig, ax = plt.subplots(figsize=(5, 2))
+        fig, ax = plt.subplots(figsize=(8, 4))
         labels = []
         for k, v in data.items():
             kn = k.split('_')[0] + ' ' + k.split('_')[1]
             labels.append(kn)
-        ax.bar(range(len(data)), list(data.values()), align='center', color=color)
+        ax.bar(range(len(data)), list(data.values()), align='center', color=self.colors)
         ax.set_xticks(range(len(data)), labels)
         ax.set_ylabel('Number of mutants per eBlock')
         ax.set_xlabel('eBlock')
         ax.set_title('Number of mutants per eBlock')
         ax.bar_label(ax.containers[0])
-        fig.savefig(os.path.join(outpath, fname))
+        if not show:
+            plt.close()
+        return fig
 
-    def calculate_cost(self, clusters: dict, bp_price=0.05) -> float:
+    def calculate_cost(self, clusters: dict) -> float:
         """
         Calculate the total cost of all fragments, based on clusters
 
@@ -618,7 +670,7 @@ class DesignEblocks:
             min_val = min(value)
             max_val = max(value)
             len_gene_block = (max_val - min_val) + 2 * self.min_bin_overlap  # on both size of the gene block there should be a number of non-mutated basepairs for IVA primer design
-            cost = len_gene_block * bp_price * len(value)
+            cost = len_gene_block * self.bp_price * len(value)
             total_cost += cost
         return round(total_cost, 2)
 
@@ -653,112 +705,133 @@ class DesignEblocks:
 
         return bandwidth
         
-    def optimize_bins(self, x, bandwidth=200):
-        """
-        Optimize the bins using a meanshift algorithm
+    # def optimize_bins(self, x, bandwidth=200):
+    #     """
+    #     Optimize the bins using a meanshift algorithm
 
-        Args:
-            x (list): indexes of mutations
+    #     Args:
+    #         x (list): indexes of mutations
 
-        Returns:
-            optimal_bandwidth (int): 
-            lowest_cost (float): estimated costs of all gene blocks together
-        """    
+    #     Returns:
+    #         optimal_bandwidth (int): 
+    #         lowest_cost (float): estimated costs of all gene blocks together
+    #     """    
 
-        lowest_cost = np.inf
-        optimal_bandwidth = bandwidth
+    #     lowest_cost = np.inf
+    #     optimal_bandwidth = bandwidth
         
-        for i in range(self.n_iterations):
+    #     for i in range(self.n_iterations):
 
-            # Start with default value
-            clusters = self.meanshift(x, bandwidth)
+    #         # Start with default value
+    #         clusters = self.meanshift(x, bandwidth)
 
-            # Calculate costs and check size of fragments
-            cost = self.calculate_cost(clusters)
-            new_bandwidth = self.check_fragment_sizes(clusters, bandwidth)
+    #         # Calculate costs and check size of fragments
+    #         cost = self.calculate_cost(clusters)
+    #         new_bandwidth = self.check_fragment_sizes(clusters, bandwidth)
                    
-            if bandwidth == new_bandwidth:
-                if lowest_cost > cost:
-                    lowest_cost = cost
-                    optimal_bandwidth = new_bandwidth
+    #         if bandwidth == new_bandwidth:
+    #             if lowest_cost > cost:
+    #                 lowest_cost = cost
+    #                 optimal_bandwidth = new_bandwidth
                 
-                ops = (add, sub)
-                operation = random.choice(ops)
-                random_int = random.randint(1, 50)
-                bandwidth = operation(bandwidth, random_int)
-            else:
-                bandwidth = new_bandwidth
+    #             ops = (add, sub)
+    #             operation = random.choice(ops)
+    #             random_int = random.randint(1, 50)
+    #             bandwidth = operation(bandwidth, random_int)
+    #         else:
+    #             bandwidth = new_bandwidth
 
-        return optimal_bandwidth, lowest_cost
+    #     return optimal_bandwidth, lowest_cost
     
-    def dbscan_clustering(self, data, epsilon):
-        # Flatten the list of ranges to individual numbers
-        print(data)
-        flattened_data = [item if isinstance(item, int) else item for sublist in data for item in (sublist if isinstance(sublist, list) else [sublist])]
-        print(flattened_data)
+    # def dbscan_clustering(self, data, epsilon):
+    #     # Flatten the list of ranges to individual numbers
+    #     print(data)
+    #     flattened_data = [item if isinstance(item, int) else item for sublist in data for item in (sublist if isinstance(sublist, list) else [sublist])]
+    #     print(flattened_data)
                 
-        X = np.array(flattened_data).reshape(-1, 1)
-        dbscan = DBSCAN(eps=epsilon, min_samples=2, metric='euclidean')
-        labels = dbscan.fit_predict(X)
+    #     X = np.array(flattened_data).reshape(-1, 1)
+    #     dbscan = DBSCAN(eps=epsilon, min_samples=2, metric='euclidean')
+    #     labels = dbscan.fit_predict(X)
 
-        clusters = {}
-        for idx, label in enumerate(labels):
-            if label not in clusters:
-                clusters[label] = []
-            clusters[label].append(flattened_data[idx])
+    #     clusters = {}
+    #     for idx, label in enumerate(labels):
+    #         if label not in clusters:
+    #             clusters[label] = []
+    #         clusters[label].append(flattened_data[idx])
 
-        return clusters
+    #     return clusters
     
-    def make_clusters(self, idxs, paired_mutations):
-        # OTHER OPTIMIZE Possibilty = 'amount'
+    def make_clusters(self, idxs, idxs_tuple, idx_test, paired_mutations):
+        # OTHER OPTIMIZE Possibilty = 'amount', 'cost'
         
-        possibilities = {}
+        possibilities = {} # Store all possible clusterings
         n = 1
         valid_clusters = True
 
-        # TODO CHECK IF PAIRED MUTATIONS ARE CORRECTLY ADDED TO THE CLUSTER
-        # TODO GIVE SUMMARY OF OPTIONS AND LET THE USER DECIDE WHICH ONE TO USE
-        # TODO PEROFRM DIFFERENT RANDOM STATES AS WELL?
+        # TODO CHECK IF PAIRED MUTATIONS ARE CORRECTLY ADDED TO THE CLUSTER > CHECK THIS
+        # TODO IF DESIGN OF EBLOCK IS NOT POSSIBLE > SUGGEST REMOVAL OF MUTATIONS
 
         while valid_clusters:
             
-            print(f"Clustering with {n} clusters ...")
+            # print(f"Clustering with {n} clusters ...")
 
             clusters = {}
-            cluster_labels = self.kmeans_clustering(idxs, paired_mutations, n)
+            cluster_labels, idxs_reordered = self.kmeans_clustering(idx_test, paired_mutations, n)
+            # print("cluster_labels", cluster_labels)
+            # print("idxs_reordered", idxs_reordered)
 
             # Calculate the size of each cluster
-            for i, j in zip(cluster_labels, idxs):
+            for i, j in zip(cluster_labels, idxs_reordered):
                 if i not in clusters:
                     clusters[i] = []
                 clusters[i].append(j)
 
             # Check if the size of the clusters is within bounds
             cluster_sizes = [max(v) - min(v) for v in clusters.values()]
-            print("Cluster sizes: ", cluster_sizes)
+            # print(f"Cluster sizes: {cluster_sizes}", type(cluster_sizes))
+
+            # Find in which cluster the insertion and deleted is located and check if the size of the cluster is within bounds when the mutation is added
+            for num, mut in enumerate(idxs_tuple):
+                if self.mutation_types[num] == self.type_insert:
+                    for key, value in clusters.items():
+                        if mut[1] in value:
+                            length_insert = len(mut[0].split('-')[1]) * 3
+                            cluster_sizes[key] += length_insert
+                elif self.mutation_types[num] == self.type_deletion:
+                    for key, value in clusters.items():
+                        if mut[1] in value:
+                            del_begin = int(mut[0].split('-')[0][1:]) * 3
+                            del_end = int(mut[0].split('-')[1][1:]) * 3
+                            length_del = (del_end - del_begin) + 3
+                            cluster_sizes[key] -= length_del
 
             max_cluster_size = max(cluster_sizes)
             min_cluster_size = min(cluster_sizes)
 
             if max_cluster_size > (self.idt_max_length_fragment - 2 * self.min_bin_overlap): # Take into account the OH on both sides of the gene block, so decrease max size with 2 times min length of OH
-                print("Cluster size is still too large, increasing the number of clusters")
+                # print(f"N={n}, Cluster size is still too large, increasing the number of clusters")
+                # print(f"Max cluster size: {max_cluster_size}, max allowed size: {self.idt_max_length_fragment - 2 * self.min_bin_overlap}")
                 n += 1
             elif min_cluster_size < (self.idt_min_length_fragment - 2 * self.min_bin_overlap):
-                print("Cluster size is too small, stop increasing the number of clusters")
+                # print(f"N={n}, Cluster size is too small, stop increasing the number of clusters")
+                # print(f"Min cluster size: {min_cluster_size}, min allowed size: {self.idt_min_length_fragment - 2 * self.min_bin_overlap}")
                 valid_clusters = False
             else:
-                possibilities[f'cluster N={n}'] = clusters # TODO ADD CLUSTERING PARAMS HERE? 
-                # Calculate costs and check size of fragments
-                cost = self.calculate_cost(clusters)
-                n_eblocks = len(clusters)
-                print(f"Costs of cluster N={n}: {cost}")
+                # print(f"N={n}, Cluster size is within bounds, increasing the number of clusters")
+                # print(f"Min cluster size: {min_cluster_size}, min allowed size: {self.idt_min_length_fragment - 2 * self.min_bin_overlap}")
+                possibilities[f'cluster N={n}'] = clusters # TODO ADD CLUSTERING PARAMS HERE? Atleast store them somwhere
                 n += 1
+        
+        if len(possibilities) == 0:  # No valid clusters found
+            # The double mutants are too far apart to be clustered together
+            # TODO Think about what to do here and what to suggest to the user
+            # TODO Find out which mutations are too far apart and suggest to remove them
+            print("No valid clusterings found, please check your input mutations and make sure that the multiple mutants are not too far apart.")
+            sys.exit()
 
-        print(f"Found {len(possibilities)} possible clusterings")
-        for key, value in possibilities.items():
-            print(key, value)
-
+        # Choose the best clustering based on the optimization parameter
         if self.optimization == 'cost':
+            print("Optimizing based on price per bp ...")
             # Find the clustering with the lowest cost
             lowest_cost = np.inf
             for key, value in possibilities.items():
@@ -766,10 +839,11 @@ class DesignEblocks:
                 if cost < lowest_cost:
                     lowest_cost = cost
                     best_clustering = value
-            print(f"Lowest cost: {lowest_cost}")
+            print(f"Lowest cost: {lowest_cost} with cluster {key}")
             return best_clustering
         
         elif self.optimization == 'amount':
+            print("Optimizing based on amount of eBlocks ...")
             # Find the clustering with the lowest number of eBlocks
             fewest_blocks = np.inf
             for key, value in possibilities.items():
@@ -777,75 +851,126 @@ class DesignEblocks:
                 if n_blocks < fewest_blocks:
                     fewest_blocks = n_blocks
                     best_clustering = value
+            print(f"Fewest blocks: {fewest_blocks} with cluster {key}")
             return best_clustering
+        
 
-    def kmeans_clustering(self, mutation_indices, paired_mutations, num_clusters, visaualize=False):
-        # Create connected mutation indices based on pairs
-        connected_indices = []
-        for pair in paired_mutations:
-            avg_position = np.mean(pair)
-            connected_indices.extend(list(pair) + [avg_position])
+    def kmeans_clustering(self, idx_test, paired_mutations, num_clusters, visualize=False, n_init='auto', random_state=42):
 
-        # Create a matrix where each row contains the distances to each point
-        mutation_matrix = np.concatenate([mutation_indices, connected_indices]).reshape(-1, 1)
+        idx_first = []
+        for i in idx_test:
+            if isinstance(i, list):
+                mean = np.mean(i)
+                idx_first.append(mean)
+            else:
+                idx_first.append(i)
+
+        mutation_arr = np.array(idx_first).reshape(-1, 1)
 
         # Initialize KMeans with the number of clusters
-        kmeans = KMeans(n_clusters=num_clusters, random_state=42)
+        kmeans = KMeans(n_clusters=num_clusters, random_state=random_state, n_init=n_init)
 
         # Fit the model and obtain cluster labels for connected indices
-        cluster_labels = kmeans.fit_predict(mutation_matrix)
+        cluster_labels = kmeans.fit_predict(mutation_arr)
+        cluster_labels = list(cluster_labels)
+        # print("length cluster label:", len(cluster_labels))
+
+        # Add the remaining indices of the pairs to the assigned cluster
+        to_remove = []
+        for pair in paired_mutations:
+            mean = np.mean(pair)
+            index = list(mutation_arr).index(mean)
+            to_remove.append(index)
+            cluster_label = cluster_labels[index]
+            L = [cluster_label] * len(pair)
+            for i in L:
+                cluster_labels.append(i)
+            for i in pair:
+                idx_first.append(i)
+            # print(pair, mean, index, cluster_label, L)
+            # Remove mean value from labels and indices
+        
+        # Remove the mean values from the list of indices and cluster labels
+        to_remove = sorted(to_remove, reverse=True)
+        for i in to_remove:
+            del idx_first[i]
+            del cluster_labels[i]
+             
+        # print("length cluster labels:", len(cluster_labels))
+
+        # print("length idx_first:", len(idx_first))
 
         # Extract cluster centers
-        cluster_centers = kmeans.cluster_centers_
-
         # Visualize the clusters
-        if visaualize:
-            plt.scatter(mutation_matrix, np.zeros_like(mutation_matrix),
-                        c=cluster_labels, cmap='viridis')
-            plt.scatter(cluster_centers, np.zeros_like(cluster_centers), c='red', marker='X', s=100, label='Cluster Centers')
-            plt.xlabel('Mutation Indices')
-            plt.title('K-means Clustering with Connected Mutations')
-            plt.legend()
-            plt.show()
-        return cluster_labels
+        # TODO Check what to do with this. Can be removed I guess
+        # if visualize:
+        #     plt.scatter(mutation_matrix, np.zeros_like(mutation_matrix),
+        #                 c=cluster_labels, cmap='viridis')
+        #     plt.scatter(cluster_centers, np.zeros_like(cluster_centers), c='red', marker='X', s=100, label='Cluster Centers')
+        #     plt.xlabel('Mutation Indices')
+        #     plt.title('K-means Clustering with Connected Mutations')
+        #     plt.legend()
+        #     plt.show()
+
+        return cluster_labels, idx_first
 
 
 
-    def meanshift(self, x: list, bandwidth: int):
+    # def meanshift(self, x: list, bandwidth: int):
+    #     """
+    #     Meanshift algorithm for finding clusters of mutations that fit in a gene block
+
+    #     Args:
+    #         x (list): _description_
+    #         bandwidth (int): _description_
+
+    #     Returns:
+    #         clusters (dict): _description_
+    #     """    
+    #     # https://stackoverflow.com/questions/18364026/clustering-values-by-their-proximity-in-python-machine-learning
+    #     X = np.array(list(zip(x, np.zeros(len(x)))), dtype=np.int64)
+    #     bandwidth = bandwidth
+    #     ms = MeanShift(bandwidth=bandwidth, bin_seeding=True)
+    #     ms.fit(X)
+    #     labels = ms.labels_
+    #     labels_unique = np.unique(labels)
+    #     clusters = {}
+    #     for label in labels_unique:
+    #         clusters[f'cluster {label}'] = []
+    #     for num, i in enumerate(labels):
+    #         clusters[f'cluster {i}'].append(x[num])
+    #     return clusters
+
+    def renumber_gene_blocks(self, gene_blocks):
         """
-        Meanshift algorithm for finding clusters of mutations that fit in a gene block
+        """
+        new_gene_blocks = {}
+        first_positions = []
+        for k, v in gene_blocks.items():
+            pos1 = k.split('_')[3]
+            first_positions.append(int(pos1))
+        # Sort the first positions
+        first_positions = sorted(first_positions)
 
-        Args:
-            x (list): _description_
-            bandwidth (int): _description_
 
-        Returns:
-            clusters (dict): _description_
-        """    
-        # https://stackoverflow.com/questions/18364026/clustering-values-by-their-proximity-in-python-machine-learning
-        X = np.array(list(zip(x, np.zeros(len(x)))), dtype=np.int64)
-        bandwidth = bandwidth
-        ms = MeanShift(bandwidth=bandwidth, bin_seeding=True)
-        ms.fit(X)
-        labels = ms.labels_
-        labels_unique = np.unique(labels)
-        clusters = {}
-        for label in labels_unique:
-            clusters[f'cluster {label}'] = []
-        for num, i in enumerate(labels):
-            clusters[f'cluster {i}'].append(x[num])
-        return clusters
-
-    def name_block(self, num, bins):
-        return f'Block_{num}_pos_{bins[num]}_{bins[num+1]}'
+        for num, i in enumerate(first_positions, 1):
+            for k, v in gene_blocks.items():
+                if int(k.split('_')[3]) == i:
+                    new_gene_blocks[f'Block_{num}_pos_{k.split("_")[3]}_{k.split("_")[4]}'] = v
+        return new_gene_blocks
 
     def make_gene_block(self, bins, dna_sequence):
-        # TODO Add overhang on both sides of the gene block 
         gene_blocks = {}
-        for num in range(len(bins) - 1):
-            name = self.name_block(num, bins)
+        num = 0
+        block_num = 1
+        while num < len(bins):
+            # print(f"Creating gene block {block_num} ...")
+            name = f'Block_{str(block_num)}_pos_{bins[num]}_{bins[num+1]}'
             block = dna_sequence[bins[num]:bins[num+1]]
             gene_blocks[name] = str(block)
+            num += 2
+            block_num += 1
+        gene_blocks = self.renumber_gene_blocks(gene_blocks)
         return gene_blocks
 
     def map_codons_aas(self, protein_sequence, dna_sequence):
@@ -886,55 +1011,21 @@ class DesignEblocks:
         return mut_codons
     
     def find_gene_block(self, gene_blocks, mutation_idx):
+        count = 0
+        results = {}
         for key, value in gene_blocks.items():
             begin_range, end_range = self.gene_block_range(key)
             if begin_range < int(mutation_idx) < end_range:
-                result = (key, value)
-                return result
-        
-    def check_position_gene_block(self, gene_block, idx_mutation):
-        begin_range, end_range = self.gene_block_range(gene_block)
-        if (idx_mutation - begin_range) > self.idt_min_length_fragment:
-            self.alter_gene_block_range(gene_block, 'extend_begin')
-            # TODO CHANGE
-            # print("Mutation is too close to beginning of gene block")
-            # sys.exit()
-        elif (end_range - idx_mutation) < self.idt_min_length_fragment:
-            print("Mutation is too close to final part of gene block")
-            # TODO 
-            sys.exit()
-        # SHOULD NOT BE NECCESSARY
-
-        # log_to_file_and_console(begin_range, end_range, idx_mutation)
-        # # TODO CHANGE
-        # if (idx_mutation - begin_range) > self.idt_min_length_fragment:
-        #     # self.alter_gene_block_range(gene_block, 'extend_begin')
-        #     log_to_file_and_console("Mutation is too close to beginning of gene block")
-        #     sys.exit()
-        # elif (end_range - idx_mutation) < self.idt_min_length_fragment:
-        #     log_to_file_and_console(end_range - idx_mutation)
-        #     log_to_file_and_console("Mutation is too close to final part of gene block")
-        #     sys.exit()
-
-    def alter_gene_block_range(self, gene_block, alteration):
-        if alteration == 'extend_begin':
-            pass
-            # TODO Add 20 nucleotides to beginning of gene block
-            # TODO: Make this more general
-            # TODO: Then check again if size is ok
-            # TODO: If correct, then return new range
-        elif alteration == 'extend_end':
-            pass
-            # TODO Add 20 nucleotides to end of gene block
-            
-
-        
+                results[key] = value
+                count += 1
+        return results, count
+                         
     def find_mutation_index_in_gene_block(self, gene_block, idx_mutation):
         begin_range, _ = self.gene_block_range(gene_block)
         # Find index of mutation within geneblock
         index = idx_mutation - begin_range
         # Check that mutation is not in the first or final X residues of the gene block (this would make it very difficult to design IVA primers)
-        self.check_position_gene_block(gene_block, index)
+        # self.check_position_gene_block(gene_block, index)
         return index
 
     def mutate_gene_block(self, mut_codon, mut_index, gene_block_seq, change_type, end_idx = None):
@@ -959,29 +1050,72 @@ class DesignEblocks:
                 len_gene_block = len(value[1])
                 out.write(key + '\t' + value[0] + '\t' + str(len_gene_block) + '\t' + value[1] + '\t' + str(value[2]) + '\t' + value[3] + '\t' + value[4] + '\n')
 
-    def extract_wells_from_template(self, template=template_path):
+    def extract_wells_from_template(self, template):
         df = pd.read_excel(template)
         wells = df['Well Position'].tolist()
         return wells
 
-    def write_gene_blocks_to_template(self, gene_block_dict, outpath, fname="eblocks-plate-upload-template-96-filled.xlsx"):
-        outfile = os.path.join(outpath, fname)
-        names = []
-        seqs = []
-        for key, value in gene_block_dict.items():
-            mutation = key
-            block = value[0].split('_')[0:2]
-            block = block[0] + '-' + block[1]
-            name = mutation + '_' + block
-            names.append(name)
-            seqs.append(value[1])
-        wells = self.extract_wells_from_template()
-        wells = wells[:len(names)]
-        df = pd.DataFrame()
-        df['Well Position'] = wells
-        df['Name'] = names
-        df['Sequence'] = seqs
-        df.to_excel(outfile, index=False)
+    def write_gene_blocks_to_template(self, gene_block_dict, outpath):
+        # TODO Change this function when more than 96 eBlocks are designed
+        # 384-well plate
+        # Count number of samples
+        n_samples = len(gene_block_dict)
+        if n_samples <= 96: # Use 96-well plate
+            fname="eblocks-plate-upload-template-96-filled.xlsx"
+            n_plates = 1
+            template = template_path_96
+        elif n_samples > 96 and n_samples <= 384: # Use 384-well plate
+            fname="eblocks-plate-upload-template-384-filled.xlsx"
+            n_plates = 1
+            template = template_path_384
+        elif n_samples > 384:
+            n_plates = math.ceil(n_samples / 384)
+            fnames = [f"eblocks-plate-upload-template-384-filled_{i}.xlsx" for i in range(1, n_plates + 1)]
+            template = template_path_384
+
+        if n_plates == 1:
+            outfile = os.path.join(outpath, fname)
+            names = []
+            seqs = []
+            for key, value in gene_block_dict.items():
+                mutation = key
+                block = value[0].split('_')[0:2]
+                block = block[0] + '-' + block[1]
+                name = mutation + '_' + block
+                names.append(name)
+                seqs.append(value[1])
+            wells = self.extract_wells_from_template(template=template)
+            wells = wells[:len(names)]
+            df = pd.DataFrame()
+            df['Well Position'] = wells
+            df['Name'] = names
+            df['Sequence'] = seqs
+            df.to_excel(outfile, index=False)
+
+        elif n_plates > 1:
+            # count = 1
+            max_samples = 384
+            for num, i in enumerate(fnames, 1):
+                # print(num, i, count)
+                outfile = os.path.join(outpath, i)
+                names = []
+                seqs = []
+                for index, (key, value) in enumerate(gene_block_dict.items(), 1):
+                    if index <= (max_samples * num) and index >= (max_samples * (num - 1) + 1):
+                        mutation = key
+                        block = value[0].split('_')[0:2]
+                        block = block[0] + '-' + block[1]
+                        name = mutation + '_' + block
+                        names.append(name)
+                        seqs.append(value[1])
+                        # count += 1
+                wells = self.extract_wells_from_template(template=template)
+                wells = wells[:len(names)]
+                df = pd.DataFrame()
+                df['Well Position'] = wells
+                df['Name'] = names
+                df['Sequence'] = seqs
+                df.to_excel(outfile, index=False)
         
     @staticmethod
     def short_name(name):
