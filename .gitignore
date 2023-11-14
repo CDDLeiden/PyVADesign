@@ -4,6 +4,7 @@
 # !tests/T1_out/.gitkeep 
 doc/problems.txt
 doc/TODO.txt
+tutorial/output/*.png
 
 ### Python template
 # Byte-compiled / optimized / DLL files
