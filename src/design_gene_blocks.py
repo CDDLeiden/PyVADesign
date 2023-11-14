@@ -88,6 +88,7 @@ class DesignEblocks:
         """
 
         # Find indexes in sequence where mutation occures
+        # TODO Remove idx test
         # TODO Change this function so that you obtain for deletions and insertions all indexes (so the full range of mutations)
         idx_dna, idx_dna_tups, idx_test, paired = self.index_mutations(self.mutations, self.mutation_types)
         
@@ -109,7 +110,7 @@ class DesignEblocks:
 
         # TODO LET THE USER DECIDE WHICH CLUSTERING TO USE (CHEAPEST, FEWEST EBLOCKS?)
         # length of ebLock is already checked here
-        clusters = self.make_clusters(idx_all, paired, optimize='amount') # or 'amount', 'cost'	# TODO ADD TO DESIGN EBLOCKS INIT
+        clusters = self.make_clusters(idx_all, paired) # or 'amount', 'cost'	# TODO ADD TO DESIGN EBLOCKS INIT
         print("clusters: ", clusters)
 
         # Write expected cost to file (based on IDT pricing)
@@ -526,7 +527,7 @@ class DesignEblocks:
         """
         mutation_type_colors = self.mutation_type_colors()
         # Create an empty plot with no data points
-        fig, ax = plt.subplots(figsize=(2, 1))
+        fig, ax = plt.subplots(figsize=(3, 2))
         # Add mutation type colors to the legend
         handles = []
         for k, v in mutation_type_colors.items():
@@ -582,11 +583,7 @@ class DesignEblocks:
                                             label=f"Block {key.split('_')[1]}"))
             
         record = GraphicRecord(sequence_length=len(self.dna_seq), features=features)
-
-        # Also create legend for the plot
-        legend = self.plot_legend()
-
-        return record, legend
+        return record
 
     def make_barplot(self, data, outpath, color, fname="barplot.png"):
         """
@@ -712,7 +709,7 @@ class DesignEblocks:
 
         return clusters
     
-    def make_clusters(self, idxs, paired_mutations, optimize='cost'):
+    def make_clusters(self, idxs, paired_mutations):
         # OTHER OPTIMIZE Possibilty = 'amount'
         
         possibilities = {}
@@ -761,7 +758,7 @@ class DesignEblocks:
         for key, value in possibilities.items():
             print(key, value)
 
-        if optimize == 'cost':
+        if self.optimization == 'cost':
             # Find the clustering with the lowest cost
             lowest_cost = np.inf
             for key, value in possibilities.items():
@@ -772,7 +769,7 @@ class DesignEblocks:
             print(f"Lowest cost: {lowest_cost}")
             return best_clustering
         
-        elif optimize == 'amount':
+        elif self.optimization == 'amount':
             # Find the clustering with the lowest number of eBlocks
             fewest_blocks = np.inf
             for key, value in possibilities.items():
