@@ -27,6 +27,10 @@ DNA_Codons = {
     "TAT": "Y", "TAC": "Y",
 }
 
+def natural_amino_acids():
+    return ['A', 'V', 'I', 'L', 'M', 'F', 'Y', 'W', 'S', 'T', 'N', 'Q', 'C', 'G', 'P', 'R', 'H', 'K', 'D', 'E']
+
+
 def read_codon_usage(fp):
     codon_usage = {}
     codon_usage_no_U = {}
