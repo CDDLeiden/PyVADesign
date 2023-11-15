@@ -1,7 +1,8 @@
 ### Specific for this directory
 
 doc/TODO.txt
-tutorial/output/*.*
+tutorial/output/*
+!tutorial/output/.gitkeep 
 
 ### Python template
 # Byte-compiled / optimized / DLL files
