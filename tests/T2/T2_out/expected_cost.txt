@@ -1,2 +1,0 @@
-expected costs: 921.1
-number of cluters: 3
