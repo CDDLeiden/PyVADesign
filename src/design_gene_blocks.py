@@ -112,10 +112,13 @@ class DesignEblocks:
         if not self.eblock_colors:  # If no colors are provided, randomly generate them
             eblock_hex_colors = self.generate_eblock_colors()
             self.eblock_colors = list(eblock_hex_colors.values())[0:len(counts)]
+        elif len(self.eblock_colors) < len(self.gene_blocks):
+            eblock_hex_colors = self.generate_eblock_colors()
+            self.eblock_colors = list(eblock_hex_colors.values())[0:len(counts)]
 
         # Barplot showing the number of mutations that can be made with each eBlock
         eblock_counts = self.make_barplot(counts, show=show)
-        eblock_counts.savefig(os.path.join(self.output_fp, f'counts_{self.gene_name}_N{self.num_mutations}.png'), dpi=100)
+        eblock_counts.savefig(os.path.join(self.output_fp, f'counts_{self.gene_name}_N{self.num_mutations}_{self.optimization}.png'), dpi=100)
 
         # Plot showing the eBlocks and which mutations are in which eBlock
         # TODO CHECK WHAT HAPPENS WHEN USING COMMANDLINE FOR RUNNING (SHOULD NOT SHOW)
@@ -123,7 +126,7 @@ class DesignEblocks:
         fig_size = (20, 20)  # TODO Change
         fig, ax = plt.subplots(figsize=fig_size) 
         record.plot(ax=ax, figure_width=20)
-        fig.savefig(os.path.join(self.output_fp, f'eblocks_{self.gene_name}_N{self.num_mutations}.png'), dpi=100)
+        fig.savefig(os.path.join(self.output_fp, f'eblocks_{self.gene_name}_N{self.num_mutations}_{self.optimization}.png'), dpi=100)
         if not show:
             plt.close()
 
@@ -246,7 +249,8 @@ class DesignEblocks:
                     mut_gene_block_value = possible_gene_blocks[mut_gene_block_name]
 
             if mut_gene_block_name is None:
-                lowest_count = min(counts for _, counts in self.find_gene_block(self.gene_blocks, mut_i[1]) for mut_i in idx_dna_tups[num])
+                all_counts = [counts for _, counts in (self.find_gene_block(self.gene_blocks, mut_i[1]) for mut_i in idx_dna_tups[num])]
+                lowest_count = min(all_counts)
 
             for mut_i in idx_dna_tups[num]:
                 possible_gene_blocks, counts = self.find_gene_block(self.gene_blocks, mut_i[1])
@@ -894,7 +898,8 @@ class DesignEblocks:
         return mut_block
 
 
-    def write_gene_blocks_to_txt(self, eblocks: dict, outpath, fname="gene_blocks.txt"):
+    def write_gene_blocks_to_txt(self, eblocks: dict, outpath):
+        fname= f"gene_blocks_{self.gene_name}_N{self.num_mutations}_{self.optimization}.txt"
         header = ['mutation', 'gene block name', 'length gene block', 'gene block sequence', 'index mutation', 'mut codon', 'type']
         outfile = os.path.join(outpath, fname)
         with open(outfile, 'w+') as out:
@@ -902,6 +907,15 @@ class DesignEblocks:
             for key, value in eblocks.items():
                 len_gene_block = len(value[1])
                 out.write(f"{key}\t{value[0]}\t{len_gene_block}\t{value[1]}\t{value[2]}\t{value[3]}\t{value[4]}\n")
+
+
+    def determine_template(self, n_samples: int):
+        if n_samples <= 96:
+            return template_path_96, f"eblocks-plate-upload-96-{self.gene_name}_N{self.num_mutations}_{self.optimization}.xlsx"
+        elif n_samples > 96 and n_samples <= 384:
+            return template_path_384, f"eblocks-plate-upload-template-384-{self.gene_name}_N{self.num_mutations}_{self.optimization}.xlsx"
+        elif n_samples > 384:
+            return template_path_384, f"eblocks-plate-upload-template-384-{self.gene_name}_N{self.num_mutations}_{self.optimization}.xlsx" 
 
 
     def write_gene_blocks_to_template(self, eblocks: dict, outpath):
@@ -961,16 +975,6 @@ class DesignEblocks:
             return 1
         elif n_samples > 384:
             return math.ceil(n_samples / 384)
-
-
-    @staticmethod
-    def determine_template(n_samples: int):
-        if n_samples <= 96:
-            return template_path_96, "eblocks-plate-upload-template-96-filled.xlsx"
-        elif n_samples > 96 and n_samples <= 384:
-            return template_path_384, "eblocks-plate-upload-template-384-filled.xlsx"
-        elif n_samples > 384:
-            return template_path_384, "eblocks-plate-upload-template-384-filled.xlsx" 
 
 
     @staticmethod
