@@ -80,7 +80,9 @@ class DesignEblocks:
         self.dna_seq = self.read_single_seq(sequence_fp)
         self.mutations, self.mutation_types = self.read_mutations(mutations_fp)  # Types = {Mutation, Insert, Deletion, Combined}
         self.codon_usage = self.check_existance_codon_usage_table()  # Check if codon usage table is present for selected species
-        
+        self.counts = None  # Number of mutations per eblock
+
+        self.legend_created = False
 
     def run(self, show=False):
         """
@@ -102,33 +104,25 @@ class DesignEblocks:
         self.gene_blocks = self.make_gene_block(bins, self.dna_seq)
 
         # Count number of mutations per eblock, for making barplot
-        counts = self.count_mutations_per_eblock(idx_dna_tups)
+        self.counts = self.count_mutations_per_eblock(idx_dna_tups)
 
         # Create legend, barplot and plot of eBlocks and mutations for visualization
         # Legend
-        legend = self.plot_legend(show=show)
-        legend.savefig(os.path.join(self.output_fp, 'legend.png'), dpi=100)
-
+        self.plot_legend(show=show)
+    
         if not self.eblock_colors:  # If no colors are provided, randomly generate them
             eblock_hex_colors = self.generate_eblock_colors()
-            self.eblock_colors = list(eblock_hex_colors.values())[0:len(counts)]
-        elif len(self.eblock_colors) < len(self.gene_blocks):
+            self.eblock_colors = list(eblock_hex_colors.values())[0:len(self.counts)]
+        elif len(self.eblock_colors) < len(self.gene_blocks):  # If not enough colors are provided, randomly generate the remaining ones (amount optimization uses less colors)
             eblock_hex_colors = self.generate_eblock_colors()
-            self.eblock_colors = list(eblock_hex_colors.values())[0:len(counts)]
+            self.eblock_colors = list(eblock_hex_colors.values())[0:len(self.counts)]
 
         # Barplot showing the number of mutations that can be made with each eBlock
-        eblock_counts = self.make_barplot(counts, show=show)
-        eblock_counts.savefig(os.path.join(self.output_fp, f'counts_{self.gene_name}_N{self.num_mutations}_{self.optimization}.png'), dpi=100)
-
+        self.make_barplot(show=show)
+        
         # Plot showing the eBlocks and which mutations are in which eBlock
-        # TODO CHECK WHAT HAPPENS WHEN USING COMMANDLINE FOR RUNNING (SHOULD NOT SHOW)
-        record = self.plot_eblocks_mutations(idx_dna_tups=idx_dna_tups, eblocks=True, mutations=True, genename=self.gene_name)
-        fig_size = (20, 20)  # TODO Change
-        fig, ax = plt.subplots(figsize=fig_size) 
-        record.plot(ax=ax, figure_width=20)
-        fig.savefig(os.path.join(self.output_fp, f'eblocks_{self.gene_name}_N{self.num_mutations}_{self.optimization}.png'), dpi=100)
-        if not show:
-            plt.close()
+        # TODO Save plot somewhere so that you can call it later
+        self.plot_eblocks_mutations(idx_dna_tups=idx_dna_tups, eblocks=True, mutations=True, genename=self.gene_name, show=show)
 
         # Loop over all mutations and create the eBlocks
         results = {}
@@ -527,8 +521,8 @@ class DesignEblocks:
         """
         bins = []
         for _, value in clusters.items():
-            bins.append(min(value) - self.min_bin_overlap)
-            bins.append(max(value) + self.min_bin_overlap)
+            bins.append(int(min(value) - self.min_bin_overlap))
+            bins.append(int(max(value) + self.min_bin_overlap))
         return bins
     
 
@@ -546,12 +540,14 @@ class DesignEblocks:
         legend = ax.legend(handles=handles, loc=loc, bbox_to_anchor=bbox_to_anchor, fontsize=font_size, framealpha=legend_alpha)
         # Hide the axes
         ax.axis('off')
-        if not show:
+        fig.savefig(os.path.join(self.output_fp, 'legend.png'), dpi=100)
+        if show:
+            plt.show()
+        else:
             plt.close()
-        return fig
-    
 
-    def plot_eblocks_mutations(self, idx_dna_tups=None, eblocks=True, mutations=True, genename=None, genecolor="#d3d3d3"):
+    
+    def plot_eblocks_mutations(self, idx_dna_tups=None, eblocks=True, mutations=True, genename=None, genecolor="#d3d3d3", show=False):
         """
         Plot mutations and selected eBlocks
         """
@@ -595,27 +591,41 @@ class DesignEblocks:
         
 
         record = GraphicRecord(sequence_length=len(self.dna_seq), features=features)
-        return record
+        figure_length = np.ceil(len(self.dna_seq) / 150)
+        figure_width = np.ceil(self.num_mutations / 10)
+        fig_size = (figure_length, figure_width)
+        fig, ax = plt.subplots(figsize=fig_size) 
+        record.plot(ax=ax, figure_width=20)
+        if show:
+            plt.show()
+        else:
+            plt.close()
+        if eblocks:
+            fig.savefig(os.path.join(self.output_fp, f'eblocks_{self.gene_name}_N{self.num_mutations}_{self.optimization}.png'), dpi=100)
+        if not eblocks:
+            fig.savefig(os.path.join(self.output_fp, f'{self.gene_name}_N{self.num_mutations}.png'), dpi=100)
 
 
-    def make_barplot(self, data, show):
+    def make_barplot(self, show):
         """
         Make barplot of bins
         """
         fig, ax = plt.subplots(figsize=(8, 4))
         labels = []
-        for k, v in data.items():
+        for k, v in self.counts.items():
             kn = k.split('_')[0] + ' ' + k.split('_')[1]
             labels.append(kn)
-        ax.bar(range(len(data)), list(data.values()), align='center', color=self.eblock_colors)
-        ax.set_xticks(range(len(data)), labels)
+        ax.bar(range(len(self.counts)), list(self.counts.values()), align='center', color=self.eblock_colors)
+        ax.set_xticks(range(len(self.counts)), labels)
         ax.set_ylabel('Number of mutants per eBlock')
         ax.set_xlabel('eBlock')
         ax.set_title('Number of mutants per eBlock')
         ax.bar_label(ax.containers[0])
-        if not show:
+        if show:
+            plt.show()
+        else:
             plt.close()
-        return fig
+        fig.savefig(os.path.join(self.output_fp, f'counts_{self.gene_name}_N{self.num_mutations}_{self.optimization}.png'), dpi=100)
 
 
     def calculate_cost(self, clusters: dict) -> float:

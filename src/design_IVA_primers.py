@@ -6,6 +6,11 @@ from Bio.SeqUtils import MeltingTemp as mt
 from design_gene_blocks import DesignEblocks
 from utils import load_pickle, extract_filename
 
+# TODO Imherit class attributes?
+# TODO What to do if complementarity between primers is too high?
+# TODO Hairpin primer complementarity (self-complementarity
+# TODO Complementarity between fw and rv primer
+
 class DesignPrimers:
     """
     """
@@ -40,13 +45,11 @@ class DesignPrimers:
             else:
                 unique_gene_blocks[mut] = wt_gene_blocks[mut]
 
-        fw_sequence = DesignEblocks.read_seq(self.input_gene_path)
+        fw_sequence = DesignEblocks.read_single_seq(self.input_gene_path)
         rv_sequence = self.reverse_complement(fw_sequence)
 
         primers = {}
         for gb_name, gb in unique_gene_blocks.items():
-
-            print(gb_name)
             
             begin_pos, end_pos = DesignEblocks.gene_block_range(gb_name)
             
@@ -91,6 +94,7 @@ class DesignPrimers:
             self.write_primers_to_file(df, self.output_location, self.snapgene_file)
         
         print("Primers written to file")
+        # TODO Check that primers bind nowhere else in sequence
         print("Make sure that primer binds nowhere else in sequence")
 
     def melting_temperature(self, sequence):
@@ -104,11 +108,7 @@ class DesignPrimers:
         best_tm = self.melting_temperature(primer)
         best_diff = round(abs(optimum - best_tm), 2)
 
-        # print("primer before loop", primer)
-
         for i in range(nsteps):
-
-            # print("primer", i, primer, pos)
 
             tm = self.melting_temperature(primer)
             diff = round(abs(optimum - tm), 2)
@@ -118,11 +118,9 @@ class DesignPrimers:
                 best_diff = diff
 
             if tm > optimum:
-                # print("tm > optimum")
                 size -= 1
                 primer = function(pos, sequence, size)
             elif tm < optimum:
-                # print("tm < optimum")
                 size += 1
                 primer = function(pos, sequence, size)
   
