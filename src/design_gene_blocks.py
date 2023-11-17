@@ -12,11 +12,9 @@ from sklearn.cluster import DBSCAN
 from sklearn.cluster import MeanShift
 from sklearn.cluster import KMeans
 from dna_features_viewer import GraphicFeature, GraphicRecord
-from utils import read_codon_usage, DNA_Codons, write_pickle, log_to_file_and_console, create_or_clear_file
+from utils import read_codon_usage, DNA_Codons, write_pickle
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
-
-# TODO Change this
 template_path_96 = os.path.join(script_dir, 'data/eblocks-plate-upload-template-96.xlsx')
 template_path_384 = os.path.join(script_dir, 'data/eblocks-plate-upload-template-384.xlsx')
 
@@ -40,7 +38,6 @@ class DesignEblocks:
         _type_: _description_
     """
 
-    # TODO Add all parameters here
     def __init__(self, 
                  sequence_fp: str, 
                  mutations_fp: str,
@@ -82,7 +79,8 @@ class DesignEblocks:
         self.codon_usage = self.check_existance_codon_usage_table()  # Check if codon usage table is present for selected species
         self.counts = None  # Number of mutations per eblock
 
-        self.legend_created = False
+        self.valid_aas = 'acdefghiklmnpqrstvwy'
+        self.valid_nucleotides = 'atcg'
 
     def run(self, show=False):
         """
@@ -93,7 +91,6 @@ class DesignEblocks:
         self.num_mutations = len(idx_dna_tups)
      
         # length of ebLock is checked here and should be within bounds
-        # TODO Write clustering model to file
         clusters = self.make_clusters(idx_dna_tups, idx_test, paired)
         print(f"expected cost, counting {self.bp_price} cent per bp: {self.calculate_cost(clusters)} euros")
 
@@ -121,7 +118,6 @@ class DesignEblocks:
         self.make_barplot(show=show)
         
         # Plot showing the eBlocks and which mutations are in which eBlock
-        # TODO Save plot somewhere so that you can call it later
         self.plot_eblocks_mutations(idx_dna_tups=idx_dna_tups, eblocks=True, mutations=True, genename=self.gene_name, show=show)
 
         # Loop over all mutations and create the eBlocks
@@ -369,7 +365,6 @@ class DesignEblocks:
         Returns:
             Bool: Returns true if all amino acids are valid
         """
-        valid = 'acdefghiklmnpqrstvwy'
         for mut, type in zip(mutations, mutation_types):
             if type == self.type_mutation:
                 if not self.check_mut_format(mut, self.type_mutation):
@@ -382,7 +377,7 @@ class DesignEblocks:
                         print( f"Input {mut} contain non-natural amino acids or incorrect formatting")
                         sys.exit()
                 for i in added_residues:
-                    if not i.lower() in valid:
+                    if not i.lower() in self.valid_aas:
                         print( f"Input {i} contain non-natural amino acids or incorrect formatting")
                         sys.exit()
             elif type == self.type_deletion:
@@ -568,14 +563,14 @@ class DesignEblocks:
             for num, mut in enumerate(idx_dna_tups):
                 if type(mut[1]) == int:
                     features.append(GraphicFeature(start=int(mut[1]), 
-                                                end=int(mut[1]) + 3, # TODO MAKE MORE SPECIFIC FOR INSERTS ETC
+                                                end=int(mut[1]) + 3,
                                                 strand=+1, 
                                                 color=self.mutation_type_colors[self.mutation_types[num]], 
                                                 label=f"{mut[0]}"))
                 elif type(mut[1]) == list:
                         for m in mut:
                             features.append(GraphicFeature(start=int(m[1]), 
-                                                    end=int(m[1]) + 3, # TODO MAKE MORE SPECIFIC FOR INSERTS ETC
+                                                    end=int(m[1]) + 3,
                                                     strand=+1, 
                                                     color=self.mutation_type_colors['Combined'], 
                                                     label=f"{m[0]}"))
@@ -737,7 +732,7 @@ class DesignEblocks:
             elif min_cluster_size < (self.idt_min_length_fragment - 2 * self.min_bin_overlap):
                 valid_clusters = False
             else:
-                possibilities[f'cluster N={n}'] = clusters # TODO ADD CLUSTERING PARAMS HERE? Atleast store them somwhere
+                possibilities[f'cluster N={n}'] = clusters
                 n += 1
         
         if len(possibilities) == 0:  # No valid clusters found
@@ -990,7 +985,6 @@ class DesignEblocks:
     @staticmethod
     def check_mut_format(mut: str, mut_type: str) -> bool:
         valid = 'acdefghiklmnpqrstvwy'
-        # TODO Mutation and Combined is hardcoded here
         if (mut_type == "Mutation") or (mut_type == "Combined"):
             if (mut[0].lower() in valid) and (mut[-1].lower() in valid) and (isinstance(int(mut[1:-1]), int)):
                 return True
