@@ -38,15 +38,15 @@ class DesignEblocks:
         _type_: _description_
     """
     # Mutation types supported
-    type_mutation = "Mutation"
-    type_insert = "Insert"
-    type_deletion = "Deletion"
-    type_combined = "Combined"
+    type_mutation: str = "Mutation"
+    type_insert: str = "Insert"
+    type_deletion: str = "Deletion"
+    type_combined: str = "Combined"
 
-    valid_aas = 'acdefghiklmnpqrstvwy'
-    valid_nucleotides = 'atcg'
+    valid_aas: str = 'acdefghiklmnpqrstvwy'
+    valid_nucleotides: str = 'atcg'
 
-    mutation_type_colors = {'Mutation': 'black', 'Insert': 'red', 'Deletion': 'blue', 'Combined': 'green'}
+    mutation_type_colors: dict = {'Mutation': 'black', 'Insert': 'red', 'Deletion': 'blue', 'Combined': 'green'}
 
     def __init__(self, 
                  sequence_fp: str, 
@@ -54,32 +54,37 @@ class DesignEblocks:
                  output_fp: str,
                  codon_usage_fp: str,
                  optimize: str, 
-                 species = "Escherichia coli",
-                 bp_price = 0.05,
-                 gene_name = None,
-                 min_bin_overlap = 25,
+                 species: str = "Escherichia coli",
+                 bp_price: float = 0.05,
+                 gene_name: str = None,
+                 min_bin_overlap: int = 25,
                  eblock_colors = None,
-                 idt_max_length_fragment = 1500,
-                 idt_min_length_fragment = 300,
-                 idt_min_order = 24):
+                 idt_max_length_fragment: int = 1500,
+                 idt_min_length_fragment: int = 300,
+                 idt_min_order: int = 24):
         
-        self.output_fp = output_fp
-        self.species = species
-        self.optimization = optimize
-        self.min_bin_overlap = min_bin_overlap
-        self.gene_name = gene_name
-        self.bp_price = bp_price
-        self.idt_max_length_fragment = idt_max_length_fragment
-        self.idt_min_length_fragment = idt_min_length_fragment
-        self.idt_min_order = idt_min_order
-        self.codon_usage_fp = codon_usage_fp
+        self.output_fp: str = output_fp  # TODO Change to Path object
+        self.species: str = species
+        self.optimization: str = optimize
+        self.min_bin_overlap: int = min_bin_overlap
+        self.gene_name: str = gene_name
+        self.bp_price: float = bp_price
+        self.idt_max_length_fragment: int = idt_max_length_fragment
+        self.idt_min_length_fragment: int = idt_min_length_fragment
+        self.idt_min_order: int = idt_min_order
+        self.codon_usage_fp: str = codon_usage_fp
         self.gene_blocks = None
         self.num_mutations = None
         self.eblock_colors = eblock_colors
+
+        # TODO Move these functions out of the __init__ function
         self.dna_seq = self.read_single_seq(sequence_fp)
         self.mutations, self.mutation_types = self.read_mutations(mutations_fp)  # Types = {Mutation, Insert, Deletion, Combined}
         self.codon_usage = self.check_existance_codon_usage_table()  # Check if codon usage table is present for selected species
         self.counts = None  # Number of mutations per eblock
+
+        self.wt_gene_blocks = None
+        self.mut_gene_blocks = None
 
     def __str__(self):
         return (
