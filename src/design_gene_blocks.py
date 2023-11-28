@@ -6,17 +6,17 @@ import random
 import numpy as np
 import pandas as pd
 from Bio import SeqIO
-from operator import add, sub
 import matplotlib.pyplot as plt
-from sklearn.cluster import DBSCAN
-from sklearn.cluster import MeanShift
 from sklearn.cluster import KMeans
 from dna_features_viewer import GraphicFeature, GraphicRecord
-from utils import read_codon_usage, DNA_Codons, write_pickle
+from utils import read_codon_usage, DNA_Codons, write_pickle, natural_amino_acids
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 template_path_96 = os.path.join(script_dir, 'data/eblocks-plate-upload-template-96.xlsx')
 template_path_384 = os.path.join(script_dir, 'data/eblocks-plate-upload-template-384.xlsx')
+
+# TODO Add @classmethod function to some of the functions
+# TODO Make a separate class for plotting maybe?
 
 class DesignEblocks:
     """
@@ -37,6 +37,16 @@ class DesignEblocks:
     Returns:
         _type_: _description_
     """
+    # Mutation types supported
+    type_mutation = "Mutation"
+    type_insert = "Insert"
+    type_deletion = "Deletion"
+    type_combined = "Combined"
+
+    valid_aas = 'acdefghiklmnpqrstvwy'
+    valid_nucleotides = 'atcg'
+
+    mutation_type_colors = {'Mutation': 'black', 'Insert': 'red', 'Deletion': 'blue', 'Combined': 'green'}
 
     def __init__(self, 
                  sequence_fp: str, 
@@ -53,13 +63,6 @@ class DesignEblocks:
                  idt_min_length_fragment = 300,
                  idt_min_order = 24):
         
-        # Mutation types supported
-        self.type_mutation = "Mutation"
-        self.type_insert = "Insert"
-        self.type_deletion = "Deletion"
-        self.type_combined = "Combined"
-
-        # Initialize class attributes
         self.output_fp = output_fp
         self.species = species
         self.optimization = optimize
@@ -73,14 +76,29 @@ class DesignEblocks:
         self.gene_blocks = None
         self.num_mutations = None
         self.eblock_colors = eblock_colors
-        self.mutation_type_colors = {'Mutation': 'black', 'Insert': 'red', 'Deletion': 'blue', 'Combined': 'green'}
         self.dna_seq = self.read_single_seq(sequence_fp)
         self.mutations, self.mutation_types = self.read_mutations(mutations_fp)  # Types = {Mutation, Insert, Deletion, Combined}
         self.codon_usage = self.check_existance_codon_usage_table()  # Check if codon usage table is present for selected species
         self.counts = None  # Number of mutations per eblock
 
-        self.valid_aas = 'acdefghiklmnpqrstvwy'
-        self.valid_nucleotides = 'atcg'
+    def __str__(self):
+        return (
+            f"DesignEblocks("
+            # f"sequence_fp='{self.sequence_fp}', "
+            # f"mutations_fp='{self.mutations_fp}', "
+            f"output_fp='{self.output_fp}', "
+            f"codon_usage_fp='{self.codon_usage_fp}', "
+            f"optimize='{self.optimization}', "
+            f"species='{self.species}', "
+            f"bp_price={self.bp_price}, "
+            f"gene_name={self.gene_name}, "
+            f"min_bin_overlap={self.min_bin_overlap}, "
+            f"eblock_colors={self.eblock_colors}, "
+            f"idt_max_length_fragment={self.idt_max_length_fragment}, "
+            f"idt_min_length_fragment={self.idt_min_length_fragment}, "
+            f"idt_min_order={self.idt_min_order})"
+        )
+
 
     def run(self, show=False):
         """
@@ -134,22 +152,6 @@ class DesignEblocks:
         write_pickle(self.gene_blocks, self.output_fp, fname="wt_gene_blocks.npy")
 
         print("Designed eBlocks and stored output in ", self.output_fp)
-
-
-    def map_mutation_to_eblock(self, mutation_index: int):
-        name_val, _ = self.find_gene_block(self.gene_blocks, mutation_index)
-        eblock_name = list(name_val.keys())[0]
-        eblock_value = name_val[eblock_name]
-        return eblock_name, eblock_value
-    
-
-    def design_insert(self, aas):
-        codon_insert = ''  # Sequence to insert in gene block
-        for res in aas:
-            codons = self.extract_mut_codons(res)
-            codon = self.select_mut_codon(codons)
-            codon_insert += codon
-        return codon_insert
 
 
     def create_mutated_eblock(self, num: int, mut: str, mut_type: str, idx_dna_tups: list, results: dict) -> dict:
@@ -408,7 +410,22 @@ class DesignEblocks:
             sys.exit()
         elif len(mutations) >= self.idt_min_order:
             return True
+        
 
+    def map_mutation_to_eblock(self, mutation_index: int):
+        name_val, _ = self.find_gene_block(self.gene_blocks, mutation_index)
+        eblock_name = list(name_val.keys())[0]
+        eblock_value = name_val[eblock_name]
+        return eblock_name, eblock_value
+    
+
+    def design_insert(self, aas):
+        codon_insert = ''  # Sequence to insert in gene block
+        for res in aas:
+            codons = self.extract_mut_codons(res)
+            codon = self.select_mut_codon(codons)
+            codon_insert += codon
+        return codon_insert
 
 
     def index_mutations(self, mut_list: list, mut_types: list):
@@ -542,7 +559,7 @@ class DesignEblocks:
             plt.close()
 
     
-    def plot_eblocks_mutations(self, idx_dna_tups=None, eblocks=True, mutations=True, genename=None, genecolor="#d3d3d3", show=False):
+    def plot_eblocks_mutations(self, idx_dna_tups=None, eblocks=True, mutations=True, genename=None, genecolor="#d3d3d3", show=False, figure_width=20, figure_length=10):
         """
         Plot mutations and selected eBlocks
         """
@@ -586,8 +603,9 @@ class DesignEblocks:
         
 
         record = GraphicRecord(sequence_length=len(self.dna_seq), features=features)
-        figure_length = np.ceil(len(self.dna_seq) / 150)
-        figure_width = np.ceil(self.num_mutations / 10)
+        # if self.num_mutations:
+        #     figure_length = np.ceil(len(self.dna_seq) / 150)
+        #     figure_width = np.ceil(self.num_mutations / 10)
         fig_size = (figure_length, figure_width)
         fig, ax = plt.subplots(figsize=fig_size) 
         record.plot(ax=ax, figure_width=20)
@@ -601,11 +619,11 @@ class DesignEblocks:
             fig.savefig(os.path.join(self.output_fp, f'{self.gene_name}_N{self.num_mutations}.png'), dpi=100)
 
 
-    def make_barplot(self, show):
+    def make_barplot(self, show, figure_width=5, figure_length=5):
         """
         Make barplot of bins
         """
-        fig, ax = plt.subplots(figsize=(8, 4))
+        fig, ax = plt.subplots(figsize=(figure_width, figure_length))
         labels = []
         for k, v in self.counts.items():
             kn = k.split('_')[0] + ' ' + k.split('_')[1]
@@ -735,6 +753,7 @@ class DesignEblocks:
                 possibilities[f'cluster N={n}'] = clusters
                 n += 1
         
+        # TODO Fix this, it is not working properly
         if len(possibilities) == 0:  # No valid clusters found
             print("No valid clusterings found, please check your input mutations and make sure that the multiple mutants are not too far apart.")
             sys.exit()
@@ -743,7 +762,7 @@ class DesignEblocks:
         return optimal_clustering
 
         
-    def kmeans_clustering(self, idx_test, paired_mutations, num_clusters, n_init='auto', random_state=42):
+    def kmeans_clustering(self, idx_test, paired_mutations, num_clusters, n_init='auto', random_state=42, OMP_NUM_THREADS=1):
         # Extract the first index of each mutation in idx_test
         idx_first = [np.mean(i) if isinstance(i, list) else i for i in idx_test]
         
@@ -773,50 +792,6 @@ class DesignEblocks:
 
         return cluster_labels, idx_first
     
-
-    # def kmeans_clustering(self, idx_test, paired_mutations, num_clusters, n_init='auto', random_state=42):
-
-    #     idx_first = []
-    #     for i in idx_test:
-    #         if isinstance(i, list):
-    #             mean = np.mean(i)
-    #             idx_first.append(mean)
-    #         else:
-    #             idx_first.append(i)
-
-    #     mutation_arr = np.array(idx_first).reshape(-1, 1)
-
-    #     # Initialize KMeans with the number of clusters
-    #     kmeans = KMeans(n_clusters=num_clusters, random_state=random_state, n_init=n_init)
-
-    #     # Fit the model and obtain cluster labels for connected indices
-    #     cluster_labels = kmeans.fit_predict(mutation_arr)
-    #     cluster_labels = list(cluster_labels)
-    #     # print("length cluster label:", len(cluster_labels))
-
-    #     # Add the remaining indices of the pairs to the assigned cluster
-    #     to_remove = []
-    #     for pair in paired_mutations:
-    #         mean = np.mean(pair)
-    #         index = list(mutation_arr).index(mean)
-    #         to_remove.append(index)
-    #         cluster_label = cluster_labels[index]
-    #         L = [cluster_label] * len(pair)
-    #         for i in L:
-    #             cluster_labels.append(i)
-    #         for i in pair:
-    #             idx_first.append(i)
-    #         # print(pair, mean, index, cluster_label, L)
-    #         # Remove mean value from labels and indices
-        
-    #     # Remove the mean values from the list of indices and cluster labels
-    #     to_remove = sorted(to_remove, reverse=True)
-    #     for i in to_remove:
-    #         del idx_first[i]
-    #         del cluster_labels[i]
-             
-    #     return cluster_labels, idx_first
-
 
     def renumber_gene_blocks(self, gene_blocks):
         new_gene_blocks = {}
