@@ -11,22 +11,42 @@ from utils import load_pickle, extract_filename
 # TODO Hairpin primer complementarity (self-complementarity
 # TODO Complementarity between fw and rv primer
 
-class DesignPrimers:
+class DesignPrimers(DesignEblocks):  # TODO DesignPrimers(DesignEblocks)
     """
     """
 
     def __init__(self,
-                 wt_gene_blocks_fp: str,
-                 mut_gene_blocks_fp: str,
+                 wt_gene_blocks: str,
+                 mut_gene_blocks: str,
                  output_location: str,
                  input_gene_path: str,
                  snapgene_file: str):
-    
-        self.wt_gene_blocks_fp = wt_gene_blocks_fp
-        self.mut_gene_blocks_fp = mut_gene_blocks_fp
-        self.output_location = output_location
-        self.input_gene_path = input_gene_path
-        self.snapgene_file = snapgene_file
+
+        # TODO Fix this error, see tutorial
+        super().__init__(
+            sequence_fp=input_gene_path,
+            mutations_fp=mut_gene_blocks_fp,
+            output_fp=output_location,
+            codon_usage_fp=input_gene_path,
+            optimize=snapgene_file,
+            species="Escherichia coli",  # Set the default species or provide as needed
+            bp_price=0.05,  # Set the default value or provide as needed
+            gene_name=None,  # Set the default value or provide as needed
+            min_bin_overlap=25,  # Set the default value or provide as needed
+            eblock_colors=None,  # Set the default value or provide as needed
+            idt_max_length_fragment=1500,  # Set the default value or provide as needed
+            idt_min_length_fragment=300,  # Set the default value or provide as needed
+            idt_min_order=24  # Set the default value or provide as needed
+        )
+        
+        self.wt_gene_blocks = None
+        self.mut_gene_blocks = None        
+
+        # self.wt_gene_blocks_fp = wt_gene_blocks_fp
+        # self.mut_gene_blocks_fp = mut_gene_blocks_fp
+        # self.output_location = output_location
+        # self.input_gene_path = input_gene_path
+        # self.snapgene_file = snapgene_file
 
         self.IVA_overhang_temp = 50
         self.IVA_template_temp = 60
@@ -34,6 +54,7 @@ class DesignPrimers:
     def run(self):
         
         # Load input
+        # TODO Save this in class attribute of DesignEblocks
         wt_gene_blocks = load_pickle(self.wt_gene_blocks_fp)
         mut_gene_blocks = load_pickle(self.mut_gene_blocks_fp)
 
