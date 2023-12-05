@@ -78,10 +78,6 @@ class SnapGeneOutput:
                                     rv_templates,
                                     mutations)
 
-    def read_snapgene_dna_file(self, fp):
-        with open(fp, 'rb') as handle:
-            for record in SeqIO.parse(handle, "snapgene"):
-                return record
 
     def create_gff3_fname(self, fp, extension="_features.gff3"):
         fname = extract_filename(fp)
@@ -199,4 +195,10 @@ class SnapGeneOutput:
             return self.color_deletion
         elif mutation_type == self.type_combined:
             return self.color_combination
+        
+    @staticmethod
+    def read_snapgene_dna_file(fp):
+        with open(fp, 'rb') as handle:
+            for record in SeqIO.parse(handle, "snapgene"):
+                return record
         

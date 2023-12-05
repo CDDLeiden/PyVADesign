@@ -70,6 +70,8 @@ def read_plasmid(dna_fp, organism, gene_name):
     # TODO Read .DNA file using biopython ans parse into (plasmid mapping)
     # TODO How to Extract the features from a .dna file?
     # TODO Find a way to parse the .dna file (See snapgene output for this)
+
+    
     annotation = seq.Annotation([
         seq.Feature(
             "source",
