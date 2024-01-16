@@ -1,13 +1,15 @@
 import os
 import pickle
 import pandas as pd
+import matplotlib.pyplot as plt
 
 # For plasmid viewing
 import biotite.sequence as seq
 import biotite.sequence.io.genbank as gb
 import biotite.sequence.graphics as graphics
 import biotite.database.entrez as entrez
-import matplotlib.pyplot as plt
+from biotite.sequence import Feature, Location, Annotation
+
 
 DNA_Codons = {
     "ATG": "start",
@@ -64,117 +66,65 @@ def load_pickle(fp):
     return obj
 
 
+def extract_snapgene_features(vector, organism=None):
+    """
+    Extract features from snapgene file and return them as a list of biotite sequence features.
 
-def read_plasmid(dna_fp, organism, gene_name):
-    # TODO Read file and parse into (plasmid mapping)
-    # TODO Read .DNA file using biopython ans parse into (plasmid mapping)
-    # TODO How to Extract the features from a .dna file?
-    # TODO Find a way to parse the .dna file (See snapgene output for this)
+    Parameters
+    ----------
+    vector : biotite sequence object
+        The vector sequence
+    organism : str
+        The source organism name (optional)
+    """
+    vector_features = []
+    for i in vector.features:
+        feature_type = i.type
+        quals = i.qualifiers
+        label_qualifier = i.qualifiers.get('label', '')
+        locations = [Location(int(i.location.start), int(i.location.end))]
 
-    
-    annotation = seq.Annotation([
-        seq.Feature(
-            "source",
-            [seq.Location(0, 1500)],
-            {"organism": f"{organism}"}
-        ),
+        if label_qualifier:
+            qual = {"label": ' '.join(label_qualifier)}
+        else:
+            qual = {}
 
-        # # Ori
-        # seq.Feature(
-        #     "rep_origin",
-        #     [seq.Location(600, 700, seq.Location.Strand.REVERSE)],
-        #     {"regulatory_class": "promoter", "note": "MyProm"}
-        # ),
+        if (i.type == "rep_origin") or (i.type == "protein_bind") or (i.type == "terminator"):
+            if quals['note']:
+                qual = {"note": ' '.join(quals['label'])}
 
-        # # Promoter
-        # seq.Feature(
-        #     "regulatory",
-        #     [seq.Location(1000, 1060)],
-        #     {"regulatory_class": "promoter", "note": "MyProm"}
-        # ),
-        # seq.Feature(
-        #     "protein_bind",
-        #     [seq.Location(1025, 1045)],
-        #     {"note": "repr"}
-        # ),
+        elif (i.type == "CDS") or (i.type == "gene"):
+            if quals['label']:
+                qual = {"product": ' '.join(quals['label'])}
+        elif (i.type == "regulatory"):
+            if quals['label']:
+                qual = {"label": ' '.join(quals['label'])}
+        elif (i.type == "misc_feature"):
+            if quals['label']:
+                qual = {"note": ' '.join(quals['label'])}
 
-        # Gene A
-        seq.Feature(
-            "regulatory",
-            [seq.Location(1070, 1080)],
-            {"regulatory_class": "ribosome_binding_site"}
-        ),
-        seq.Feature(
-            "CDS",
-            [seq.Location(1091, 1150)],
-            {"product": "geneA"}
-        ),
+        vector_features.append(Feature(feature_type, locations, qual))
+    # Add organism source
+    if organism:
+            vector_features.append(Feature("source", [Location(0, len(vector.seq))], {"organism": f"{organism}"}))
+    return vector_features
 
 
-        # Terminator
-        # seq.Feature(
-        #     "regulatory",
-        #     [seq.Location(310, 350)],
-        #     {"regulatory_class": "terminator", "note": "MyTerm"}
-        # ),
-
-        # Primers
-        # The labels will be too long to be displayed on the map
-        # If you want to display them nevertheless, set the
-        # 'omit_oversized_labels' to False
-        # seq.Feature(
-        #     "primer_bind",
-        #     [seq.Location(1385, 1405)],
-        #     {"note": "geneC"}
-        # ),
-        # seq.Feature(
-        #     "primer_bind",
-        #     [seq.Location(345, 365, seq.Location.Strand.REVERSE)],
-        #     {"note": "geneC_R"}
-        # ),
-
-        # # Terminator
-        # seq.Feature(
-        #     "regulatory",
-        #     [seq.Location(310, 350)],
-        #     {"regulatory_class": "terminator", "note": "MyTerm"}
-        # ),
-    ])
-
-
-    fig = plt.figure(figsize=(8.0, 8.0))
+def plot_vector(vector, features, figsize=(8,8), fontsize=10):
+    """
+    Plot a plasmid map of the vector sequence.
+    """
+    annotation = Annotation(features)
+    fig = plt.figure(figsize=figsize)
     ax = fig.add_subplot(111, projection="polar")
     graphics.plot_plasmid_map(
         ax, 
         annotation, 
-        plasmid_size=1500, 
-        label="My plasmid",
-        label_properties={"fontsize": 8})
-
+        plasmid_size=len(vector.seq), 
+        label=f"{vector.name}",
+        label_properties={"fontsize": fontsize})
     ticks = ax.get_xticks()
-    labels = ax.get_xticklabels()
-
+    # Only show a few ticks
+    ax.set_xticks(ticks[::2])
     fig.tight_layout()
-    # plt.show()
-    return fig, ax
-
-
-
-# def log_to_file_and_console(logfile, *messages):
-#     with open(logfile, 'a') as log_file:
-#         for message in messages:
-#             # Write each message to the log file
-#             log_file.write(message)
-#     # Print all messages to the console
-#     print(*messages, end='')
-
-# def create_or_clear_file(file_path):
-#     try:
-#         # Check if the file exists
-#         with open(file_path, 'r') as file:
-#             # Close the file
-#             pass
-#     except FileNotFoundError:
-#         # If the file doesn't exist, create it
-#         with open(file_path, 'w'):
-#             pass
+    return ax, fig
