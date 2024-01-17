@@ -9,7 +9,7 @@ from Bio import SeqIO
 import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans
 from dna_features_viewer import GraphicFeature, GraphicRecord
-from utils import read_codon_usage, DNA_Codons, write_pickle, natural_amino_acids
+from utils_old import read_codon_usage, DNA_Codons, write_pickle, natural_amino_acids
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 template_path_96 = os.path.join(script_dir, 'data/eblocks-plate-upload-template-96.xlsx')
@@ -43,10 +43,10 @@ class DesignEblocks:
     # type_deletion: str = "Deletion"
     # type_combined: str = "Combined"
 
-    valid_aas: str = 'acdefghiklmnpqrstvwy'
-    valid_nucleotides: str = 'atcg'
+    # valid_aas: str = 'acdefghiklmnpqrstvwy'
+    # valid_nucleotides: str = 'atcg'
 
-    mutation_type_colors: dict = {'Mutation': 'black', 'Insert': 'red', 'Deletion': 'blue', 'Combined': 'green'}
+    # mutation_type_colors: dict = {'Mutation': 'black', 'Insert': 'red', 'Deletion': 'blue', 'Combined': 'green'}
 
     def __init__(self, 
                  sequence_fp: str, 
@@ -361,51 +361,51 @@ class DesignEblocks:
                 sys.exit()
 
 
-    def check_input_mutations(self, mutations, mutation_types):
-        """
-        Make sure that none of the input mutations contains a unusual amino acid
+    # def check_input_mutations(self, mutations, mutation_types):
+    #     """
+    #     Make sure that none of the input mutations contains a unusual amino acid
 
-        Args:
-            mutations (list): List of mutations in format [WT residue][index][mutant residue], such as G432W
-            mutation_types (list): List with type of mutations, either: Mutation, Insert or Deletion
+    #     Args:
+    #         mutations (list): List of mutations in format [WT residue][index][mutant residue], such as G432W
+    #         mutation_types (list): List with type of mutations, either: Mutation, Insert or Deletion
 
-        Returns:
-            Bool: Returns true if all amino acids are valid
-        """
-        for mut, type in zip(mutations, mutation_types):
-            if type == self.type_mutation:
-                if not self.check_mut_format(mut, self.type_mutation):
-                    print( f"Input {mut} contain non-natural amino acids or incorrect formatting")
-                    sys.exit()
-            elif type == self.type_insert:
-                mut_format = mut.split('-')[0]
-                added_residues = mut.split('-')[1]
-                if not self.check_mut_format(mut_format, self.type_insert):
-                        print( f"Input {mut} contain non-natural amino acids or incorrect formatting")
-                        sys.exit()
-                for i in added_residues:
-                    if not i.lower() in self.valid_aas:
-                        print( f"Input {i} contain non-natural amino acids or incorrect formatting")
-                        sys.exit()
-            elif type == self.type_deletion:
-                mut_start = mut.split('-')[0]
-                mut_end = mut.split('-')[0]
-                if not self.check_mut_format(mut_start, self.type_deletion):
-                    print( f"Input {mut_start} contain non-natural amino acids or incorrect formatting")
-                    sys.exit()
-                if not self.check_mut_format(mut_end, self.type_deletion):
-                    print( f"Input {mut_end} contain non-natural amino acids or incorrect formatting")
-                    sys.exit()
-            elif type == self.type_combined:
-                mut_list = mut.split('-')
-                for i in mut_list:
-                    if not self.check_mut_format(i, self.type_combined):
-                        print( f"Input {i} contain non-natural amino acids or incorrect formatting")
-                        sys.exit()
-            else:
-                print("Input contains non standard mutation")
-                sys.exit()
-        return True
+    #     Returns:
+    #         Bool: Returns true if all amino acids are valid
+    #     """
+    #     for mut, type in zip(mutations, mutation_types):
+    #         if type == self.type_mutation:
+    #             if not self.check_mut_format(mut, self.type_mutation):
+    #                 print( f"Input {mut} contain non-natural amino acids or incorrect formatting")
+    #                 sys.exit()
+    #         elif type == self.type_insert:
+    #             mut_format = mut.split('-')[0]
+    #             added_residues = mut.split('-')[1]
+    #             if not self.check_mut_format(mut_format, self.type_insert):
+    #                     print( f"Input {mut} contain non-natural amino acids or incorrect formatting")
+    #                     sys.exit()
+    #             for i in added_residues:
+    #                 if not i.lower() in self.valid_aas:
+    #                     print( f"Input {i} contain non-natural amino acids or incorrect formatting")
+    #                     sys.exit()
+    #         elif type == self.type_deletion:
+    #             mut_start = mut.split('-')[0]
+    #             mut_end = mut.split('-')[0]
+    #             if not self.check_mut_format(mut_start, self.type_deletion):
+    #                 print( f"Input {mut_start} contain non-natural amino acids or incorrect formatting")
+    #                 sys.exit()
+    #             if not self.check_mut_format(mut_end, self.type_deletion):
+    #                 print( f"Input {mut_end} contain non-natural amino acids or incorrect formatting")
+    #                 sys.exit()
+    #         elif type == self.type_combined:
+    #             mut_list = mut.split('-')
+    #             for i in mut_list:
+    #                 if not self.check_mut_format(i, self.type_combined):
+    #                     print( f"Input {i} contain non-natural amino acids or incorrect formatting")
+    #                     sys.exit()
+    #         else:
+    #             print("Input contains non standard mutation")
+    #             sys.exit()
+    #     return True
 
 
     def check_number_input_mutations(self, mutations):
@@ -477,53 +477,53 @@ class DesignEblocks:
         return mutname_idx, idx_dna_list, paired
     
 
-    def read_mutations(self, fp: str):
-        """
-        Read mutations file in TXT format.
+    # def read_mutations(self, fp: str):
+    #     """
+    #     Read mutations file in TXT format.
         
-        Each line of the file should contain one amino acid in the format [WT residue][index][mutant residue], such as G432W.
+    #     Each line of the file should contain one amino acid in the format [WT residue][index][mutant residue], such as G432W.
         
-        The function performs the following checks:
-        - Ensure there are NO non-natural amino acids in the mutations.
-        - Verify that there are enough mutations to process.
-        - Check the formatting of mutations.
-        - Ensure there are no duplicate mutations.
+    #     The function performs the following checks:
+    #     - Ensure there are NO non-natural amino acids in the mutations.
+    #     - Verify that there are enough mutations to process.
+    #     - Check the formatting of mutations.
+    #     - Ensure there are no duplicate mutations.
         
-        Args:
-            fp (str): Filepath of the input mutations TXT file.
+    #     Args:
+    #         fp (str): Filepath of the input mutations TXT file.
 
-        Returns:
-            tuple: A tuple containing two lists - 
-                1. List of mutations extracted from the input file.
-                2. List of corresponding mutation types ('mutation', 'insert', 'deletion').
-                Returns None if checks fail.
-        """
-        mutations = []
-        mutation_types = []
-        with open(fp, 'r') as f:
-            content = f.readlines()
-            for line in content:
-                line = line.split()
-                if len(line) == 1:
-                    mutations.append(line[0])
-                    mutation_types.append(self.type_mutation)
-                elif (len(line) == 2) and (line[0] == self.type_deletion):
-                    mutation_types.append(self.type_deletion)
-                    mutations.append(line[1])
-                elif (len(line) == 2) and (line[0] == self.type_insert):
-                    mutation_types.append(self.type_insert)
-                    mutations.append(line[1])
-                elif (len(line) == 2) and (line[0] == self.type_combined):
-                    mutation_types.append(self.type_combined)
-                    mutations.append(line[1])
-                else:
-                    print(f"Please check format of mutation {line}, one mutation should be written per line and for inserts and deletions check the requirements.")
-                    sys.exit() 
-        if len(mutations) != len(set(mutations)):
-            print("Duplicate mutations detected. Please remove and rerun.")
-            sys.exit()
-        if (self.check_input_mutations(mutations, mutation_types)) and (self.check_number_input_mutations(mutations)):  
-            return mutations, mutation_types
+    #     Returns:
+    #         tuple: A tuple containing two lists - 
+    #             1. List of mutations extracted from the input file.
+    #             2. List of corresponding mutation types ('mutation', 'insert', 'deletion').
+    #             Returns None if checks fail.
+    #     """
+    #     mutations = []
+    #     mutation_types = []
+    #     with open(fp, 'r') as f:
+    #         content = f.readlines()
+    #         for line in content:
+    #             line = line.split()
+    #             if len(line) == 1:
+    #                 mutations.append(line[0])
+    #                 mutation_types.append(self.type_mutation)
+    #             elif (len(line) == 2) and (line[0] == self.type_deletion):
+    #                 mutation_types.append(self.type_deletion)
+    #                 mutations.append(line[1])
+    #             elif (len(line) == 2) and (line[0] == self.type_insert):
+    #                 mutation_types.append(self.type_insert)
+    #                 mutations.append(line[1])
+    #             elif (len(line) == 2) and (line[0] == self.type_combined):
+    #                 mutation_types.append(self.type_combined)
+    #                 mutations.append(line[1])
+    #             else:
+    #                 print(f"Please check format of mutation {line}, one mutation should be written per line and for inserts and deletions check the requirements.")
+    #                 sys.exit() 
+    #     if len(mutations) != len(set(mutations)):
+    #         print("Duplicate mutations detected. Please remove and rerun.")
+    #         sys.exit()
+    #     if (self.check_input_mutations(mutations, mutation_types)) and (self.check_number_input_mutations(mutations)):  
+    #         return mutations, mutation_types
 
 
     def make_bins(self, clusters: dict):
@@ -962,17 +962,17 @@ class DesignEblocks:
             return math.ceil(n_samples / 384)
 
 
-    @staticmethod
-    def check_mut_format(mut: str, mut_type: str) -> bool:
-        valid = 'acdefghiklmnpqrstvwy'
-        if (mut_type == "Mutation") or (mut_type == "Combined"):
-            if (mut[0].lower() in valid) and (mut[-1].lower() in valid) and (isinstance(int(mut[1:-1]), int)):
-                return True
-        elif (mut_type == 'Insert') or (mut_type == 'Deletion'):
-            if (mut[0].lower() in valid) and (isinstance(int(mut[1:]), int)):
-                return True
-        else:
-            return False
+    # @staticmethod
+    # def check_mut_format(mut: str, mut_type: str) -> bool:
+    #     valid = 'acdefghiklmnpqrstvwy'
+    #     if (mut_type == "Mutation") or (mut_type == "Combined"):
+    #         if (mut[0].lower() in valid) and (mut[-1].lower() in valid) and (isinstance(int(mut[1:-1]), int)):
+    #             return True
+    #     elif (mut_type == 'Insert') or (mut_type == 'Deletion'):
+    #         if (mut[0].lower() in valid) and (isinstance(int(mut[1:]), int)):
+    #             return True
+    #     else:
+    #         return False
     
 
     # @staticmethod
@@ -1018,12 +1018,12 @@ class DesignEblocks:
     #         sys.exit()
 
 
-    @staticmethod
-    def translate_sequence(dna_seq):    
-        """
-        Translate DNA sequence to protein sequence
-        """
-        return dna_seq.translate()
+    # @staticmethod
+    # def translate_sequence(dna_seq):    
+    #     """
+    #     Translate DNA sequence to protein sequence
+    #     """
+    #     return dna_seq.translate()
 
 
     @staticmethod

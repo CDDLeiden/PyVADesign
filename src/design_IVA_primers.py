@@ -4,7 +4,7 @@ import difflib
 import pandas as pd
 from Bio.SeqUtils import MeltingTemp as mt
 from design_gene_blocks import DesignEblocks
-from utils import load_pickle, extract_filename
+from utils_old import load_pickle, extract_filename
 
 # TODO Imherit class attributes?
 # TODO What to do if complementarity between primers is too high?

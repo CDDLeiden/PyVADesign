@@ -3,7 +3,7 @@ import sys
 import pandas as pd
 from Bio import SeqIO
 from design_IVA_primers import DesignPrimers
-from utils import extract_filename, load_pickle
+from utils_old import extract_filename, load_pickle
 
 
 class SnapGeneOutput:
