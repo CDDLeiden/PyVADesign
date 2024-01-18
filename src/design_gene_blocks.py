@@ -9,7 +9,7 @@ from Bio import SeqIO
 import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans
 from dna_features_viewer import GraphicFeature, GraphicRecord
-from utils import read_codon_usage, DNA_Codons, write_pickle, natural_amino_acids
+from utils_old import read_codon_usage, DNA_Codons, write_pickle, natural_amino_acids
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 template_path_96 = os.path.join(script_dir, 'data/eblocks-plate-upload-template-96.xlsx')

@@ -433,48 +433,48 @@ class DesignEblocks:
         return codon_insert
 
 
-    def index_mutations(self, mut_list: list, mut_types: list):
-        """
-        Find the indexes in the DNA sequence where mutations occur
+    # def index_mutations(self, mut_list: list, mut_types: list):
+    #     """
+    #     Find the indexes in the DNA sequence where mutations occur
 
-        Args:
-            mut_list (list): list of mutations in format [WT residue][index][mutant residue], such as G432W
-            mut_types (list): list with type of mutations, either: Mutation, Combined, Insert or Deletion
+    #     Args:
+    #         mut_list (list): list of mutations in format [WT residue][index][mutant residue], such as G432W
+    #         mut_types (list): list with type of mutations, either: Mutation, Combined, Insert or Deletion
 
-        Returns:
-            list: list of indexes in DNA sequence where mutations occur
-        """
-        mutname_idx = []  # List of tuples with [mutation, index], double mutation are split in multiple sublists
-        idx_dna_list = []  # Single list containting all indexes, nested lists for double mutations and deletions
-        paired = []  # Paired = double mutation and insertion
-        for mut, mut_type in zip(mut_list, mut_types):
-            if (mut_type == self.type_mutation) or (mut_type == self.type_insert):
-                if (mut_type) == self.type_mutation:
-                    idx = int(mut[1:-1]) * 3
-                elif (mut_type) == self.type_insert:
-                    idx = int(mut.split('-')[0][1:]) * 3
-                mutname_idx.append([mut, idx])
-                idx_dna_list.append(idx)
+    #     Returns:
+    #         list: list of indexes in DNA sequence where mutations occur
+    #     """
+    #     mutname_idx = []  # List of tuples with [mutation, index], double mutation are split in multiple sublists
+    #     idx_dna_list = []  # Single list containting all indexes, nested lists for double mutations and deletions
+    #     paired = []  # Paired = double mutation and insertion
+    #     for mut, mut_type in zip(mut_list, mut_types):
+    #         if (mut_type == self.type_mutation) or (mut_type == self.type_insert):
+    #             if (mut_type) == self.type_mutation:
+    #                 idx = int(mut[1:-1]) * 3
+    #             elif (mut_type) == self.type_insert:
+    #                 idx = int(mut.split('-')[0][1:]) * 3
+    #             mutname_idx.append([mut, idx])
+    #             idx_dna_list.append(idx)
 
-            elif (mut_type == self.type_deletion):
-                mut_begin = int(mut.split('-')[0][1:])
-                mut_end = int(mut.split('-')[1][1:])
-                mut_length = int(mut_end) - int(mut_begin)
+    #         elif (mut_type == self.type_deletion):
+    #             mut_begin = int(mut.split('-')[0][1:])
+    #             mut_end = int(mut.split('-')[1][1:])
+    #             mut_length = int(mut_end) - int(mut_begin)
                 
-                mutname_idx.append([f"{mut}", mut_begin * 3])
-                idx_end = (mut_begin * 3) + (mut_length * 3)
+    #             mutname_idx.append([f"{mut}", mut_begin * 3])
+    #             idx_end = (mut_begin * 3) + (mut_length * 3)
 
-                tmp_list = list(range(mut_begin * 3, idx_end, 3))  # For a deletion add all indexes in between the start and end of the deletion
-                idx_dna_list.append(tmp_list)
-                paired.append(tuple(tmp_list))
+    #             tmp_list = list(range(mut_begin * 3, idx_end, 3))  # For a deletion add all indexes in between the start and end of the deletion
+    #             idx_dna_list.append(tmp_list)
+    #             paired.append(tuple(tmp_list))
 
-            elif (mut_type == self.type_combined):
-                mutations = mut.split('-')
-                mutname_idx.append([[i, int(i[1:-1]) * 3] for i in mutations])
-                idx_dna_list.append([int(i[1:-1]) * 3 for i in mutations])
-                paired.append(tuple(idx_dna_list[-1]))
+    #         elif (mut_type == self.type_combined):
+    #             mutations = mut.split('-')
+    #             mutname_idx.append([[i, int(i[1:-1]) * 3] for i in mutations])
+    #             idx_dna_list.append([int(i[1:-1]) * 3 for i in mutations])
+    #             paired.append(tuple(idx_dna_list[-1]))
 
-        return mutname_idx, idx_dna_list, paired
+    #     return mutname_idx, idx_dna_list, paired
     
 
     # def read_mutations(self, fp: str):
