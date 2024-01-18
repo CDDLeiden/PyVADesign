@@ -1,34 +1,60 @@
 import sys
-from src.eblocks import Utils
+import numpy as np
+from utils import Utils
 
 
 class Mutation:
     """
-    This class represents a mutation.
+    This class represents the information for the selected mutations.
     """
 
     def __init__(self, 
                  type: str = None,
                  input: str = None,
                  mutation: list = None,
+                 n_mutants: int = None,
                  insert: str = None,
                  deletion: str = None,
+                 idx_dna: list = None,
+                #  idx_start: int = None,
+                #  idx_end: int = None,
+                 idx_dna_deletion_begin: int = None,
+                 idx_dna_deletion_end: int = None,
+                 length_deletion: int = None,
+                 length_insert: int = None,
                  position: int = None, 
                  wt_residue: str = None, 
                  mut_residue: str = None):
+        
         self.type = type
         self.input = input
         self.mutation = mutation
         self.position = position
+        self.idx_dna = idx_dna
+        self.paired = []
+        self.insert = insert
+        self.deletion = deletion
+        self.length_insert = length_insert
+        self.idx_dna_deletion_begin = idx_dna_deletion_begin
+        self.idx_dna_deletion_end = idx_dna_deletion_end
+        # self.idx_start = idx_start
+        # self.idx_end = idx_end
+        self.length_deletion = length_deletion
+        self.wt_residue = wt_residue
         self.wt_residue = wt_residue
         self.mut_residue = mut_residue
+        self.n_mutantsn = n_mutants
         self.mutations = []
+        self.colors = {'Mutation': 'black', 'Insert': 'red', 'Deletion': 'blue', 'Combined': 'green'}
 
     def parse_mutations(self, fp: str):
+        """
+        This function parses the mutations from a text file and checks the input.
+        """
         mutations = self.read_mutations(fp)
         result = self.perform_checks(mutations)
         return result
-            
+                
     def read_mutations(self, fp: str):
         """
         This function reads the mutations from a text file and returns a list of Mutation objects.
@@ -36,22 +62,73 @@ class Mutation:
         mutations = []
         with open(fp, "r") as f:
             content = f.readlines()
+            count = 0
             for line in content:
-                str_spl_line = line.strip().split()
-                if len(str_spl_line) == 1:
-                    mutations.append(Mutation(type="Mutation", input=line, mutation=[str_spl_line[0]]))
-                elif (len(str_spl_line) == 2) and (str_spl_line[0] == "Combined"):
-                    mutations.append(Mutation(type="Combined", input=line, mutation=str_spl_line[1].split("-")))
-                elif (len(str_spl_line) == 2) and (str_spl_line[0] == "Deletion"):
-                    mutations.append(Mutation(type="Deletion", input=line, mutation=str_spl_line[1]))
-                elif (len(str_spl_line) == 2) and (str_spl_line[0] == "Insert"):
-                    mutations.append(Mutation(type="Insert", input=line, mutation=str_spl_line[1]))
-                else:
+                try:
+                    str_spl_line = line.strip().split()
+                    if len(str_spl_line) == 1:
+                        count += 1
+                        idx = int(str_spl_line[0][1:-1]) * 3
+                        mutations.append(Mutation(type="Mutation", 
+                                                input=line, 
+                                                mutation=[str_spl_line[0]],
+                                                idx_dna=[idx]))
+                    elif (len(str_spl_line) == 2) and (str_spl_line[0] == "Combined"):
+                        count += 1
+                        muts = str_spl_line[1].split("-")
+                        idxs = list()
+                        for m in muts:
+                            idx = int(m[1:-1]) * 3
+                            idxs.append(idx)
+                        mutations.append(Mutation(type="Combined", 
+                                                input=line, 
+                                                mutation=muts,
+                                                idx_dna=idxs))
+                    elif (len(str_spl_line) == 2) and (str_spl_line[0] == "Deletion"):
+                        count += 1
+                        mut_begin = int(str_spl_line[1].split("-")[0][1:])
+                        mut_end = int(str_spl_line[1].split("-")[1][1:])
+                        mut_length = int(mut_end - mut_begin)
+                        idx_end = (mut_begin * 3) + (mut_length * 3)
+                        idxs = list(range((mut_begin * 3), idx_end, 3))
+                        mutations.append(Mutation(type="Deletion", 
+                                                input=line, 
+                                                mutation=str_spl_line[1],
+                                                idx_dna_deletion_begin=int(mut_begin) *3,
+                                                idx_dna_deletion_end=int(mut_end) *3,
+                                                idx_dna=idxs,
+                                                length_deletion=mut_length * 3))
+                    elif (len(str_spl_line) == 2) and (str_spl_line[0] == "Insert"):
+                        count += 1
+                        idx = int(str_spl_line[1].split("-")[0][1:]) * 3
+                        mutations.append(Mutation(type="Insert", 
+                                                  input=line, 
+                                                  mutation=str_spl_line[1],
+                                                  idx_dna=[idx],
+                                                  insert=str_spl_line[1].split("-")[1],
+                                                  length_insert=len(str_spl_line[1].split("-")[1]) * 3))
+                    else:
+                        print(f"Please check format of mutation {line}")
+                        sys.exit()
+                except:
                     print(f"Please check format of mutation {line}")
                     sys.exit()
 
         self.mutations = mutations
+        self.n_mutants = count
         return mutations
+    
+    def mean_idxs_dna(self) -> list:
+        """
+        This function returns the first index of each mutation.
+        """
+        mean_idxs = []
+        for mutation in self.mutations:
+            if len(mutation.idx_dna) > 1:
+                mean_idxs.append(float(np.mean(mutation.idx_dna)))
+            elif len(mutation.idx_dna) == 1:
+                mean_idxs.append(mutation.idx_dna[0])
+        return mean_idxs
 
     @classmethod
     def perform_checks(cls, mutations: list):
@@ -136,10 +213,3 @@ class Mutation:
                         sys.exit()
             else:
                 pass
-
-    @staticmethod
-    def mutation_colors():
-        """
-        This function returns a dictionary of colors for each mutation type.
-        """
-        return {'Mutation': 'black', 'Insert': 'red', 'Deletion': 'blue', 'Combined': 'green'}

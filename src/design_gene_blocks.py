@@ -8,8 +8,8 @@ import pandas as pd
 from Bio import SeqIO
 import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans
-from dna_features_viewer import GraphicFeature, GraphicRecord
-from utils import read_codon_usage, DNA_Codons, write_pickle, natural_amino_acids
+# from dna_features_viewer import GraphicFeature, GraphicRecord
+from utils_old import read_codon_usage, DNA_Codons, write_pickle, natural_amino_acids
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 template_path_96 = os.path.join(script_dir, 'data/eblocks-plate-upload-template-96.xlsx')
@@ -112,6 +112,11 @@ class DesignEblocks:
         # Find indexes in sequence where mutation occures
         idx_dna_tups, idx_test, paired = self.index_mutations(self.mutations, self.mutation_types)
         self.num_mutations = len(idx_dna_tups)
+
+        print(idx_dna_tups)
+        print(idx_test)
+        print(paired)
+        sys.exit()
      
         # length of ebLock is checked here and should be within bounds
         clusters = self.make_clusters(idx_dna_tups, idx_test, paired)
@@ -767,13 +772,11 @@ class DesignEblocks:
         return optimal_clustering
 
         
-    def kmeans_clustering(self, idx_test, paired_mutations, num_clusters, n_init='auto', random_state=42, OMP_NUM_THREADS=1):
+    def kmeans_clustering(self, idx_test, paired_mutations, num_clusters, n_init=10, random_state=42, OMP_NUM_THREADS=1):
         # Extract the first index of each mutation in idx_test
         idx_first = [np.mean(i) if isinstance(i, list) else i for i in idx_test]
-        
         # Create a numpy array for clustering
         mutation_arr = np.array(idx_first).reshape(-1, 1)
-
         # Initialize KMeans with the number of clusters
         kmeans = KMeans(n_clusters=num_clusters, random_state=random_state, n_init=n_init)
 
@@ -794,7 +797,8 @@ class DesignEblocks:
         for i in to_remove:
             del idx_first[i]
             cluster_labels = np.delete(cluster_labels, i)
-
+        print(cluster_label)
+        sys.exit()
         return cluster_labels, idx_first
     
 
