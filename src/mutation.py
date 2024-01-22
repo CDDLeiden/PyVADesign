@@ -1,5 +1,6 @@
 import sys
-from src.eblocks import Utils
+import numpy as np
+from utils import Utils
 
 
 class Mutation:
@@ -18,6 +19,7 @@ class Mutation:
                 #  idx_start: int = None,
                 #  idx_end: int = None,
                  length_deletion: int = None,
+                 length_insert: int = None,
                  position: int = None, 
                  wt_residue: str = None, 
                  mut_residue: str = None):
@@ -27,9 +29,11 @@ class Mutation:
         self.mutation = mutation
         self.position = position
         self.idx_dna = idx_dna
+        self.paired = []
         # self.idx_start = idx_start
         # self.idx_end = idx_end
         self.length_deletion = length_deletion
+        self.wt_residue = wt_residue
         self.wt_residue = wt_residue
         self.mut_residue = mut_residue
         self.n_mutantsn = n_mutants
@@ -41,6 +45,7 @@ class Mutation:
         """
         mutations = self.read_mutations(fp)
         result = self.perform_checks(mutations)
+
         return result
                 
     def read_mutations(self, fp: str):
@@ -63,14 +68,14 @@ class Mutation:
                                                 idx_dna=[idx]))
                     elif (len(str_spl_line) == 2) and (str_spl_line[0] == "Combined"):
                         count += 1
-                        mutations = str_spl_line[1].split("-")
-                        idxs = []
-                        for m in mutations:
+                        muts = str_spl_line[1].split("-")
+                        idxs = list()
+                        for m in muts:
                             idx = int(m[1:-1]) * 3
                             idxs.append(idx)
                         mutations.append(Mutation(type="Combined", 
                                                 input=line, 
-                                                mutation=mutations,
+                                                mutation=muts,
                                                 idx_dna=idxs))
                     elif (len(str_spl_line) == 2) and (str_spl_line[0] == "Deletion"):
                         count += 1
@@ -81,15 +86,17 @@ class Mutation:
                         idxs = list(range((mut_begin * 3), idx_end, 3))
                         mutations.append(Mutation(type="Deletion", 
                                                 input=line, 
-                                                mutation=str_spl_line[1]),
-                                                idx_dna=idxs)
+                                                mutation=str_spl_line[1],
+                                                idx_dna=idxs,
+                                                length_deletion=mut_length * 3))
                     elif (len(str_spl_line) == 2) and (str_spl_line[0] == "Insert"):
                         count += 1
                         idx = int(str_spl_line[1].split("-")[0][1:-1]) * 3
                         mutations.append(Mutation(type="Insert", 
                                                 input=line, 
                                                 mutation=str_spl_line[1],
-                                                idx_dna=[idx]))
+                                                idx_dna=[idx],
+                                                length_insert=len(str_spl_line[1].split("-")[1]) * 3))
                     else:
                         print(f"Please check format of mutation {line}")
                         sys.exit()
@@ -101,6 +108,18 @@ class Mutation:
         self.n_mutants = count
         return mutations
     
+    def mean_idxs_dna(self) -> list:
+        """
+        This function returns the first index of each mutation.
+        """
+        mean_idxs = []
+        for mutation in self.mutations:
+            if len(mutation.idx_dna) > 1:
+                mean_idxs.append(float(np.mean(mutation.idx_dna)))
+            elif len(mutation.idx_dna) == 1:
+                mean_idxs.append(mutation.idx_dna[0])
+        return mean_idxs
+
     @classmethod
     def perform_checks(cls, mutations: list):
         """

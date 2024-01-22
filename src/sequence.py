@@ -3,6 +3,23 @@ from Bio import SeqIO
 
 
 class Sequence:
+    """
+    This class contains functions to parse and translate DNA sequences.
+    """
+
+    def __init__(self):
+        # TODO Do for the sequence the same as for the mutation class
+        self.sequence: str = None
+
+    def parse_sequence(self, fp: str) -> str:
+        """
+        This function parses the sequence from a text file and checks the input.
+        """
+        sequence = self.read_single_fasta(fp)
+        self.sequence = sequence
+        result = self.check_sequence(sequence)
+        return result
+
     @staticmethod
     def read_single_fasta(fp: str) -> str:
         """
@@ -21,7 +38,10 @@ class Sequence:
         This function checks the input sequence.
         """
         if Sequence.is_dna(sequence) and Sequence.contains_start_stop_codon(sequence):
-            return sequence
+            return 1
+        else:
+            print("Please provide a DNA sequence with start and stop codons.")
+            sys.exit()
 
     @staticmethod
     def is_dna(sequence: str) -> bool:
@@ -38,7 +58,7 @@ class Sequence:
         """
         This function checks if the sequence contains start and stop codons.
         """
-        if sequence.startswith("ATG") and sequence.endswith(("TAA", "TAG", "TGA")):
+        if sequence.upper().startswith("ATG") and sequence.upper().endswith(("TAA", "TAG", "TGA")):
             return True
         else:
             print("Please provide a sequence with start and stop codons")
