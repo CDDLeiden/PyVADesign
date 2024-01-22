@@ -1,4 +1,5 @@
 import sys
+import pandas as pd
 
 
 class Utils:
@@ -35,3 +36,15 @@ class Utils:
         "TGG": "W",
         "TAT": "Y", "TAC": "Y"}
         return DNA_Codons
+    
+    @staticmethod
+    def read_codon_usage(fp):
+        codon_usage = {}
+        codon_usage_no_U = {}
+        df = pd.read_csv(fp, sep=';')
+        for _, row in df.iterrows():
+            codon_usage[row['Triplet']] = row['Number']
+        for key, value in codon_usage.items():
+            newkey = key.replace('U', 'T').lower()
+            codon_usage_no_U[newkey] = value
+        return codon_usage_no_U

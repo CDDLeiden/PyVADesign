@@ -8,15 +8,16 @@ class Sequence:
     """
 
     def __init__(self):
-        # TODO Do for the sequence the same as for the mutation class
         self.sequence: str = None
+        self.seqid = None
 
     def parse_sequence(self, fp: str) -> str:
         """
         This function parses the sequence from a text file and checks the input.
         """
-        sequence = self.read_single_fasta(fp)
+        sequence, seqid = self.read_single_fasta(fp)
         self.sequence = sequence
+        self.seqid = seqid
         result = self.check_sequence(sequence)
         return result
 
@@ -27,10 +28,11 @@ class Sequence:
         """
         for num, record in enumerate(SeqIO.parse(fp, "fasta")):
             sequence = record.seq
+            seqid = record.id
             if num > 0:
                 print("Please provide a single sequence in FASTA format.")
                 sys.exit()
-        return sequence
+        return sequence, seqid
     
     @staticmethod
     def check_sequence(sequence: str) -> str:
