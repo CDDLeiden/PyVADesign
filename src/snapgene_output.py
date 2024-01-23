@@ -194,11 +194,4 @@ class SnapGeneOutput:
         elif mutation_type == self.type_deletion:
             return self.color_deletion
         elif mutation_type == self.type_combined:
-            return self.color_combination
-        
-    @staticmethod
-    def read_snapgene_dna_file(fp):
-        with open(fp, 'rb') as handle:
-            for record in SeqIO.parse(handle, "snapgene"):
-                return record
-        
+            return self.color_combination        

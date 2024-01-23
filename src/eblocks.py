@@ -21,7 +21,6 @@ from utils import Utils
 class Eblocks:
     def __init__(self):
         self.eblock_parameters = {"common_param": "shared_value"}
-        self.block_sequences = []
 
     def set_parameters(self, parameters):
         # TODO Store the information for the designed eblocks here (mutation, eblock nun, eblock sequences, etc.)
@@ -69,7 +68,7 @@ class EblockDesign:
         self.min_order = min_order
         self.optimization_method = optimization_method
 
-        self.wt_eblocks = None
+        self.wt_eblocks = {}
         self.eblocks = {}
         self.codon_usage = codon_usage
         self.block_sequences = []
@@ -94,23 +93,12 @@ class EblockDesign:
             # Create mutated eblock, based on mutation type
             results = self.make_mutant_eblock(mutation, results)
 
-        self.eblocks = results
+        # Sort the eblocks based on the index of the first mutation in the eblock and the number of the eblock
+        sorted_dict = dict(sorted(results.items(), key=lambda item: (int(item[1][0].split('_')[1]), int(item[1][2]))))
+        self.eblocks = sorted_dict
 
         print("Finished.")
                                     
-        # Store output
-        # TODO 
-        # self.write_gene_blocks_to_txt(results, self.output_fp)
-        # self.write_gene_blocks_to_template(results, self.output_fp)
-        # write_pickle(results, self.output_fp)
-        # write_pickle(self.wt_eblocks, self.output_fp, fname="wt_gene_blocks.npy")
-
-        # print("Designed eBlocks and stored output in ", self.output_fp)
-
-        # Count number of mutations per eblock, for making barplot
-        # TODO 
-        # self.counts = self.count_mutations_per_eblock(idx_dna_tups)
-
         # # Your design logic to generate block_sequences
         # self.block_sequences = ["sequence1", "sequence2", "sequence3"]
 
@@ -252,7 +240,6 @@ class EblockDesign:
         """
         all_codons = Utils.DNA_codons()
         codon = eblock_seq[idx-3:idx]
-        print(codon)
         result = next((value for key, value in all_codons.items() if key.lower() == codon), None)
         if result is not None and result != mut[0]:
             print(f"WT codon does not match residue {mut}, but is {result}, the codon is {codon}")
@@ -363,7 +350,6 @@ class EblockDesign:
             mut_gene_block_value = None
             lowest_count = None 
             for mut_i in mutation.idx_dna:
-                print("mut_1:", mut_i)
                 possible_gene_blocks, counts = self.find_gene_block(mut_i)
                 if (counts == 1) and (mut_gene_block_name is None):
                     mut_gene_block_name = list(possible_gene_blocks.keys())[0]
@@ -404,3 +390,7 @@ class EblockDesign:
         begin_range = int(eblock_name.split('_')[3])
         end_range = int(eblock_name.split('_')[4])
         return begin_range, end_range
+    
+    @staticmethod
+    def short_block_name(longname):
+        return longname.split('_')[0] + longname.split('_')[1]

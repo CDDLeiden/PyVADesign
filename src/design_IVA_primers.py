@@ -277,19 +277,19 @@ class DesignPrimers(DesignEblocks):  # TODO DesignPrimers(DesignEblocks)
             if row['dTm Templates'] > threshold:
                 print(f"The template temperatures for Fw and Rv primer of {row['Gene Block']} exceed max Tm difference {threshold} degrees")
 
-    @staticmethod
-    def invert_sequence(sequence):
-        return sequence[::-1]
+    # @staticmethod
+    # def invert_sequence(sequence):
+    #     return sequence[::-1]
     
-    @staticmethod
-    def reverse_complement(sequence):
-        pairs = {"a": "t", "c":"g", "t":"a", "g":"c"}
-        reverse = ""
-        for nucleotide in sequence:
-            rev_nucl = pairs[nucleotide]
-            reverse += rev_nucl
-        return reverse
+    # @staticmethod
+    # def reverse_complement(sequence):
+    #     pairs = {"a": "t", "c":"g", "t":"a", "g":"c"}
+    #     reverse = ""
+    #     for nucleotide in sequence:
+    #         rev_nucl = pairs[nucleotide]
+    #         reverse += rev_nucl
+    #     return reverse
 
-    @staticmethod
-    def short_block_name(name):
-        return name.split('_')[0] + name.split('_')[1]
+    # @staticmethod
+    # def short_block_name(longname):
+    #     return longname.split('_')[0] + longname.split('_')[1]
