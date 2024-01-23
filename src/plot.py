@@ -11,6 +11,12 @@ import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans
 from dna_features_viewer import GraphicFeature, GraphicRecord
 # from utils import read_codon_usage, DNA_Codons, write_pickle, natural_amino_acids
+# For plasmid viewing
+import biotite.sequence as seq
+import biotite.sequence.io.genbank as gb
+import biotite.sequence.graphics as graphics
+import biotite.database.entrez as entrez
+from biotite.sequence import Feature, Location, Annotation
 
 # from mutation import Mutation
 # TODO Change filepath (str) to Path object
@@ -126,3 +132,64 @@ class Plot:
         Create dictionary with colors for plotting eBlocks
         """
         return {i: '#%06X' % random.randint(0, 0xFFFFFF) for i in range(100)}
+    
+    def extract_snapgene_features(self):
+        """
+        Extract features from a snapgene vector file and return them as a list of biotite sequence features.
+        """
+        if self.sequence_instance.vector is None:
+            print("No vector found. Please run the sequence class first.")
+            sys.exit()
+
+        vector_features = []
+        for i in self.sequence_instance.vector.features:
+            feature_type = i.type
+            quals = i.qualifiers
+            label_qualifier = i.qualifiers.get('label', '')
+            locations = [Location(int(i.location.start), int(i.location.end))]
+
+            if label_qualifier:
+                qual = {"label": ' '.join(label_qualifier)}
+            else:
+                qual = {}
+
+            if (i.type == "rep_origin") or (i.type == "protein_bind") or (i.type == "terminator"):
+                if quals['note']:
+                    qual = {"note": ' '.join(quals['label'])}
+
+            elif (i.type == "CDS") or (i.type == "gene"):
+                if quals['label']:
+                    qual = {"product": ' '.join(quals['label'])}
+            elif (i.type == "regulatory"):
+                if quals['label']:
+                    qual = {"label": ' '.join(quals['label'])}
+            elif (i.type == "misc_feature"):
+                if quals['label']:
+                    qual = {"note": ' '.join(quals['label'])}
+
+            vector_features.append(Feature(feature_type, locations, qual))
+        # Add organism source
+        if self.sequence_instance.organism:
+                vector_features.append(Feature("source", [Location(0, len(self.sequence_instance.vector.seq))], {"organism": f"{self.sequence_instance.organism}"}))
+        return vector_features
+
+
+    def plot_vector(self, figsize=(8,8), fontsize=10):
+        """
+        Plot a plasmid map of the vector sequence.
+        """
+        features = self.extract_snapgene_features()
+        annotation = Annotation(features)
+        fig = plt.figure(figsize=figsize)
+        ax = fig.add_subplot(111, projection="polar")
+        graphics.plot_plasmid_map(
+            ax, 
+            annotation, 
+            plasmid_size=len(self.sequence_instance.vector.seq), 
+            label=f"{self.sequence_instance.vector.name}",
+            label_properties={"fontsize": fontsize})
+        ticks = ax.get_xticks()
+        # Only show a few ticks
+        ax.set_xticks(ticks[::2])
+        fig.tight_layout()
+        return ax, fig

@@ -25,14 +25,20 @@ class Plasmid:
         result = self.check_sequence(sequence)
         return result
     
-    def parse_vector(self):
+    def parse_vector(self, fp: str):
         """
         This function parses the vector from a DNA file.
         """
-        # TODO
-        pass
-        
+        vector = self.read_snapgene_dna_file(fp)
+        self.vector = vector
+        # TODO Add some checks here for the vector
 
+    @staticmethod
+    def read_snapgene_dna_file(fp: str):
+        with open(fp, 'rb') as handle:
+            for record in SeqIO.parse(handle, "snapgene"):
+                return record
+        
     @staticmethod
     def read_single_fasta(fp: str) -> str:
         """
@@ -51,7 +57,7 @@ class Plasmid:
         """
         This function checks the input sequence.
         """
-        if Sequence.is_dna(sequence) and Sequence.contains_start_stop_codon(sequence):
+        if Plasmid.is_dna(sequence) and Plasmid.contains_start_stop_codon(sequence):
             return 1
         else:
             print("Please provide a DNA sequence with start and stop codons.")
