@@ -1,16 +1,19 @@
 import sys
 from Bio import SeqIO
 
+# TODO Add vector here as well (so that mutations in N and C terminal can be made)
 
-class Sequence:
+class Plasmid:
     """
-    This class contains functions to parse and translate DNA sequences.
+    This class contains functions to parse and translate DNA sequences and vectors.
     """
 
     def __init__(self):
         self.sequence: str = None
         self.seqid = None
-
+        self.organism = None
+        self.vector = None
+ 
     def parse_sequence(self, fp: str) -> str:
         """
         This function parses the sequence from a text file and checks the input.
@@ -18,8 +21,17 @@ class Sequence:
         sequence, seqid = self.read_single_fasta(fp)
         self.sequence = sequence
         self.seqid = seqid
+
         result = self.check_sequence(sequence)
         return result
+    
+    def parse_vector(self):
+        """
+        This function parses the vector from a DNA file.
+        """
+        # TODO
+        pass
+        
 
     @staticmethod
     def read_single_fasta(fp: str) -> str:
@@ -71,3 +83,4 @@ class Sequence:
         Translate DNA sequence to protein sequence
         """
         return sequence.translate()
+    
