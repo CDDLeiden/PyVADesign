@@ -1,30 +1,15 @@
 
 import os
 import sys
-import math
 import random
-# import openpyxl
-import numpy as np
-import pandas as pd
-from Bio import SeqIO
 import matplotlib.pyplot as plt
-from sklearn.cluster import KMeans
-from dna_features_viewer import GraphicFeature, GraphicRecord
-# from utils import read_codon_usage, DNA_Codons, write_pickle, natural_amino_acids
-# For plasmid viewing
-import biotite.sequence as seq
-import biotite.sequence.io.genbank as gb
 import biotite.sequence.graphics as graphics
-import biotite.database.entrez as entrez
 from biotite.sequence import Feature, Location, Annotation
-
-# from mutation import Mutation
-# TODO Change filepath (str) to Path object
+from dna_features_viewer import GraphicFeature, GraphicRecord
 
 from mutation import Mutation
 from sequence import Plasmid
 from eblocks import Eblocks, EblockDesign
-from utils import Utils
 
 
 class Plot:
@@ -42,7 +27,7 @@ class Plot:
         fig, ax = plt.subplots(figsize=(figure_width, figure_length))
         labels = []
         for k, v in counts.items():
-            kn = k.split('_')[0] + ' ' + k.split('_')[1]
+            kn = self.eblocks_design_instance.short_block_name(k)
             labels.append(kn)
         colors = list(self.eblock_colors.values())[:len(counts) ]
         ax.bar(range(len(counts)), list(counts.values()), align='center', color=colors)
@@ -51,6 +36,26 @@ class Plot:
         ax.set_xlabel('eBlock')
         plt.show()
         # TODO Add save
+
+    def plot_mutation_legend(self, legend_alpha=0.2, font_size='x-large', marker_size=10, linestyle='None', marker='o', loc='center', bbox_to_anchor=(0.5, 0.5), show=False):
+        """
+        Plot legend for eBlocks plot
+        """
+        # Create an empty plot with no data points
+        fig, ax = plt.subplots(figsize=(3, 2))
+        # Add mutation type colors to the legend
+        handles = []
+        for k, v in self.mutation_instance.colors.items():
+            handle = plt.Line2D([0], [0], marker=marker, color=f'{v}', label=f'{k}', markersize=marker_size, linestyle=linestyle, alpha=legend_alpha)
+            handles.append(handle) 
+        legend = ax.legend(handles=handles, loc=loc, bbox_to_anchor=bbox_to_anchor, fontsize=font_size, framealpha=legend_alpha)
+        # Hide the axes
+        ax.axis('off')
+        # fig.savefig(os.path.join(self.output_fp, 'legend.png'), dpi=100)
+        if show:
+            plt.show()
+        else:
+            plt.close()
 
     def plot_eblocks_mutations(self, 
                                plot_eblocks=True, 
@@ -108,7 +113,7 @@ class Plot:
                                                end=int(key.split('_')[4]), 
                                                strand=+1, 
                                                color=self.eblock_colors[num], 
-                                               label=f"Block {key.split('_')[1]}"))
+                                               label=f"{self.eblocks_design_instance.short_block_name(key)}"))
                 
         record = GraphicRecord(sequence_length=len(self.sequence_instance.sequence), features=features)
         fig_size = (figure_length, figure_width)

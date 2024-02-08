@@ -98,19 +98,6 @@ class EblockDesign:
 
         print("Finished.")
                                     
-        # Store output
-        # TODO 
-        # self.write_gene_blocks_to_txt(results, self.output_fp)
-        # self.write_gene_blocks_to_template(results, self.output_fp)
-        # write_pickle(results, self.output_fp)
-        # write_pickle(self.wt_eblocks, self.output_fp, fname="wt_gene_blocks.npy")
-
-        # print("Designed eBlocks and stored output in ", self.output_fp)
-
-        # Count number of mutations per eblock, for making barplot
-        # TODO 
-        # self.counts = self.count_mutations_per_eblock(idx_dna_tups)
-
         # # Your design logic to generate block_sequences
         # self.block_sequences = ["sequence1", "sequence2", "sequence3"]
 
@@ -404,3 +391,7 @@ class EblockDesign:
         begin_range = int(eblock_name.split('_')[3])
         end_range = int(eblock_name.split('_')[4])
         return begin_range, end_range
+    
+    @staticmethod
+    def short_block_name(longname):
+        return longname.split('_')[0] + longname.split('_')[1]
