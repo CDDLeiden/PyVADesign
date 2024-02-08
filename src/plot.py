@@ -16,13 +16,24 @@ class Plot:
     def __init__(self, 
                  eblocks_design_instance: EblockDesign,
                  mutation_instance: Mutation,
-                 sequence_instance: Plasmid):
+                 sequence_instance: Plasmid,
+                 output_dir: str = None):
         self.eblocks_design_instance = eblocks_design_instance
         self.mutation_instance = mutation_instance
         self.sequence_instance = sequence_instance
+        self.output_dir = output_dir
         self.eblock_colors = self.generate_eblock_colors()
+        self.show = True
+        self.save = True
 
-    def plot_histogram_mutations(self, figure_width=8, figure_length=5, show=True):
+    def save_plot(self, fig, filename, dpi=100, bbox_inches='tight', transparent=True):
+        """
+        Save plot to file.
+        """
+        fig.savefig(os.path.join(self.output_dir, filename), dpi=dpi, bbox_inches=bbox_inches, transparent=transparent)
+
+
+    def plot_histogram_mutations(self, figure_width=8, figure_length=5, show=True, save=True, filename='histogram_mutations.png'):
         counts = self.eblocks_design_instance.count_mutations_per_eblock()
         fig, ax = plt.subplots(figsize=(figure_width, figure_length))
         labels = []
@@ -34,10 +45,14 @@ class Plot:
         plt.xticks(range(len(counts)), labels, rotation=90)
         ax.set_ylabel('Number of mutants per eBlock')
         ax.set_xlabel('eBlock')
-        plt.show()
-        # TODO Add save
+        ax.set_title(f'Number of mutants per eBlock')
+        if save:
+            self.save_plot(fig, filename)
+        if show:
+            plt.show()
+        
 
-    def plot_mutation_legend(self, legend_alpha=0.2, font_size='x-large', marker_size=10, linestyle='None', marker='o', loc='center', bbox_to_anchor=(0.5, 0.5), show=False):
+    def plot_mutation_legend(self, legend_alpha=0.2, font_size='x-large', marker_size=10, linestyle='None', marker='o', loc='center', bbox_to_anchor=(0.5, 0.5)):
         """
         Plot legend for eBlocks plot
         """
@@ -51,34 +66,28 @@ class Plot:
         legend = ax.legend(handles=handles, loc=loc, bbox_to_anchor=bbox_to_anchor, fontsize=font_size, framealpha=legend_alpha)
         # Hide the axes
         ax.axis('off')
-        # fig.savefig(os.path.join(self.output_fp, 'legend.png'), dpi=100)
-        if show:
+        if self.show:
             plt.show()
         else:
             plt.close()
+        if self.save:
+            self.save_plot(fig, 'legend.png')
 
     def plot_eblocks_mutations(self, 
                                plot_eblocks=True, 
                                plot_mutations=True, 
-                               genename=None, 
                                seq_color="#d3d3d3", 
-                               show=False,
-                               save=True,
-                               output_fp=None,
                                figure_width=20, 
                                figure_length=10):
         """
         Plot mutations and selected eBlocks.
         """
-
         if self.mutation_instance.mutations is None:
             print("No mutations found. Please run the mutation class first.")
             sys.exit()
         if self.sequence_instance.sequence is None:
             print("No sequence found. Please run the sequence class first.")
             sys.exit()
-
-        eblocks_colors = self.generate_eblock_colors()
 
         features = []
         # Add gene to plot
@@ -91,7 +100,6 @@ class Plot:
         # Add mutations to plot
         if plot_mutations:
             for num, mut in enumerate(self.mutation_instance.mutations):
-                # Single mutation
                 if (mut.type == "Mutation") or (mut.type == "Insert") or (mut.type == "Deletion"):
                     features.append(GraphicFeature(start=int(mut.idx_dna[0]), 
                                                     end=int(mut.idx_dna[0]) + 3,
@@ -119,17 +127,16 @@ class Plot:
         fig_size = (figure_length, figure_width)
         fig, ax = plt.subplots(figsize=fig_size) 
         record.plot(ax=ax, figure_width=figure_width)
-        # Save with white background
-        if show:
+        if self.show:
             plt.show()
         else:
             plt.close()
-        if plot_eblocks and plot_mutations:
+        if plot_eblocks and plot_mutations and self.save:
             # fig.savefig(os.path.join(output_fp, f'eblocks_{self.sequence_instance.seqid}_N{self.mutation_instance.n_mutants}_{self.eblocks_design_instance.optimization_method}.png'), dpi=100)
             # TODO Fix this (filenames with | are not allowed)
-            fig.savefig(os.path.join(output_fp, 'eblocks'), dpi=100, bbox_inches='tight', transparent=True)
+            self.save_plot(fig, f'eblocks_{self.sequence_instance.seqid}_N{self.mutation_instance.n_mutants}_{self.eblocks_design_instance.optimization_method}.png')
         if not plot_eblocks:
-            fig.savefig(os.path.join(output_fp, f'{self.sequence_instance.seqid}_N{self.mutation_instance.n_mutants}.png'), dpi=100, box_inches='tight', transparent=True)
+            self.save_plot(fig, f'mutations_{self.sequence_instance.seqid}_N{self.mutation_instance.n_mutants}_{self.eblocks_design_instance.optimization_method}.png')
 
     @staticmethod
     def generate_eblock_colors() -> dict:
@@ -197,4 +204,10 @@ class Plot:
         # Only show a few ticks
         ax.set_xticks(ticks[::2])
         fig.tight_layout()
+        if self.save:
+            self.save_plot(fig, f"plasmid_map.png")
+        if self.show:
+            plt.show()
+        else:
+            plt.close()
         return ax, fig

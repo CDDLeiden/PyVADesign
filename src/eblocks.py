@@ -21,7 +21,6 @@ from utils import Utils
 class Eblocks:
     def __init__(self):
         self.eblock_parameters = {"common_param": "shared_value"}
-        self.block_sequences = []
 
     def set_parameters(self, parameters):
         # TODO Store the information for the designed eblocks here (mutation, eblock nun, eblock sequences, etc.)
@@ -69,7 +68,7 @@ class EblockDesign:
         self.min_order = min_order
         self.optimization_method = optimization_method
 
-        self.wt_eblocks = None
+        self.wt_eblocks = {}
         self.eblocks = {}
         self.codon_usage = codon_usage
         self.block_sequences = []
