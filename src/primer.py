@@ -28,19 +28,20 @@ class DesignPrimers:
         self.sequence_instance = sequence_instance
 
         # Primer design parameters
-        self.max_overhang_temp_IVA = 50
-        self.max_template_temp_IVA = 60
-        self.max_oh_length = 15
+        self.max_overhang_temp_IVA: int = 50
+        self.max_template_temp_IVA: int = 60
+        self.max_oh_length: int = 15
 
-        self.min_primer_length_seq = 18
-        self.max_primer_length_seq = 24
-        self.min_gc_content_primer_seq = 0.45
-        self.max_gc_content_primer_seq = 0.55
-        self.gc_clamp = False # TODO Add GC clamp
-        self.void_length = 100  # Approximate number of nucleotides that is skipped before sequencing
+        self.min_primer_length_seq: int = 18
+        self.max_primer_length_seq: int = 24
+        self.min_gc_content_primer_seq: float = 0.45
+        self.max_gc_content_primer_seq: float = 0.55
+        self.gc_clamp: bool = True # TODO Add GC clamp
+        self.void_length: int = 100  # Approximate number of nucleotides that is skipped before sequencing
+        self.max_sequenced_region: int = 600  # Maximum number of nucleotides that can be sequenced with a single primer
 
-        self.complementarity_threshold = 4
-        self.hairpin_threshold = 3
+        self.complementarity_threshold: int = 4
+        self.hairpin_threshold: int = 3
         # TODO Check self-complementarity
         # TODO Check hairpin formation
         # TODO Add examples of these to the tests directory
@@ -56,6 +57,7 @@ class DesignPrimers:
 
     def run_SEQprimer(self):
         # TODO
+        # TODO Sort mutations by position
         # First cluster the mutations and calculate the distance between them (how many mutations can be sequenced with single primer?)
         # Then design the primers
         pass

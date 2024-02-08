@@ -93,7 +93,9 @@ class EblockDesign:
             # Create mutated eblock, based on mutation type
             results = self.make_mutant_eblock(mutation, results)
 
-        self.eblocks = results
+        # Sort the eblocks based on the index of the first mutation in the eblock and the number of the eblock
+        sorted_dict = dict(sorted(results.items(), key=lambda item: (int(item[1][0].split('_')[1]), int(item[1][2]))))
+        self.eblocks = sorted_dict
 
         print("Finished.")
                                     
@@ -238,7 +240,6 @@ class EblockDesign:
         """
         all_codons = Utils.DNA_codons()
         codon = eblock_seq[idx-3:idx]
-        print(codon)
         result = next((value for key, value in all_codons.items() if key.lower() == codon), None)
         if result is not None and result != mut[0]:
             print(f"WT codon does not match residue {mut}, but is {result}, the codon is {codon}")
@@ -349,7 +350,6 @@ class EblockDesign:
             mut_gene_block_value = None
             lowest_count = None 
             for mut_i in mutation.idx_dna:
-                print("mut_1:", mut_i)
                 possible_gene_blocks, counts = self.find_gene_block(mut_i)
                 if (counts == 1) and (mut_gene_block_name is None):
                     mut_gene_block_name = list(possible_gene_blocks.keys())[0]
