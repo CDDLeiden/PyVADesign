@@ -1,8 +1,10 @@
 import os
 import sys
+import math
 import difflib
+import random
 import pandas as pd
-from Bio.SeqUtils import MeltingTemp as mt
+from Bio.SeqUtils import MeltingTemp as mt, GC
 from design_gene_blocks import DesignEblocks
 from utils_old import load_pickle, extract_filename
 
@@ -20,12 +22,14 @@ class DesignPrimers:
                  eblock_instance: Eblocks,
                  eblocks_design_instance: EblockDesign,
                  mutation_instance: Mutation,
-                 sequence_instance: Plasmid):
+                 sequence_instance: Plasmid,
+                 output_dir: str = None):
 
         self.eblock_instance = eblock_instance
         self.eblocks_design_instance = eblocks_design_instance
         self.mutation_instance = mutation_instance
         self.sequence_instance = sequence_instance
+        self.output_dir = output_dir
 
         # Primer design parameters
         self.max_overhang_temp_IVA: int = 50
@@ -34,17 +38,19 @@ class DesignPrimers:
 
         self.min_primer_length_seq: int = 18
         self.max_primer_length_seq: int = 24
-        self.min_gc_content_primer_seq: float = 0.45
-        self.max_gc_content_primer_seq: float = 0.55
+        self.min_gc_content_primer_seq: int = 45
+        self.max_gc_content_primer_seq: int = 55
         self.gc_clamp: bool = True # TODO Add GC clamp
-        self.void_length: int = 100  # Approximate number of nucleotides that is skipped before sequencing
+        self.void_length: int = 100  # Approximate number of nucleotides that is skipped before sequencing starts
         self.max_sequenced_region: int = 600  # Maximum number of nucleotides that can be sequenced with a single primer
 
         self.complementarity_threshold: int = 4
-        self.hairpin_threshold: int = 3
-        # TODO Check self-complementarity
-        # TODO Check hairpin formation
-        # TODO Add examples of these to the tests directory
+        self.hairpin_threshold: int = 4
+
+        # TODO Add examples of complementary and hairpin structures to the tests directory
+        # TODO Check unique primer binding sequence in the plasmid
+        # TODO For sequencing primer check CG lock
+        # TODO Check multiple binding sites
 
         self.primers_IVA: dict = {}
         self.primers_IVA_df: pd.DataFrame = pd.DataFrame(columns=['Eblock', 'fw_sequence', 'rv_sequence', 'FW Overhang', 
@@ -55,11 +61,101 @@ class DesignPrimers:
         # TODO Think about how to store the primers
         self.primers_SEQ: dict = {}
 
+    def find_closest_primer(self, all_primers: dict, position: int):
+        closest_key = None
+        min_difference = float('inf')
+        for key, value in all_primers.items():
+            print(key, value)
+            difference = abs(position - key[0])
+            print(difference)
+            if difference < min_difference:
+                min_difference = difference
+                closest_key = key
+        return closest_key
+    
     def run_SEQprimer(self):
-        # TODO
-        # TODO Sort mutations by position
+        # TODO Calculate the how many mutations can be captured with a single primer (for now say 600 bp)
+        # Calculate the length of the gene block and how many primers are needed to sequence the whole block
         # First cluster the mutations and calculate the distance between them (how many mutations can be sequenced with single primer?)
         # Then design the primers
+        possible_primers = self.all_possible_fw_seqprimers()
+        for key, value in possible_primers.items():
+            print(key, value)
+        for k, v in self.eblocks_design_instance.wt_eblocks.items():
+            begin, end = DesignEblocks.gene_block_range(k)
+            length = end - begin
+            num_primers = math.ceil(length / self.max_sequenced_region)
+            print(begin, end, num_primers)
+            # Calculate the starting points of the sequencing primer
+            size = int(length / num_primers)
+            print(size)
+            primer_start_index = begin - self.void_length
+            print("primer_start_index", primer_start_index)
+            end = begin + size
+            for i in range(num_primers):
+                # Find closest primer to starting position
+                closest_primer = self.find_closest_primer(possible_primers, primer_start_index)
+                print("closest distance", closest_primer)
+
+    def all_possible_fw_seqprimers(self):
+        result = {}
+        for i in range(len(self.sequence_instance.sequence)):
+            for j in range(i, len(self.sequence_instance.sequence)):
+                option = self.sequence_instance.sequence[i:j]
+                if self.min_primer_length_seq <= len(option) <= self.max_primer_length_seq:
+                    gc_content = GC(option)
+                    if self.min_gc_content_primer_seq <= gc_content <= self.max_gc_content_primer_seq:
+                        if self.gc_clamp:
+                            if option[-1] == 'G' or option[-1] == 'C':
+                                result[(i, j)] = option
+                        else:
+                            result[(i, j)] = option
+        return result
+    
+
+                
+    # def design_fw_SEQprimer(self, eblock, start, end):
+    #     # TODO Check if the primer is within the desired parameters
+    #     # TODO Check if the primer is unique in the plasmid
+    #     # For simplicity, make all primers forward primers
+    #     # Start with a primer size of 10 and increase untill the Tm is within the desired range
+    #     # If this cannot be found, primers can be shifted 50 bp to the right or the left 
+    #     # If this does not work, make a rv primer 
+    #     # Make sure to end with a GC clamp
+    #     # If Tm too high randomly jump to the left or right and retry. Make sure to calculate the distance to the beginning mutation
+        
+    #     init_primer = self.sequence_instance.sequence[start-5:start+5]
+    #     # Calculate GC content and Tm
+    #     gc_content = self.calculate_gc_content(init_primer)
+    #     tm = self.Tm(init_primer)
+    #     count_left = 9
+    #     count_right = 9
+    #     results = {} # Store the results of the primer design
+    #     tries = 0
+    #     print(init_primer, gc_content)
+    #     while (tries < 100):
+    #         if (gc_content > self.min_gc_content_primer_seq and gc_content < self.max_gc_content_primer_seq):
+    #             results['GC content'] = gc_content
+    #             count_right += 1
+    #             init_primer = self.sequence_instance.sequence[start-count_left:start+count_right]
+    #             gc_content = self.calculate_gc_content(init_primer)
+    #             tm = self.Tm(init_primer)
+    #             print(f"Len {len(init_primer)} Tm {tm} GC {gc_content} Primer {init_primer}")
+    #         else:
+    #             # Shift starting position randomly to the left or right
+    #             start = start + random.choice([-3, 3])
+    #             init_primer = self.sequence_instance.sequence[start-count_left:start+count_right]
+    #             gc_content = self.calculate_gc_content(init_primer)
+    #             tm = self.Tm(init_primer)
+    #         # print(tries)
+    #         tries += 1
+    #     sys.exit()
+    #     # TODO Alternative approach > search for locations in the sequence where the GC content is within the desired range
+
+    def calculate_gc_content(self, primer):
+        return round(GC(primer), 2)
+
+    def design_rv_SEQprimer(self, eblock, start, end):
         pass
 
     def run_IVAprimer(self):
@@ -70,7 +166,7 @@ class DesignPrimers:
         rv_sequence = self.sequence_instance.reverse_complement(fw_sequence)
 
         # Loop over gene blocks and design primers
-        for eblock, eblock_seq in self.eblocks_design_instance.wt_eblocks.items():
+        for eblock, _ in self.eblocks_design_instance.wt_eblocks.items():
             begin_pos, end_pos = DesignEblocks.gene_block_range(eblock)
 
             # Create initial primers (later to be optimized)
@@ -93,48 +189,42 @@ class DesignPrimers:
 
             # Store primers and optimize 
             primerpair = self.parse_primerpair(eblock, fw_sequence, rv_sequence, final_fw_oh, final_fw_template, final_rv_oh, final_rv_template, end_pos, begin_pos)            
-            # primerpair = self.optimize_primerpair_overhang(primerpair)
-            # primerpair = self.optimize_primerpair_template(primerpair)
 
             # Combine primers
             fw_combined = self.combine_primers(final_fw_oh, final_fw_template)
             rv_combined = self.combine_primers(final_rv_oh, final_rv_template)
 
-            # TODO Add direction (5>3)
-            primerpair['FW Primer'] = fw_combined
-            primerpair['RV Primer'] = rv_combined
-
-            # TODO Add to test
-            # primerpair['FW Primer'] = 'GGGAAAATTCCAGGATCTAT'
-            # primerpair['RV Primer'] = 'GGGAAAATTCCAGGATCTAT'
+            primerpair["FW Primer (5>3)"] = ''.join(fw_combined)
+            primerpair["RV Primer (5>3)"] = ''.join(rv_combined)
 
             # Check primers and make sure they are within the desired parameters
             self.Tm_difference(primerpair)
-            self.check_complementarity(primerpair)
-            self.check_hairpin(primerpair['FW Primer'])
-            self.check_hairpin(primerpair['RV Primer'])
+            overlap = self.check_complementarity(primerpair)
+            max_hairpin_fw, _, _ = self.check_hairpin(primerpair["FW Primer (5>3)"])
+            max_hairpin_rv, _, _ = self.check_hairpin(primerpair["RV Primer (5>3)"])
+            n_binding_sites = self.check_multiple_binding_sites(primerpair["FW Primer (5>3)"])
+            n_binding_siters = self.check_multiple_binding_sites(primerpair["RV Primer (5>3)"])
+
+            primerpair['Max hairpin length'] = max(max_hairpin_fw, max_hairpin_rv)
+            primerpair['Max complementary length'] = len(overlap)
 
             # Store primers in a dataframe
             df_row = pd.DataFrame([primerpair])
             self.primers_IVA_df = self.primers_IVA_df.append(df_row, ignore_index=True)
 
-            # TODO Save primers to file
-
+        # Save primers to file
+        self.primers_IVA_df.to_csv(os.path.join(self.output_dir, 'primers_IVA.csv'), index=False)
         return self.primers_IVA_df
-
-    def check_hairpin(self, primer: str):
-        # TODO
-        pass
 
     def parse_primerpair(self, eblock, fw_sequence, rv_sequence, fw_oh, fw_template, rv_oh, rv_template, end, begin):
         primerpair = {}
         primerpair['Eblock'] = eblock
-        primerpair['fw_sequence'] = fw_sequence
-        primerpair['rv_sequence'] = rv_sequence
-        primerpair['FW Overhang'] = fw_oh
-        primerpair['FW Template'] = fw_template
-        primerpair['RV Overhang'] = rv_oh
-        primerpair['RV Template'] = rv_template
+        primerpair['fw_sequence'] = ''.join(fw_sequence)
+        primerpair['rv_sequence'] = ''.join(rv_sequence)
+        primerpair['FW Overhang'] = ''.join(fw_oh)
+        primerpair['FW Template'] = ''.join(fw_template)
+        primerpair['RV Overhang'] = ''.join(rv_oh)
+        primerpair['RV Template'] = ''.join(rv_template)
         primerpair['Tm FW Template'] = self.Tm(fw_template)
         primerpair['Tm Rv Template'] = self.Tm(rv_template)
         primerpair['Tm FW Overhang'] = self.Tm(fw_oh)
@@ -195,109 +285,35 @@ class DesignPrimers:
 
     def check_complementarity(self, primerpair: dict):
         # Primer pairs should not have complementary regions
-        overlap = self.get_overlap(primerpair['FW Primer'], primerpair['RV Primer'])
+        overlap = self.get_overlap(primerpair["FW Primer (5>3)"], primerpair["RV Primer (5>3)"])
         if len(overlap) > self.complementarity_threshold:
             print(f"Complementarity between the IVA primers for {primerpair['Eblock']} exceeds threshold of {self.complementarity_threshold}")
+        return overlap
 
-    # def create_primers_fname(self, fp, extension="_primers.txt"):
-    #     fname = extract_filename(fp)
-    #     fname_ext = fname + extension
-    #     return fname_ext
-
-    # def write_primers_to_file(self, df, fp, snapgene_file):
-    #     """
-    #     Write primers to TXT file that can be imported in snapgene
-
-    #     Args:
-    #         df (pd.DataFrame): _description_
-    #         fp (str): _description_
-    #     """    
-    #     fname = self.create_primers_fname(snapgene_file)
-    #     with open(os.path.join(fp, fname), 'w+') as out:
-    #         for _, row in df.iterrows():
-    #             name = row['Gene Block']
-    #             fw_primer = row['Forward primer (5>3)']
-    #             rv_primer = row['Reverse primer (5>3)']
-    #             out.write(self.short_block_name(name) + '_Fw' + ';' + str(fw_primer) + '\n')
-    #             out.write(self.short_block_name(name) + '_Rv' + ';' + str(rv_primer) + '\n')
-
-
-    # def optimize_primerpair_template(self, primerpair: dict):
-    #     """
-    #     Optimize the primer pairs to make sure they are within the desired parameters
-    #     """
-    #     dt_tm = abs(primerpair['Tm FW Template'] - primerpair['Tm Rv Template'])
-    #     lowest_dt_tm = dt_tm
-    #     highest_tm = max(primerpair['Tm FW Template'], primerpair['Tm Rv Template'])
-    #     while highest_tm < ((self.max_template_temp_IVA) + 0.5):
-    #         if primerpair['Tm FW Template'] < primerpair['Tm Rv Template']:
-    #             toprocess = primerpair['FW Template']
-    #             direction = 'FW'
-    #         else:
-    #             toprocess = primerpair['RV Template']
-    #             direction = 'RV'
-    #         # Add 1 nucleotide to the primer with lowest Tm
-    #         if direction == 'FW':
-    #             primerpair['FW Template'] = self.IVA_Fw_template(primerpair['end position'], primerpair['fw_sequence'], size=len(toprocess)+1)
-    #             primerpair['Tm FW Template'] = self.Tm(primerpair['FW Template'])
-    #         elif direction == 'RV':
-    #             primerpair['RV Template'] = self.IVA_Rv_template(primerpair['begin position'], primerpair['rv_sequence'], size=len(toprocess)+1)
-    #             primerpair['Tm RV Template'] = self.Tm(primerpair['RV Template'])
-    #         highest_tm = max(primerpair['Tm FW Template'], primerpair['Tm Rv Template'])
-    #         dt_tm = abs(primerpair['Tm FW Template'] - primerpair['Tm Rv Template'])
-    #         if dt_tm < lowest_dt_tm:
-    #             lowest_dt_tm = dt_tm
-    #         else:
-    #             if direction == 'FW':
-    #                 primerpair['FW Template'] = self.IVA_Fw_template(primerpair['end position'], primerpair['fw_sequence'], size=len(toprocess))
-    #                 primerpair['Tm FW Template'] = self.Tm(primerpair['FW Template'])
-    #             elif direction == 'RV':
-    #                 primerpair['RV Template'] = self.IVA_Rv_template(primerpair['begin position'], primerpair['rv_sequence'], size=len(toprocess))
-    #                 primerpair['Tm RV Template'] = self.Tm(primerpair['RV Template'])
-    #             break
-    #         highest_tm = max(primerpair['Tm FW Template'], primerpair['Tm Rv Template'])
-    #         if highest_tm > ((self.max_template_temp_IVA) + 0.5): # revert back to previous primer
-    #             if direction == 'FW':
-    #                 primerpair['FW Template'] = self.IVA_Fw_template(primerpair['end position'], primerpair['fw_sequence'], size=len(toprocess))
-    #                 primerpair['Tm FW Template'] = self.Tm(primerpair['FW Template'])
-    #             elif direction == 'RV':
-    #                 primerpair['RV Template'] = self.IVA_Rv_template(primerpair['begin position'], primerpair['rv_sequence'], size=len(toprocess))
-    #                 primerpair['Tm RV Template'] = self.Tm(primerpair['RV Template'])
-    #             break
-    #     return primerpair
-
-    # def optimize_primerpair_overhang(self, primerpair: dict):
-    #     """
-    #     Optimize the primer pairs to make sure they are within the desired parameters
-    #     """
-    #     dt_oh = abs(primerpair['Tm FW Overhang'] - primerpair['Tm RV Overhang'])
-    #     lowest_dt_oh = dt_oh
-    #     highest_tm = max(primerpair['Tm FW Overhang'], primerpair['Tm RV Overhang'])
-    #     while highest_tm < ((self.max_overhang_temp_IVA) + 0.5):
-    #         if primerpair['Tm FW Overhang'] < primerpair['Tm RV Overhang']:
-    #             toprocess = primerpair['FW Overhang']
-    #             direction = 'FW'
-    #         else:
-    #             toprocess = primerpair['RV Overhang']
-    #             direction = 'RV'
-    #         # Add 1 nucleotide to the primer with lowest Tm
-    #         if direction == 'FW':
-    #             primerpair['FW Overhang'] = self.IVA_Fw_overhang(primerpair['end position'], primerpair['fw_sequence'], size=len(toprocess)+1)
-    #             primerpair['Tm FW Overhang'] = self.Tm(primerpair['FW Overhang'])
-    #         elif direction == 'RV':
-    #             primerpair['RV Overhang'] = self.IVA_Rv_overhang(primerpair['begin position'], primerpair['rv_sequence'], size=len(toprocess)+1)
-    #             primerpair['Tm RV Overhang'] = self.Tm(primerpair['RV Overhang'])
-    #         highest_tm = max(primerpair['Tm FW Overhang'], primerpair['Tm RV Overhang'])
-    #         dt_oh = abs(primerpair['Tm FW Overhang'] - primerpair['Tm RV Overhang'])
-    #         if dt_oh < lowest_dt_oh:
-    #             lowest_dt_oh = dt_oh
-    #         # else: # revert back to previous primer
-    #         #     print("revert")
-    #         #     if direction == 'FW':
-    #         #         primerpair['FW Overhang'] = self.IVA_Fw_overhang(primerpair['end position'], primerpair['fw_sequence'], size=len(toprocess))
-    #         #         primerpair['Tm FW Overhang'] = self.Tm(primerpair['FW Overhang'])
-    #         #     elif direction == 'RV':
-    #         #         primerpair['RV Overhang'] = self.IVA_Rv_overhang(primerpair['begin position'], primerpair['rv_sequence'], size=len(toprocess))
-    #         #         primerpair['Tm RV Overhang'] = self.Tm(primerpair['RV Overhang'])
-    #         #     break
-    #     return primerpair
+    def check_hairpin(self, primer: str):
+        # TODO Check using this website http://biotools.nubic.northwestern.edu/OligoCalc.html
+        max_hairpin = 0
+        for i in range(0, len(primer) +1):
+            for j in range(1, len(primer) +1):
+                fragment = primer[i:i+j]
+                complementary = Plasmid.reverse_complement(fragment)
+                complementary_inverted = complementary[::-1]
+                if len(fragment) >= self.hairpin_threshold:
+                    # Search for complementary regions in primer
+                    if complementary_inverted in primer:
+                        if len(fragment) > max_hairpin:
+                            max_hairpin = len(fragment)
+                            # print(f"Hairpin formation in primer {primer} exceeds threshold of {self.hairpin_threshold} ({len(fragment)}) with {fragment} and {complementary_inverted}")
+        return max_hairpin, fragment, complementary_inverted
+    
+    def check_multiple_binding_sites(self, primer: str):
+        # TODO Write some checks for this function
+        count = 0
+        for i in range(len(self.sequence_instance.vector.seq) - len(primer) + 1):
+            sub = self.sequence_instance.vector.seq[i:i + len(primer)]
+            unique_chars = set(sub)
+            if len(unique_chars) <= 2 or (len(unique_chars) == 3 and sub.count(sub[0]) == 2):
+                count += 1
+        if count > 1:
+            print(f"Multiple binding sites for primer {primer} in the vector sequence")
+        return count

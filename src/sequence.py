@@ -9,7 +9,7 @@ class Plasmid:
     """
 
     def __init__(self):
-        self.sequence: str = None
+        self.sequence: str = None  # Gene sequence
         self.seqid = None
         self.organism = None
         self.vector = None
