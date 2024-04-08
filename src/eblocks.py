@@ -303,7 +303,7 @@ class EblockDesign:
         for _, val in self.eblocks.items():
             counts[val[0]] += 1
         return counts
-
+    
     def make_mutant_eblock(self, mutation, results: dict) -> dict:
         """
         This function creates the mutated eBlock, based on the WT eBlock and the mutation.
