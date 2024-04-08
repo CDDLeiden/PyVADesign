@@ -12,10 +12,11 @@ from mutation import Mutation
 from sequence import Plasmid
 from eblocks import Eblocks, EblockDesign
 
+# TODO Chcek multiple primer binding sites?
 
 class DesignPrimers:
     """
-    This class designs IVA and sequencing primers
+    This class designs IVA primers to open-up the expression plasmid and Sanger sequencing primers for validation. 
     """
 
     def __init__(self,
@@ -31,18 +32,19 @@ class DesignPrimers:
         self.sequence_instance = sequence_instance
         self.output_dir = output_dir
 
-        # Primer design parameters
+        # IVA Primer design parameters 
         self.max_overhang_temp_IVA: int = 50
         self.max_template_temp_IVA: int = 60
         self.max_oh_length: int = 15
 
+        # Sequencing primer design parameters
         self.min_primer_length_seq: int = 18
         self.max_primer_length_seq: int = 24
         self.min_gc_content_primer_seq: int = 45
         self.max_gc_content_primer_seq: int = 55
-        self.gc_clamp: bool = True # TODO Add GC clamp
+        self.gc_clamp: bool = True
         self.void_length: int = 100  # Approximate number of nucleotides that is skipped before sequencing starts
-        self.max_sequenced_region: int = 600  # Maximum number of nucleotides that can be sequenced with a single primer
+        self.max_sequenced_region: int = 600  # Maximum number of nucleotides that can be sequenced using a single primer
 
         self.complementarity_threshold: int = 4
         self.hairpin_threshold: int = 4
@@ -63,39 +65,63 @@ class DesignPrimers:
 
     def find_closest_primer(self, all_primers: dict, position: int):
         closest_key = None
+        closest_value = None
         min_difference = float('inf')
         for key, value in all_primers.items():
-            print(key, value)
             difference = abs(position - key[0])
-            print(difference)
             if difference < min_difference:
                 min_difference = difference
                 closest_key = key
-        return closest_key
+                closest_value = value
+        return closest_key, closest_value
     
-    def run_SEQprimer(self):
+    def run_SEQprimer(self, max_difference: int = 100):
         # TODO Calculate the how many mutations can be captured with a single primer (for now say 600 bp)
         # Calculate the length of the gene block and how many primers are needed to sequence the whole block
         # First cluster the mutations and calculate the distance between them (how many mutations can be sequenced with single primer?)
         # Then design the primers
-        possible_primers = self.all_possible_fw_seqprimers()
-        for key, value in possible_primers.items():
-            print(key, value)
-        for k, v in self.eblocks_design_instance.wt_eblocks.items():
+        possible_primers = self.all_possible_fw_seqprimers()  # Find all possible primers that fit the desired parameters
+        primers = {}
+        primersdata = {}
+        for k, v in self.eblocks_design_instance.wt_eblocks.items():  # How many primers needed to sequence the whole gene block
+            primers[k] = []
+            print("Gene block:", k, v)
             begin, end = DesignEblocks.gene_block_range(k)
             length = end - begin
             num_primers = math.ceil(length / self.max_sequenced_region)
-            print(begin, end, num_primers)
+            print(begin, end, "num primers:", num_primers)
             # Calculate the starting points of the sequencing primer
             size = int(length / num_primers)
-            print(size)
-            primer_start_index = begin - self.void_length
-            print("primer_start_index", primer_start_index)
-            end = begin + size
-            for i in range(num_primers):
+            print("size", size)
+            primer_start_indexes = [(begin - self.void_length) + (i * size) for i in range(num_primers)]
+            primer_end_indexes = [begin + (i * size) for i in range(1, num_primers + 1)]
+            print("primer start index:", primer_start_indexes, "primer end index:", primer_end_indexes)
+            for i in primer_start_indexes:
                 # Find closest primer to starting position
-                closest_primer = self.find_closest_primer(possible_primers, primer_start_index)
-                print("closest distance", closest_primer)
+                closest_range, closest_primer = self.find_closest_primer(possible_primers, i)
+                difference = i - closest_range[0]
+                print(difference)
+                if difference < max_difference:
+                    print("Closest primer:", closest_primer, "difference:", difference)
+                    # TODO Add end range, correct for difference of the primer and the starting position (or neglect if difference is small enough)
+                    primers[k].append((closest_primer, closest_range[0]))
+                    index = str(v.lower()).find(str(closest_primer.lower()))
+                    print("Index:", index)  # TODO cannot find, because of the range of the eblock -100
+                else:
+                    print("No primer found within the desired range")
+            print("##########################################")
+        # TODO Create an overview of which mutations are sequenced with which primer and store in a dataframe together with the melting temperature and GC content
+        # TODO Check what mutations cna be sequenced with the primer
+        # Find what mutations are in the primer region
+        for k, v in primers.items():
+            primersdata[v[0]] = []
+            for mutation in self.mutation_instance.mutations:
+                for primer in v:
+                    if primer[1] < mutation.idx_dna < primer[1] + self.max_sequenced_region:
+                        primersdata[v[0]].append((mutation, primer))
+                        print("Mutation:", mutation, "Primer:", primer)
+            print(k, v)
+
 
     def all_possible_fw_seqprimers(self):
         result = {}
@@ -103,10 +129,9 @@ class DesignPrimers:
             for j in range(i, len(self.sequence_instance.sequence)):
                 option = self.sequence_instance.sequence[i:j]
                 if self.min_primer_length_seq <= len(option) <= self.max_primer_length_seq:
-                    gc_content = GC(option)
-                    if self.min_gc_content_primer_seq <= gc_content <= self.max_gc_content_primer_seq:
+                    if self.min_gc_content_primer_seq <= GC(option) <= self.max_gc_content_primer_seq:
                         if self.gc_clamp:
-                            if option[-1] == 'G' or option[-1] == 'C':
+                            if option[-1].lower() == 'g' or option[-1].lower() == 'c':
                                 result[(i, j)] = option
                         else:
                             result[(i, j)] = option
