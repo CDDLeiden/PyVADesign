@@ -1,8 +1,8 @@
 import os
 import sys
 import math
-import difflib
 import random
+import difflib
 import pandas as pd
 from Bio.SeqUtils import MeltingTemp as mt, GC
 from design_gene_blocks import DesignEblocks
@@ -13,6 +13,7 @@ from sequence import Plasmid
 from eblocks import Eblocks, EblockDesign
 
 # TODO Chcek multiple primer binding sites?
+# TODO Show the plasmid sequence area in a plot?
 
 class DesignPrimers:
     """
@@ -51,7 +52,6 @@ class DesignPrimers:
 
         # TODO Add examples of complementary and hairpin structures to the tests directory
         # TODO Check unique primer binding sequence in the plasmid
-        # TODO For sequencing primer check CG lock
         # TODO Check multiple binding sites
 
         self.primers_IVA: dict = {}
@@ -60,132 +60,11 @@ class DesignPrimers:
                                                                   'Tm Rv Template', 'Tm FW Overhang', 'Tm RV Overhang', 'end position',
                                                                   'begin position'])
 
-        # TODO Think about how to store the primers
         self.primers_SEQ: dict = {}
+        self.primers_SEQ_mutations: dict = {}
 
-    def find_closest_primer(self, all_primers: dict, position: int):
-        closest_key = None
-        closest_value = None
-        min_difference = float('inf')
-        for key, value in all_primers.items():
-            difference = abs(position - key[0])
-            if difference < min_difference:
-                min_difference = difference
-                closest_key = key
-                closest_value = value
-        return closest_key, closest_value
-    
-    def run_SEQprimer(self, max_difference: int = 100):
-        # TODO Calculate the how many mutations can be captured with a single primer (for now say 600 bp)
-        # Calculate the length of the gene block and how many primers are needed to sequence the whole block
-        # First cluster the mutations and calculate the distance between them (how many mutations can be sequenced with single primer?)
-        # Then design the primers
-        possible_primers = self.all_possible_fw_seqprimers()  # Find all possible primers that fit the desired parameters
-        primers = {}
-        primersdata = {}
-        for k, v in self.eblocks_design_instance.wt_eblocks.items():  # How many primers needed to sequence the whole gene block
-            primers[k] = []
-            print("Gene block:", k, v)
-            begin, end = DesignEblocks.gene_block_range(k)
-            length = end - begin
-            num_primers = math.ceil(length / self.max_sequenced_region)
-            print(begin, end, "num primers:", num_primers)
-            # Calculate the starting points of the sequencing primer
-            size = int(length / num_primers)
-            print("size", size)
-            primer_start_indexes = [(begin - self.void_length) + (i * size) for i in range(num_primers)]
-            primer_end_indexes = [begin + (i * size) for i in range(1, num_primers + 1)]
-            print("primer start index:", primer_start_indexes, "primer end index:", primer_end_indexes)
-            for i in primer_start_indexes:
-                # Find closest primer to starting position
-                closest_range, closest_primer = self.find_closest_primer(possible_primers, i)
-                difference = i - closest_range[0]
-                print(difference)
-                if difference < max_difference:
-                    print("Closest primer:", closest_primer, "difference:", difference)
-                    # TODO Add end range, correct for difference of the primer and the starting position (or neglect if difference is small enough)
-                    primers[k].append((closest_primer, closest_range[0]))
-                    index = str(v.lower()).find(str(closest_primer.lower()))
-                    print("Index:", index)  # TODO cannot find, because of the range of the eblock -100
-                else:
-                    print("No primer found within the desired range")
-            print("##########################################")
-        # TODO Create an overview of which mutations are sequenced with which primer and store in a dataframe together with the melting temperature and GC content
-        # TODO Check what mutations cna be sequenced with the primer
-        # Find what mutations are in the primer region
-        for k, v in primers.items():
-            primersdata[v[0]] = []
-            for mutation in self.mutation_instance.mutations:
-                for primer in v:
-                    if primer[1] < mutation.idx_dna < primer[1] + self.max_sequenced_region:
-                        primersdata[v[0]].append((mutation, primer))
-                        print("Mutation:", mutation, "Primer:", primer)
-            print(k, v)
-
-
-    def all_possible_fw_seqprimers(self):
-        result = {}
-        for i in range(len(self.sequence_instance.sequence)):
-            for j in range(i, len(self.sequence_instance.sequence)):
-                option = self.sequence_instance.sequence[i:j]
-                if self.min_primer_length_seq <= len(option) <= self.max_primer_length_seq:
-                    if self.min_gc_content_primer_seq <= GC(option) <= self.max_gc_content_primer_seq:
-                        if self.gc_clamp:
-                            if option[-1].lower() == 'g' or option[-1].lower() == 'c':
-                                result[(i, j)] = option
-                        else:
-                            result[(i, j)] = option
-        return result
-    
-
-                
-    # def design_fw_SEQprimer(self, eblock, start, end):
-    #     # TODO Check if the primer is within the desired parameters
-    #     # TODO Check if the primer is unique in the plasmid
-    #     # For simplicity, make all primers forward primers
-    #     # Start with a primer size of 10 and increase untill the Tm is within the desired range
-    #     # If this cannot be found, primers can be shifted 50 bp to the right or the left 
-    #     # If this does not work, make a rv primer 
-    #     # Make sure to end with a GC clamp
-    #     # If Tm too high randomly jump to the left or right and retry. Make sure to calculate the distance to the beginning mutation
-        
-    #     init_primer = self.sequence_instance.sequence[start-5:start+5]
-    #     # Calculate GC content and Tm
-    #     gc_content = self.calculate_gc_content(init_primer)
-    #     tm = self.Tm(init_primer)
-    #     count_left = 9
-    #     count_right = 9
-    #     results = {} # Store the results of the primer design
-    #     tries = 0
-    #     print(init_primer, gc_content)
-    #     while (tries < 100):
-    #         if (gc_content > self.min_gc_content_primer_seq and gc_content < self.max_gc_content_primer_seq):
-    #             results['GC content'] = gc_content
-    #             count_right += 1
-    #             init_primer = self.sequence_instance.sequence[start-count_left:start+count_right]
-    #             gc_content = self.calculate_gc_content(init_primer)
-    #             tm = self.Tm(init_primer)
-    #             print(f"Len {len(init_primer)} Tm {tm} GC {gc_content} Primer {init_primer}")
-    #         else:
-    #             # Shift starting position randomly to the left or right
-    #             start = start + random.choice([-3, 3])
-    #             init_primer = self.sequence_instance.sequence[start-count_left:start+count_right]
-    #             gc_content = self.calculate_gc_content(init_primer)
-    #             tm = self.Tm(init_primer)
-    #         # print(tries)
-    #         tries += 1
-    #     sys.exit()
-    #     # TODO Alternative approach > search for locations in the sequence where the GC content is within the desired range
-
-    def calculate_gc_content(self, primer):
-        return round(GC(primer), 2)
-
-    def design_rv_SEQprimer(self, eblock, start, end):
-        pass
 
     def run_IVAprimer(self):
-        
-        # Gene sequence
         # TODO Think of a solution when the primers are designed at the very beginning of the gene
         fw_sequence = self.sequence_instance.sequence
         rv_sequence = self.sequence_instance.reverse_complement(fw_sequence)
@@ -240,6 +119,105 @@ class DesignPrimers:
         # Save primers to file
         self.primers_IVA_df.to_csv(os.path.join(self.output_dir, 'primers_IVA.csv'), index=False)
         return self.primers_IVA_df
+
+    def run_SEQprimer(self, max_difference: int = 100):
+        # Calculate the length of the gene block and how many primers are needed to sequence the whole block
+        # First cluster the mutations and calculate the distance between them (how many mutations can be sequenced with single primer?)
+        # Then design the primers
+        possible_primers = self.all_possible_fw_seqprimers()  # Find all possible primers that fit the desired parameters
+        primers = {}
+        # TODO Add labels to the primers and make df of it
+        primers_labels = ['idx_start_seq', 'idx_end_seq', 'primer_sequence', 'primer_idx_start', 'primer_idx_end', 'primer_gc_content', 'primer_tm', 'primer_lentgh']
+        count = 1
+        for k, v in self.eblocks_design_instance.wt_eblocks.items():  # How many primers needed to sequence the whole gene block
+            begin, end = DesignEblocks.gene_block_range(k)
+            length = end - begin
+            num_primers = math.ceil(length / self.max_sequenced_region)
+            # Calculate the starting points of the sequencing primer
+            size = int(length / num_primers)
+            primer_start_indexes = [(begin - self.void_length) + (i * size) for i in range(num_primers)]
+            primer_end_indexes = [begin + (i * size) for i in range(1, num_primers + 1)]
+            for i, j in zip(primer_start_indexes, primer_end_indexes):
+                # Find closest primer to starting position
+                closest_range, closest_primer, diff = self.find_closest_primer(possible_primers, i)         
+                if diff < max_difference:
+                    primers[f"prim_{count}_eblock_{k.split('_')[1]}"] = [i + self.void_length - diff, j - diff, closest_primer, closest_range[0], closest_range[1], self.calculate_gc_content(closest_primer), self.Tm(closest_primer), len(closest_primer)]
+                    count += 1
+                else:
+                    print("No primer found within the desired range")
+        self.primers_SEQ = primers
+        self.map_seq_primers_to_mutations()
+        # Perform some checks on the primers
+        for k, v in self.primers_SEQ.items():
+            primer = v[2]
+            self.check_multiple_binding_sites(primer)
+            self.check_hairpin(primer)
+
+        # Save primers to file
+        self.primers_SEQ_df = pd.DataFrame.from_dict(self.primers_SEQ, orient='index', columns=primers_labels)
+        self.primers_SEQ_df.to_csv(os.path.join(self.output_dir, 'primers_SEQ.csv'), index=False)
+
+        # Save mapped primers to mutations to file
+        self.mapped_primers_to_txt(self.primers_SEQ_mutations)
+
+    def mapped_primers_to_txt(self, primers: dict, filename='primers_SEQ_mutations.txt'):
+        with open(os.path.join(self.output_dir, filename), 'w') as f:
+            for k, v in primers.items():
+                f.write(f"{k}\n")
+                for i in v:
+                    if type(i) == list:
+                        tmp = str(i)[1:-1]
+                        tmp = tmp.replace("'", "")
+                        f.write(f"\t{tmp}\n")
+                    else:
+                        i.replace("'", "")
+                        f.write(f"\t{i}\n")
+
+    def map_seq_primers_to_mutations(self):
+        """Map the sequenced regions to the mutations that can be validated with the sequencing primers"""
+        mapped_primers = {}
+        for primername, primerdata in self.primers_SEQ.items():
+            mapped_primers[primername] = []
+            for mutation in self.mutation_instance.mutations:
+                if primerdata[0] <= mutation.idx_dna[0] <= primerdata[1]:
+                    mapped_primers[primername].append(mutation.mutation)
+        self.primers_SEQ_mutations = mapped_primers
+
+    def find_closest_primer(self, all_primers: dict, position: int):
+        """
+        Find the closest primer to a given position
+        """
+        closest_range = None
+        closest_primer = None
+        min_difference = float('inf')
+        for prim_idx, prim in all_primers.items():
+            difference = position - prim_idx[0]
+            if abs(difference) < min_difference:
+                min_difference = difference
+                closest_range = prim_idx
+                closest_primer = prim
+                min_difference = difference
+        return closest_range, closest_primer, min_difference
+
+    def all_possible_fw_seqprimers(self):
+        result = {}
+        for i in range(len(self.sequence_instance.sequence)):
+            for j in range(i, len(self.sequence_instance.sequence)):
+                option = self.sequence_instance.sequence[i:j]
+                if self.min_primer_length_seq <= len(option) <= self.max_primer_length_seq:
+                    if self.min_gc_content_primer_seq <= GC(option) <= self.max_gc_content_primer_seq:
+                        if self.gc_clamp:
+                            if option[-1].lower() == 'g' or option[-1].lower() == 'c':
+                                result[(i, j)] = option
+                        else:
+                            result[(i, j)] = option
+        return result
+    
+    def calculate_gc_content(self, primer):
+        return round(GC(primer), 2)
+
+    def design_rv_SEQprimer(self, eblock, start, end):
+        pass
 
     def parse_primerpair(self, eblock, fw_sequence, rv_sequence, fw_oh, fw_template, rv_oh, rv_template, end, begin):
         primerpair = {}
@@ -333,6 +311,7 @@ class DesignPrimers:
     
     def check_multiple_binding_sites(self, primer: str):
         # TODO Write some checks for this function
+        # TODO Check for exact cases where the primer binds multiple times and almost exact cases where only few characters are different
         count = 0
         for i in range(len(self.sequence_instance.vector.seq) - len(primer) + 1):
             sub = self.sequence_instance.vector.seq[i:i + len(primer)]
