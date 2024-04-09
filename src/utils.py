@@ -59,10 +59,10 @@ class Utils:
         return result
 
     @staticmethod
-    def gff3_line(begin_pos, end_pos, name, hex_color):
+    def gff3_line(begin_pos, end_pos, name, hex_color, type='gene'):
         # TODO Change feature, gene, CDS etc to the correct type
         # TODO Change Myseq to the correct sequence name?
-        line = ['myseq', '.', 'gene', str(begin_pos), str(end_pos), '.', '.', '.', f"Name={name};color={hex_color}"]
+        line = ['myseq', '.', f"{type}", str(begin_pos), str(end_pos), '.', '.', '.', f"Name={name};color={hex_color}"]
         return line
     
     @staticmethod
@@ -77,6 +77,15 @@ class Utils:
             'SEQprimer': '#06FF92'}
         return colors
     
+    @staticmethod
+    def count_substring_occurance(sequence: str, substring: str):
+        return str(sequence).count(str(substring))
+    
+    # TODO Check if file exists, otherwise create it and append header gff3 file 
+    
     # @staticmethod
     # def write_gff3_line(file, line):
     #     file.write('\t'.join(line) + '\n')
+
+    # @staticmethod
+    # TDOD remove last empty line in file

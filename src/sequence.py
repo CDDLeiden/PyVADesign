@@ -1,7 +1,6 @@
 import sys
 from Bio import SeqIO
 
-# TODO Add vector here as well (so that mutations in N and C terminal can be made)
 
 class Plasmid:
     """
@@ -10,9 +9,9 @@ class Plasmid:
 
     def __init__(self):
         self.sequence: str = None  # Gene sequence
-        self.seqid = None
-        self.organism = None
-        self.vector = None
+        self.seqid: str = None
+        self.organism: str = None
+        self.vector: str = None  # Vector sequence with gene cloned into it
  
     def parse_sequence(self, fp: str) -> str:
         """
@@ -21,7 +20,6 @@ class Plasmid:
         sequence, seqid = self.read_single_fasta(fp)
         self.sequence = sequence
         self.seqid = seqid
-
         result = self.check_sequence(sequence)
         return result
     
@@ -33,6 +31,15 @@ class Plasmid:
         self.vector = vector
         # TODO Add some checks here for the vector
 
+    @staticmethod
+    def find_index_in_vector(vector, sequence: str):
+        idx_begin = str(vector).find(str(sequence))
+        idx_end = idx_begin + len(sequence)
+        if idx_begin == -1 or idx_end == -1:
+            print(f"Gene block {sequence} not found in vector sequence. Check whether your target gene is correct in your vector.")
+            sys.exit()
+        return idx_begin, idx_end
+        
     @staticmethod
     def read_snapgene_dna_file(fp: str):
         with open(fp, 'rb') as handle:
@@ -55,13 +62,21 @@ class Plasmid:
     @staticmethod
     def check_sequence(sequence: str) -> str:
         """
-        This function checks the input sequence.
+        This function checks whether the sequence is DNA (only contains GCTA) and contains a start and stop codon.
         """
         if Plasmid.is_dna(sequence) and Plasmid.contains_start_stop_codon(sequence):
             return 1
         else:
             print("Please provide a DNA sequence with start and stop codons.")
             sys.exit()
+
+    @staticmethod
+    def check_vector(vector: str) -> str:
+        """
+        This function checks whether the vector is DNA (only contains GCTA) and contains the gene sequence.
+        """
+        # TODO Make this function
+        pass
 
     @staticmethod
     def is_dna(sequence: str) -> bool:
@@ -108,4 +123,3 @@ class Plasmid:
             rev_nucl = pairs[nucleotide]
             reverse += rev_nucl
         return reverse
-    

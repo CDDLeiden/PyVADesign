@@ -110,7 +110,7 @@ class DesignPrimers:
             max_hairpin_fw, _, _ = self.check_hairpin(primerpair["FW Primer (5>3)"])
             max_hairpin_rv, _, _ = self.check_hairpin(primerpair["RV Primer (5>3)"])
             n_binding_sites = self.check_multiple_binding_sites(primerpair["FW Primer (5>3)"])
-            n_binding_siters = self.check_multiple_binding_sites(primerpair["RV Primer (5>3)"])
+            n_binding_sites = self.check_multiple_binding_sites(primerpair["RV Primer (5>3)"])
 
             primerpair['Max hairpin length'] = max(max_hairpin_fw, max_hairpin_rv)
             primerpair['Max complementary length'] = len(overlap)
@@ -125,10 +125,15 @@ class DesignPrimers:
         # Convert primers to SnapGene format
         primers_IVA_snapgene = {}
         for idx, row in self.primers_IVA_df.iterrows():
-            primers_IVA_snapgene[f"prim_{idx}"] = [row['begin position'], row['end position'], self.snapgene_colors['IVAprimer']]
+            print(row['FW Primer (5>3)'], row['RV Primer (5>3)'])
+            idx_begin, idx_end = self.sequence_instance.find_index_in_vector(self.sequence_instance.vector.seq, row['FW Primer (5>3)'])
+            print(idx_begin, idx_end)
+            primers_IVA_snapgene[f"IVAprimer_{idx + 1}_Fw"] = [idx_begin, idx_end, self.snapgene_colors['IVAprimer']]
+            # TODO DO THE SAME FOR THE REVERSE PRIMER
+            # idx_begin, idx_end = self.sequence_instance.find_index_in_vector(self.sequence_instance.vector.seq, self.sequence_instance.reverse_complement(row['RV Primer (5>3)']))
+            # primers_IVA_snapgene[f"IVAprimer_{idx + 1}_Rv"] = [idx_begin, idx_end, self.snapgene_colors['IVAprimer']]
 
-
-        self.primers_to_snapgene(primers=self.primers_IVA)
+        self.primers_to_snapgene(primers=primers_IVA_snapgene)
         return self.primers_IVA_df
 
     def run_SEQprimer(self, max_difference: int = 100):

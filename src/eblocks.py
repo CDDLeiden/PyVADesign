@@ -101,6 +101,8 @@ class EblockDesign:
         sorted_dict = dict(sorted(results.items(), key=lambda item: (int(item[1][0].split('_')[1]), int(item[1][2]))))
         self.eblocks = sorted_dict
 
+        self.eblocks_to_snapgene(self.wt_eblocks)
+
         print("Completed eBlock design.")
                                     
         # # Your design logic to generate block_sequences
@@ -109,23 +111,12 @@ class EblockDesign:
         # # Set the block_sequences in the Eblocks instance
         # self.eblocks_instance.set_block_sequences(self.block_sequences)
 
-    def eblocks_to_snapgene(self):
+    def eblocks_to_snapgene(self, eblocks: dict, filename='snapgene_features.gff3'):
         """
         This function writes the eBlocks to a SnapGene file.
         """
         if self.to_snapgene:
             pass
-
-    def eblock_indexes_in_vector(self):
-        gene_block_indexes = {}  # d[gene_block_name] = [begin position in vector, end position in vector]
-        for key, value in self.wt_eblocks.items():
-            begin_idx = self.find_index(str(self.sequence_instance.vector.seq), value)  # Position in vector, NOT in target gene
-            end_idx = begin_idx + len(value)
-            if (begin_idx == -1) or (end_idx == -1):
-                print(f"Gene block {key} not found in vector sequence. Check whether your target gene is correct in your vector.")
-                sys.exit()
-            gene_block_indexes[key] = [begin_idx + 1, end_idx + 1]
-        return gene_block_indexes
 
     def find_possible_clusters(self):        
         possibilities = {} # Store all possible clusterings
