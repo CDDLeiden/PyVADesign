@@ -3,6 +3,10 @@ import pandas as pd
 
 
 class Utils:
+
+    def __init__(self):
+            pass
+
     @staticmethod
     def natural_amino_acids():
         """
