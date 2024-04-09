@@ -1,6 +1,6 @@
 import sys
 import numpy as np
-from utils import Utils
+from .utils import Utils
 
 
 class Mutation:

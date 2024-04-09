@@ -14,9 +14,9 @@ from dna_features_viewer import GraphicFeature, GraphicRecord
 # from mutation import Mutation
 # TODO Change filepath (str) to Path object
 
-from mutation import Mutation
-from sequence import Plasmid
-from utils import Utils
+from .mutation import Mutation
+from .sequence import Plasmid
+from .utils import Utils
 
 class Eblocks:
     def __init__(self):
