@@ -11,6 +11,7 @@ from utils_old import load_pickle, extract_filename
 from .mutation import Mutation
 from .sequence import Plasmid
 from .eblocks import Eblocks, EblockDesign
+from .utils import Utils
 
 # TODO Chcek multiple primer binding sites?
 # TODO Show the plasmid sequence area in a plot?
@@ -64,7 +65,7 @@ class DesignPrimers:
         self.primers_SEQ_mutations: dict = {}
 
         self.to_snapgene: bool = True
-
+        self.snapgene_colors = Utils.gff3_colors()
 
     def run_IVAprimer(self):
         # TODO Think of a solution when the primers are designed at the very beginning of the gene
@@ -120,6 +121,13 @@ class DesignPrimers:
 
         # Save primers to file
         self.primers_IVA_df.to_csv(os.path.join(self.output_dir, 'primers_IVA.csv'), index=False)
+
+        # Convert primers to SnapGene format
+        primers_IVA_snapgene = {}
+        for idx, row in self.primers_IVA_df.iterrows():
+            primers_IVA_snapgene[f"prim_{idx}"] = [row['begin position'], row['end position'], self.snapgene_colors['IVAprimer']]
+
+
         self.primers_to_snapgene(primers=self.primers_IVA)
         return self.primers_IVA_df
 
@@ -156,16 +164,22 @@ class DesignPrimers:
             self.check_multiple_binding_sites(primer)
             self.check_hairpin(primer)
 
+        # Convert dict to snapgene dictionary format
+        primers_seq_snapgene = {}
+        for k, v in self.primers_SEQ.items():
+            primers_seq_snapgene[k] = [v[3], v[4], self.snapgene_colors['SEQprimer']]
+
         # Save primers to file
         self.primers_SEQ_df = pd.DataFrame.from_dict(self.primers_SEQ, orient='index', columns=primers_labels)
         self.primers_SEQ_df.to_csv(os.path.join(self.output_dir, 'primers_SEQ.csv'), index=False)
 
         # Save mapped primers to mutations to file
         self.mapped_primers_to_txt(self.primers_SEQ_mutations)
-        self.primers_to_snapgene(primers=self.primers_SEQ)
+        self.primers_to_snapgene(primers=primers_seq_snapgene)
 
     def primers_to_snapgene(self, primers: dict, filename='snapgene_features.gff3'):
         """This function converts the primers to a format that can be read by SnapGene."""
+        # TODO : primers[name] = [start, end, name]
         if self.to_snapgene:
             try:
                 with open(os.path.join(self.output_dir, filename), 'r') as f:
@@ -175,15 +189,12 @@ class DesignPrimers:
                     f.write("\n".join(self.gff3_header(len(self.sequence_instance.vector.seq))))
 
             with open(os.path.join(self.output_dir, filename), 'a') as f:
-                    
-                    
-                    # TODO Write primers to file
-                    # TODO Think about how deliver the primers what info is needed
+                    for k, v in primers.items():
+                        line = Utils.gff3_line(v[0], v[1], k, v[2])
+                        f.write('\t'.join(line) + '\n')
 
-                    # line = Utils.gff3_line(begin_pos, end_pos, name, hex_color)
-                    # f.write('\t'.join(line) + '\n')
-                    pass
-                
+        # TODO Remove last empty line from the file
+                                    
     def mapped_primers_to_txt(self, primers: dict, filename='primers_SEQ_mutations.txt'):
         with open(os.path.join(self.output_dir, filename), 'w') as f:
             for k, v in primers.items():
