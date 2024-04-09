@@ -7,9 +7,9 @@ import biotite.sequence.graphics as graphics
 from biotite.sequence import Feature, Location, Annotation
 from dna_features_viewer import GraphicFeature, GraphicRecord
 
-from mutation import Mutation
-from sequence import Plasmid
-from eblocks import Eblocks, EblockDesign
+from .mutation import Mutation
+from .sequence import Plasmid
+from .eblocks import Eblocks, EblockDesign
 
 
 class Plot:
@@ -44,7 +44,7 @@ class Plot:
         ax.bar(range(len(counts)), list(counts.values()), align='center', color=colors)
         plt.xticks(range(len(counts)), labels, rotation=90)
         ax.set_ylabel('Number of mutants per eBlock')
-        ax.set_xlabel('eBlock')
+        # ax.set_xlabel('eBlock')
         ax.set_title(f'Number of mutants per eBlock')
         if save:
             self.save_plot(fig, filename)

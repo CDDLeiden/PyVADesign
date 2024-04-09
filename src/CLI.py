@@ -1,9 +1,29 @@
+#!/usr/bin/env python
+
 import os
 import sys
 import argparse
-from design_gene_blocks import DesignEblocks
-from design_IVA_primers import DesignPrimers
-from snapgene_output import SnapGeneOutput
+from .eblocks import EblockDesign, Eblocks
+from .primer import DesignPrimers
+
+
+def eBlocksArgParser():
+    parser = argparse.ArgumentParser(description='')
+    parser.add_argument("-i", 
+                        "--input_gene", 
+                        required=True, 
+                        help="FASTA file containing the gene of interest")
+
+
+
+
+    parser.add_argument("-i", "--input_gene", required=True, help="FASTA file containing the gene of interest")
+    parser.add_argument("-sp", "--species", type=str, default="Mycobacterium Smegmatis", help="Species to make calculations for")
+    parser.add_argument("-m", "--mutations", required=True, help="TXT file containing the mutations to make")
+    parser.add_argument("-o", "--output_location", required=True, help="Location where to store the output of the script")
+    args = parser.parse_args()
+    return args
+
 
 def read_arguments():
     parser = argparse.ArgumentParser(description='')
