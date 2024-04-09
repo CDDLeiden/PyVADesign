@@ -9,7 +9,7 @@ from dna_features_viewer import GraphicFeature, GraphicRecord
 
 from .mutation import Mutation
 from .sequence import Plasmid
-from .eblocks import Eblocks, EblockDesign
+from .eblocks import EblockDesign
 
 
 class Plot:
@@ -141,10 +141,12 @@ class Plot:
     @staticmethod
     def generate_eblock_colors() -> dict:
         """
-        Create dictionary with colors for plotting eBlocks
+        Create dictionary with colors for plotting eBlocks using the tab10 color scheme.
         """
-        return {i: '#%06X' % random.randint(0, 0xFFFFFF) for i in range(100)}
-    
+        # TODO Add more colors
+        tab10_colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
+        return {i: tab10_colors[i] for i in range(10)}
+
     def extract_snapgene_features(self):
         """
         Extract features from a snapgene vector file and return them as a list of biotite sequence features.
