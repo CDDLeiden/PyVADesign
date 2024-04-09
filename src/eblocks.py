@@ -53,6 +53,7 @@ class EblockDesign:
                  optimization_method = "cost",
 
                  codon_usage: str = r"C:\Users\Rosan\Documents\git\my_repositories\design_gene_blocks\src\data\codon_usage\Escherichia_coli.csv",
+                 to_snapgene: bool = True,
                 ):
         
         self.eblocks_instance = eblocks_instance
@@ -72,11 +73,14 @@ class EblockDesign:
         self.eblocks = {}
         self.codon_usage = codon_usage
         self.block_sequences = []
+        self.to_snapgene = to_snapgene
 
     def run_design_eblocks(self):
         """
         This function runs the design process for eblocks.
         """
+
+        print("Starting eBlock design ...")
 
         valid_clusters = self.find_possible_clusters()
         optimal_clustering = self.choose_clusters(valid_clusters)
@@ -97,13 +101,31 @@ class EblockDesign:
         sorted_dict = dict(sorted(results.items(), key=lambda item: (int(item[1][0].split('_')[1]), int(item[1][2]))))
         self.eblocks = sorted_dict
 
-        print("Finished.")
+        print("Completed eBlock design.")
                                     
         # # Your design logic to generate block_sequences
         # self.block_sequences = ["sequence1", "sequence2", "sequence3"]
 
         # # Set the block_sequences in the Eblocks instance
         # self.eblocks_instance.set_block_sequences(self.block_sequences)
+
+    def eblocks_to_snapgene(self):
+        """
+        This function writes the eBlocks to a SnapGene file.
+        """
+        if self.to_snapgene:
+            pass
+
+    def eblock_indexes_in_vector(self):
+        gene_block_indexes = {}  # d[gene_block_name] = [begin position in vector, end position in vector]
+        for key, value in self.wt_eblocks.items():
+            begin_idx = self.find_index(str(self.sequence_instance.vector.seq), value)  # Position in vector, NOT in target gene
+            end_idx = begin_idx + len(value)
+            if (begin_idx == -1) or (end_idx == -1):
+                print(f"Gene block {key} not found in vector sequence. Check whether your target gene is correct in your vector.")
+                sys.exit()
+            gene_block_indexes[key] = [begin_idx + 1, end_idx + 1]
+        return gene_block_indexes
 
     def find_possible_clusters(self):        
         possibilities = {} # Store all possible clusterings
@@ -183,7 +205,7 @@ class EblockDesign:
         if self.optimization_method == "cost":
             print("Optimizing based on price per bp ...")
             lowest_cost, best_clustering = min((self.calculate_cost(value), value) for value in clusters.values())
-            print(f"Lowest cost: {lowest_cost} with cluster {best_clustering}")
+            print(f"Lowest estimated cost: €{lowest_cost}")
             return best_clustering
         elif self.optimization_method == "amount":
             print("Optimizing based on number of eBlocks ...")

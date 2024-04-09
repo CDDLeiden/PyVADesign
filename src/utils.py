@@ -52,3 +52,31 @@ class Utils:
             newkey = key.replace('U', 'T').lower()
             codon_usage_no_U[newkey] = value
         return codon_usage_no_U
+    
+    @staticmethod
+    def gff3_header(length_sequence, version="3.2.1", sequence_name="myseq"):
+        result = [f"##gff-version {version}", f"##sequence-region {sequence_name} 1 {str(length_sequence)}"]
+        return result
+
+    @staticmethod
+    def gff3_line(begin_pos, end_pos, name, hex_color):
+        # TODO Change feature, gene, CDS etc to the correct type
+        # TODO Change Myseq to the correct sequence name?
+        line = ['myseq', '.', 'gene', str(begin_pos), str(end_pos), '.', '.', '.', f"Name={name};color={hex_color}"]
+        return line
+    
+    @staticmethod
+    def gff3_colors():
+        colors = {
+            'mutation': '#FF0000',
+            'combination': '#D8FF00',
+            'insert': '#0017FF',
+            'deletion': '#FF5900',
+            'eBlock': '#939393',
+            'IVAprimer': '#FF00D4',
+            'SEQprimer': '#06FF92'}
+        return colors
+    
+    # @staticmethod
+    # def write_gff3_line(file, line):
+    #     file.write('\t'.join(line) + '\n')

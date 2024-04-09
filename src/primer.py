@@ -8,9 +8,9 @@ from Bio.SeqUtils import MeltingTemp as mt, GC
 from design_gene_blocks import DesignEblocks
 from utils_old import load_pickle, extract_filename
 
-from mutation import Mutation
-from sequence import Plasmid
-from eblocks import Eblocks, EblockDesign
+from .mutation import Mutation
+from .sequence import Plasmid
+from .eblocks import Eblocks, EblockDesign
 
 # TODO Chcek multiple primer binding sites?
 # TODO Show the plasmid sequence area in a plot?
@@ -62,6 +62,8 @@ class DesignPrimers:
 
         self.primers_SEQ: dict = {}
         self.primers_SEQ_mutations: dict = {}
+
+        self.to_snapgene: bool = True
 
 
     def run_IVAprimer(self):
@@ -118,6 +120,7 @@ class DesignPrimers:
 
         # Save primers to file
         self.primers_IVA_df.to_csv(os.path.join(self.output_dir, 'primers_IVA.csv'), index=False)
+        self.primers_to_snapgene(primers=self.primers_IVA)
         return self.primers_IVA_df
 
     def run_SEQprimer(self, max_difference: int = 100):
@@ -159,7 +162,28 @@ class DesignPrimers:
 
         # Save mapped primers to mutations to file
         self.mapped_primers_to_txt(self.primers_SEQ_mutations)
+        self.primers_to_snapgene(primers=self.primers_SEQ)
 
+    def primers_to_snapgene(self, primers: dict, filename='snapgene_features.gff3'):
+        """This function converts the primers to a format that can be read by SnapGene."""
+        if self.to_snapgene:
+            try:
+                with open(os.path.join(self.output_dir, filename), 'r') as f:
+                    pass
+            except FileNotFoundError:
+                with open(os.path.join(self.output_dir, filename), 'w') as f:
+                    f.write("\n".join(self.gff3_header(len(self.sequence_instance.vector.seq))))
+
+            with open(os.path.join(self.output_dir, filename), 'a') as f:
+                    
+                    
+                    # TODO Write primers to file
+                    # TODO Think about how deliver the primers what info is needed
+
+                    # line = Utils.gff3_line(begin_pos, end_pos, name, hex_color)
+                    # f.write('\t'.join(line) + '\n')
+                    pass
+                
     def mapped_primers_to_txt(self, primers: dict, filename='primers_SEQ_mutations.txt'):
         with open(os.path.join(self.output_dir, filename), 'w') as f:
             for k, v in primers.items():
