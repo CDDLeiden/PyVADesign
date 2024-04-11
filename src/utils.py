@@ -89,8 +89,7 @@ class SnapGene:
         self.make_file(self.eblocks_filename, header=True)
         with open(os.path.join(self.output_dir, self.eblocks_filename), 'a') as f:
             for k, v in eblocks.items():
-                print(k, v)
-                line = SnapGene.gff3_line(v[0], v[1], k, SnapGene.gff3_colors()[v[2]])
+                line = SnapGene.gff3_line(v[0], v[1], k, v[2])
                 f.write('\t'.join(line) + '\n')
 
     def make_file(self, filename, header=False):

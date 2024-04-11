@@ -17,6 +17,7 @@ from dna_features_viewer import GraphicFeature, GraphicRecord
 from .mutation import Mutation
 from .sequence import Plasmid
 from .utils import Utils, SnapGene
+from .plot import Plot
 
 class Eblocks:
     def __init__(self):
@@ -101,7 +102,14 @@ class EblockDesign:
         sorted_dict = dict(sorted(results.items(), key=lambda item: (int(item[1][0].split('_')[1]), int(item[1][2]))))
         self.eblocks = sorted_dict
 
-        self.snapgene_instance.eblocks_to_gff3(self.wt_eblocks)
+        snapgene_dict = {}
+        colors = Plot.generate_eblock_colors()
+        for k, v in self.wt_eblocks.items():
+            eblock_number = int(k.split('_')[1])
+            start_idx, stop_idx = self.sequence_instance.find_index_in_vector(self.sequence_instance.vector.seq, v)
+            snapgene_dict[f"eBblock {eblock_number}"] = [start_idx, stop_idx, colors[eblock_number-1]]
+
+        self.snapgene_instance.eblocks_to_gff3(snapgene_dict)
 
         print("Completed eBlock design.")
                                     
