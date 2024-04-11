@@ -16,7 +16,7 @@ from dna_features_viewer import GraphicFeature, GraphicRecord
 
 from .mutation import Mutation
 from .sequence import Plasmid
-from .utils import Utils
+from .utils import Utils, SnapGene
 
 class Eblocks:
     def __init__(self):
@@ -39,6 +39,7 @@ class EblockDesign:
                  eblocks_instance: Eblocks,
                  mutation_instance: Mutation,
                  sequence_instance: Plasmid,
+                 snapgene_instance: SnapGene,
                  
                  # File paths for input files
                  output_fp: str = None,
@@ -53,12 +54,12 @@ class EblockDesign:
                  optimization_method = "cost",
 
                  codon_usage: str = r"C:\Users\Rosan\Documents\git\my_repositories\design_gene_blocks\src\data\codon_usage\Escherichia_coli.csv",
-                 to_snapgene: bool = True,
                 ):
         
         self.eblocks_instance = eblocks_instance
         self.mutation_instance = mutation_instance
         self.sequence_instance = sequence_instance
+        self.snapgene_instance = snapgene_instance
         self.verbose = verbose
 
         # IDT parameters
@@ -73,7 +74,6 @@ class EblockDesign:
         self.eblocks = {}
         self.codon_usage = codon_usage
         self.block_sequences = []
-        self.to_snapgene = to_snapgene
 
     def run_design_eblocks(self):
         """
@@ -101,7 +101,7 @@ class EblockDesign:
         sorted_dict = dict(sorted(results.items(), key=lambda item: (int(item[1][0].split('_')[1]), int(item[1][2]))))
         self.eblocks = sorted_dict
 
-        self.eblocks_to_snapgene(self.wt_eblocks)
+        self.snapgene_instance.eblocks_to_gff3(self.wt_eblocks)
 
         print("Completed eBlock design.")
                                     
@@ -110,13 +110,6 @@ class EblockDesign:
 
         # # Set the block_sequences in the Eblocks instance
         # self.eblocks_instance.set_block_sequences(self.block_sequences)
-
-    def eblocks_to_snapgene(self, eblocks: dict, filename='snapgene_features.gff3'):
-        """
-        This function writes the eBlocks to a SnapGene file.
-        """
-        if self.to_snapgene:
-            pass
 
     def find_possible_clusters(self):        
         possibilities = {} # Store all possible clusterings
@@ -196,7 +189,7 @@ class EblockDesign:
         if self.optimization_method == "cost":
             print("Optimizing based on price per bp ...")
             lowest_cost, best_clustering = min((self.calculate_cost(value), value) for value in clusters.values())
-            print(f"Lowest estimated cost: €{lowest_cost}")
+            print(f"Lowest estimated cost: €{lowest_cost} (given price per bp of €{self.bp_price})")
             return best_clustering
         elif self.optimization_method == "amount":
             print("Optimizing based on number of eBlocks ...")

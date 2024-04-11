@@ -118,6 +118,20 @@ class Mutation:
         self.n_mutants = count
         return mutations
     
+    def print_mutations(self):
+        """
+        This function prints the mutations.
+        """
+        print("The selected mutations are:")
+        for mut in self.mutations:
+            if type(mut.mutation) == list:  
+                tmp = str(mut.mutation)[1:-1]  # Remove list brackets
+                tmp = tmp.replace("'", "")
+                print(f"\t{mut.type}\t{tmp}")
+            else:
+               mutation = mut.mutation.replace("'", "")
+               print(f"\t{mut.type}\t{mutation}")
+
     def mean_idxs_dna(self) -> list:
         """
         This function returns the first index of each mutation.
@@ -213,3 +227,5 @@ class Mutation:
                         sys.exit()
             else:
                 pass
+
+        

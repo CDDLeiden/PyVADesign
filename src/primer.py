@@ -5,13 +5,13 @@ import random
 import difflib
 import pandas as pd
 from Bio.SeqUtils import MeltingTemp as mt, GC
-from design_gene_blocks import DesignEblocks
-from utils_old import load_pickle, extract_filename
+# from design_gene_blocks import DesignEblocks
+# from utils_old import load_pickle, extract_filename
 
 from .mutation import Mutation
 from .sequence import Plasmid
 from .eblocks import Eblocks, EblockDesign
-from .utils import Utils
+from .utils import Utils, SnapGene
 
 # TODO Chcek multiple primer binding sites?
 # TODO Show the plasmid sequence area in a plot?
@@ -26,6 +26,7 @@ class DesignPrimers:
                  eblocks_design_instance: EblockDesign,
                  mutation_instance: Mutation,
                  sequence_instance: Plasmid,
+                 snapgene_instance = None,
                  output_dir: str = None):
 
         self.eblock_instance = eblock_instance
@@ -33,6 +34,7 @@ class DesignPrimers:
         self.mutation_instance = mutation_instance
         self.sequence_instance = sequence_instance
         self.output_dir = output_dir
+        self.snapgene_instance = snapgene_instance
 
         # IVA Primer design parameters 
         self.max_overhang_temp_IVA: int = 50
@@ -64,8 +66,6 @@ class DesignPrimers:
         self.primers_SEQ: dict = {}
         self.primers_SEQ_mutations: dict = {}
 
-        self.to_snapgene: bool = True
-        self.snapgene_colors = Utils.gff3_colors()
 
     def run_IVAprimer(self):
         # TODO Think of a solution when the primers are designed at the very beginning of the gene
@@ -74,7 +74,7 @@ class DesignPrimers:
 
         # Loop over gene blocks and design primers
         for eblock, _ in self.eblocks_design_instance.wt_eblocks.items():
-            begin_pos, end_pos = DesignEblocks.gene_block_range(eblock)
+            begin_pos, end_pos = EblockDesign.gene_block_range(eblock)
 
             # Create initial primers (later to be optimized)
             init_size = 10
@@ -98,11 +98,11 @@ class DesignPrimers:
             primerpair = self.parse_primerpair(eblock, fw_sequence, rv_sequence, final_fw_oh, final_fw_template, final_rv_oh, final_rv_template, end_pos, begin_pos)            
 
             # Combine primers
-            fw_combined = self.combine_primers(final_fw_oh, final_fw_template)
-            rv_combined = self.combine_primers(final_rv_oh, final_rv_template)
+            fw_combined = self.combine_primers(final_fw_oh, final_fw_template, type='FW')
+            rv_combined = self.combine_primers(final_rv_oh, final_rv_template, type='RV')
 
             primerpair["FW Primer (5>3)"] = ''.join(fw_combined)
-            primerpair["RV Primer (5>3)"] = ''.join(rv_combined)
+            primerpair["RV Primer (5>3)"] = self.sequence_instance.invert_sequence(''.join(rv_combined))
 
             # Check primers and make sure they are within the desired parameters
             self.Tm_difference(primerpair)
@@ -123,17 +123,24 @@ class DesignPrimers:
         self.primers_IVA_df.to_csv(os.path.join(self.output_dir, 'primers_IVA.csv'), index=False)
 
         # Convert primers to SnapGene format
-        primers_IVA_snapgene = {}
-        for idx, row in self.primers_IVA_df.iterrows():
-            print(row['FW Primer (5>3)'], row['RV Primer (5>3)'])
-            idx_begin, idx_end = self.sequence_instance.find_index_in_vector(self.sequence_instance.vector.seq, row['FW Primer (5>3)'])
-            print(idx_begin, idx_end)
-            primers_IVA_snapgene[f"IVAprimer_{idx + 1}_Fw"] = [idx_begin, idx_end, self.snapgene_colors['IVAprimer']]
-            # TODO DO THE SAME FOR THE REVERSE PRIMER
-            # idx_begin, idx_end = self.sequence_instance.find_index_in_vector(self.sequence_instance.vector.seq, self.sequence_instance.reverse_complement(row['RV Primer (5>3)']))
-            # primers_IVA_snapgene[f"IVAprimer_{idx + 1}_Rv"] = [idx_begin, idx_end, self.snapgene_colors['IVAprimer']]
+        if self.snapgene_instance:
+            print("Converting primers to SnapGene format")
+            primers_IVA_snapgene = {}
+            count = 1
+            for idx, row in self.primers_IVA_df.iterrows():
+                print(row['FW Primer (5>3)'], row['RV Primer (5>3)'])
+                # idx_begin, idx_end = self.sequence_instance.find_index_in_vector(self.sequence_instance.vector.seq, row['FW Primer (5>3)'])
+                # print(idx_begin, idx_end)
+                primers_IVA_snapgene[f"IVA_Fw_eBlock_{count}"] = row['FW Primer (5>3)']
+                # idx_begin, idx_end = self.sequence_instance.find_index_in_vector(self.sequence_instance.vector.seq, row['RV Primer (5>3)'])
+                # print(row['RV Primer (5>3)'])
+                # print(idx_begin, idx_end)
+                # TODO MAke sure that the numbering of eblocks is always same order
+                primers_IVA_snapgene[f"IVA_Rv_eBlock_{count}"] = row['RV Primer (5>3)']
+                count += 1
 
-        self.primers_to_snapgene(primers=primers_IVA_snapgene)
+            # Save primers to file
+            self.snapgene_instance.primers_to_fasta(primers=primers_IVA_snapgene)
         return self.primers_IVA_df
 
     def run_SEQprimer(self, max_difference: int = 100):
@@ -146,7 +153,7 @@ class DesignPrimers:
         primers_labels = ['idx_start_seq', 'idx_end_seq', 'primer_sequence', 'primer_idx_start', 'primer_idx_end', 'primer_gc_content', 'primer_tm', 'primer_lentgh']
         count = 1
         for k, v in self.eblocks_design_instance.wt_eblocks.items():  # How many primers needed to sequence the whole gene block
-            begin, end = DesignEblocks.gene_block_range(k)
+            begin, end = EblockDesign.gene_block_range(k)
             length = end - begin
             num_primers = math.ceil(length / self.max_sequenced_region)
             # Calculate the starting points of the sequencing primer
@@ -157,7 +164,7 @@ class DesignPrimers:
                 # Find closest primer to starting position
                 closest_range, closest_primer, diff = self.find_closest_primer(possible_primers, i)         
                 if diff < max_difference:
-                    primers[f"prim_{count}_eblock_{k.split('_')[1]}"] = [i + self.void_length - diff, j - diff, closest_primer, closest_range[0], closest_range[1], self.calculate_gc_content(closest_primer), self.Tm(closest_primer), len(closest_primer)]
+                    primers[f"SEQ{count}_eBlock_{k.split('_')[1]}"] = [i + self.void_length - diff, j - diff, closest_primer, closest_range[0], closest_range[1], self.calculate_gc_content(closest_primer), self.Tm(closest_primer), len(closest_primer)]
                     count += 1
                 else:
                     print("No primer found within the desired range")
@@ -172,7 +179,7 @@ class DesignPrimers:
         # Convert dict to snapgene dictionary format
         primers_seq_snapgene = {}
         for k, v in self.primers_SEQ.items():
-            primers_seq_snapgene[k] = [v[3], v[4], self.snapgene_colors['SEQprimer']]
+            primers_seq_snapgene[k] = v[2]
 
         # Save primers to file
         self.primers_SEQ_df = pd.DataFrame.from_dict(self.primers_SEQ, orient='index', columns=primers_labels)
@@ -180,25 +187,7 @@ class DesignPrimers:
 
         # Save mapped primers to mutations to file
         self.mapped_primers_to_txt(self.primers_SEQ_mutations)
-        self.primers_to_snapgene(primers=primers_seq_snapgene)
-
-    def primers_to_snapgene(self, primers: dict, filename='snapgene_features.gff3'):
-        """This function converts the primers to a format that can be read by SnapGene."""
-        # TODO : primers[name] = [start, end, name]
-        if self.to_snapgene:
-            try:
-                with open(os.path.join(self.output_dir, filename), 'r') as f:
-                    pass
-            except FileNotFoundError:
-                with open(os.path.join(self.output_dir, filename), 'w') as f:
-                    f.write("\n".join(self.gff3_header(len(self.sequence_instance.vector.seq))))
-
-            with open(os.path.join(self.output_dir, filename), 'a') as f:
-                    for k, v in primers.items():
-                        line = Utils.gff3_line(v[0], v[1], k, v[2])
-                        f.write('\t'.join(line) + '\n')
-
-        # TODO Remove last empty line from the file
+        self.snapgene_instance.primers_to_fasta(primers=primers_seq_snapgene)
                                     
     def mapped_primers_to_txt(self, primers: dict, filename='primers_SEQ_mutations.txt'):
         with open(os.path.join(self.output_dir, filename), 'w') as f:
@@ -307,8 +296,11 @@ class DesignPrimers:
         rv_oh = rv_sequence[block_begin:block_begin+size]
         return rv_oh
 
-    def combine_primers(self, overhang, template_binding):
-        return overhang + template_binding
+    def combine_primers(self, overhang, template_binding, type):
+        if type == 'FW':
+            return overhang + template_binding
+        elif type == 'RV':
+            return template_binding + overhang
             
     def get_overlap(self, s1, s2):
         s = difflib.SequenceMatcher(None, s1, s2)
