@@ -23,9 +23,29 @@ class Primer:
 
         self.name: str = None
         self.sequence: str = None
-        self.idx_begin: str = None
-        self.idx_end: str = None
+    #     self.idx_begin: str = None
+    #     self.idx_end: str = None
+    #     self.is_sequencing: str = False
+    #     self.is_iva: str = False
+    #     self.is_forward: str = False
+    #     self.is_reverse: str = False
 
+    #     # IVA specific properties
+    #     # TODO IVA subclass of primer?
+
+    # def set_name(self, name: str):
+    #     self.name = name
+
+
+class IVAprimer:
+    def __init__(self):
+        pass
+
+
+class SEQprimer:
+    def __init__(self):
+        pass
+    
 
 class DesignPrimers:
     """
@@ -40,7 +60,6 @@ class DesignPrimers:
                  snapgene_instance = None,
                  output_dir: str = None):
 
-        self.eblock_instance = eblock_instance
         self.eblocks_design_instance = eblocks_design_instance
         self.mutation_instance = mutation_instance
         self.sequence_instance = sequence_instance
@@ -78,35 +97,35 @@ class DesignPrimers:
         self.primers_SEQ_mutations: dict = {}
 
 
-    def run_IVAprimer(self):
+    def run_IVAprimer(self, init_size=10):
+
         # TODO Think of a solution when the primers are designed at the very beginning of the gene
+        
         fw_sequence = self.sequence_instance.sequence
         rv_sequence = self.sequence_instance.reverse_complement(fw_sequence)
 
         # Loop over gene blocks and design primers
-        for eblock, _ in self.eblocks_design_instance.wt_eblocks.items():
-            begin_pos, end_pos = EblockDesign.gene_block_range(eblock)
+        for eblock in self.eblocks_design_instance.wt_eblocks:
 
             # Create initial primers (later to be optimized)
-            init_size = 10
-            init_fw_oh = self.IVA_Fw_overhang(end_pos, fw_sequence, size=init_size)
-            size = self.optimize_size(self.max_overhang_temp_IVA, init_fw_oh, end_pos, init_size, fw_sequence, self.IVA_Fw_overhang)
-            final_fw_oh = self.IVA_Fw_overhang(end_pos, fw_sequence, size=size)
+            init_fw_oh = self.IVA_Fw_overhang(eblock.end_index, fw_sequence, size=init_size)
+            size = self.optimize_size(self.max_overhang_temp_IVA, init_fw_oh, eblock.end_index, init_size, fw_sequence, self.IVA_Fw_overhang)
+            final_fw_oh = self.IVA_Fw_overhang(eblock.end_index, fw_sequence, size=size)
 
-            init_fw_template = self.IVA_Fw_template(end_pos, fw_sequence, size=init_size)
-            size = self.optimize_size(self.max_template_temp_IVA, init_fw_template, end_pos, init_size, fw_sequence, self.IVA_Fw_template)
-            final_fw_template = self.IVA_Fw_template(end_pos, fw_sequence, size)
+            init_fw_template = self.IVA_Fw_template(eblock.end_index, fw_sequence, size=init_size)
+            size = self.optimize_size(self.max_template_temp_IVA, init_fw_template, eblock.end_index, init_size, fw_sequence, self.IVA_Fw_template)
+            final_fw_template = self.IVA_Fw_template(eblock.end_index, fw_sequence, size)
 
-            init_rv_oh = self.IVA_Rv_overhang(begin_pos, rv_sequence, size=init_size)
-            size = self.optimize_size(self.max_overhang_temp_IVA, init_rv_oh, begin_pos, init_size, rv_sequence, self.IVA_Rv_overhang)
-            final_rv_oh = self.IVA_Rv_overhang(begin_pos, rv_sequence, size)
+            init_rv_oh = self.IVA_Rv_overhang(eblock.start_index, rv_sequence, size=init_size)
+            size = self.optimize_size(self.max_overhang_temp_IVA, init_rv_oh, eblock.start_index, init_size, rv_sequence, self.IVA_Rv_overhang)
+            final_rv_oh = self.IVA_Rv_overhang(eblock.start_index, rv_sequence, size)
 
-            init_rv_template = self.IVA_Rv_template(begin_pos, rv_sequence, size=init_size)
-            size = self.optimize_size(self.max_template_temp_IVA, init_rv_template, begin_pos, init_size, rv_sequence, self.IVA_Rv_template)
-            final_rv_template = self.IVA_Rv_template(begin_pos, rv_sequence, size)
+            init_rv_template = self.IVA_Rv_template(eblock.start_index, rv_sequence, size=init_size)
+            size = self.optimize_size(self.max_template_temp_IVA, init_rv_template, eblock.start_index, init_size, rv_sequence, self.IVA_Rv_template)
+            final_rv_template = self.IVA_Rv_template(eblock.start_index, rv_sequence, size)
 
             # Store primers and optimize 
-            primerpair = self.parse_primerpair(eblock, fw_sequence, rv_sequence, final_fw_oh, final_fw_template, final_rv_oh, final_rv_template, end_pos, begin_pos)            
+            primerpair = self.parse_primerpair(eblock, fw_sequence, rv_sequence, final_fw_oh, final_fw_template, final_rv_oh, final_rv_template, eblock.end_index, eblock.start_index)            
 
             # Combine primers
             fw_combined = self.combine_primers(final_fw_oh, final_fw_template, type='FW')
@@ -276,9 +295,6 @@ class DesignPrimers:
         primerpair['begin position'] = int(begin)
         return primerpair
 
-    def Tm(self, sequence):
-        return round(mt.Tm_NN(sequence), 2)
-
     def optimize_size(self, optimum, primer, pos, size, sequence, function):
         tm = self.Tm(primer)
         while (tm < (optimum)):
@@ -364,3 +380,7 @@ class DesignPrimers:
         if count > 1:
             print(f"Multiple binding sites for primer {primer} in the vector sequence")
         return count
+    
+    @staticmethod
+    def Tm(self, sequence):
+        return round(mt.Tm_NN(sequence), 2)

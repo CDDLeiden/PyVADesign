@@ -37,15 +37,11 @@ class Plot:
     def plot_histogram_mutations(self, figure_width=8, figure_length=5, show=True, save=True, filename='histogram_mutations.png'):
         counts = self.eblocks_design_instance.count_mutations_per_eblock()
         fig, ax = plt.subplots(figsize=(figure_width, figure_length))
-        labels = []
-        for k, v in counts.items():
-            kn = self.eblocks_design_instance.short_block_name(k)
-            labels.append(kn)
+        labels = list(counts.keys())
         colors = list(self.eblocks_design_instance.eblock_colors.values())[:len(counts)]
         ax.bar(range(len(counts)), list(counts.values()), align='center', color=colors)
         plt.xticks(range(len(counts)), labels, rotation=90)
         ax.set_ylabel('Number of mutants per eBlock')
-        # ax.set_xlabel('eBlock')
         ax.set_title(f'Number of mutants per eBlock')
         if save:
             self.save_plot(fig, filename)
@@ -117,12 +113,12 @@ class Plot:
 
         # Add eBlocks to plot
         if plot_eblocks:
-            for num, (key, value) in enumerate(self.eblocks_design_instance.wt_eblocks.items()):
-                features.append(GraphicFeature(start=int(key.split('_')[3]), 
-                                               end=int(key.split('_')[4]), 
+            for num, i in enumerate(self.eblocks_design_instance.wt_eblocks):
+                features.append(GraphicFeature(start=i.start_index, 
+                                               end=i.end_index, 
                                                strand=+1, 
-                                               color=self.eblock_colors[num], 
-                                               label=f"{self.eblocks_design_instance.short_block_name(key)}"))
+                                               color=self.eblocks_design_instance.eblock_colors[num],
+                                               label=f"{i.name}"))
                 
         record = GraphicRecord(sequence_length=len(self.sequence_instance.sequence), features=features)
         fig_size = (figure_length, figure_width)
