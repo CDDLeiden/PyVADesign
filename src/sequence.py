@@ -12,6 +12,7 @@ class Plasmid:
         self.seqid: str = None
         self.organism: str = None
         self.vector: str = None  # Vector sequence with gene cloned into it
+        self.color: str = "#d3d3d3"
  
     def parse_sequence(self, fp: str) -> str:
         """
@@ -33,7 +34,7 @@ class Plasmid:
 
     @staticmethod
     def find_index_in_vector(vector, sequence: str):
-        idx_begin = str(vector).find(str(sequence))
+        idx_begin = str(vector).lower().find(str(sequence).lower())
         idx_end = idx_begin + len(sequence)
         if idx_begin == -1 or idx_end == -1:
             print(f"Gene block {sequence} not found in vector sequence. Check whether your target gene is correct in your vector.")

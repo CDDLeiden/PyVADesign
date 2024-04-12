@@ -136,6 +136,7 @@ class Mutation:
         """
         This function prints the mutations.
         """
+        # TODO Format so that the lines align nicely
         print("The selected mutations are:")
         for mut in self.mutations:
             if type(mut.mutation) == list:  
