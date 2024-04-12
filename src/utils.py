@@ -65,32 +65,20 @@ class SnapGene:
     def __init__(self,
                  sequence_instance: Plasmid,
                  output_dir: str = None):
-            
-            self.primer_filename = 'primers.fasta'
-            self.eblocks_filename = 'eBlocks.gff3'
-
+        
             self.output_dir = output_dir
             self.sequence_instance = sequence_instance
             
-    def primers_to_fasta(self, primers: dict):
+            
+    def primers_to_fasta(self, primers: dict, filename='primers.fasta'):
         """
         This function converts the primers to features that can be read by SnapGene.
         """
-        self.make_file(self.primer_filename, header=False)
-        with open(os.path.join(self.output_dir, self.primer_filename), 'a') as f:
+        self.make_file(filename, header=False)
+        with open(os.path.join(self.output_dir, filename), 'a') as f:
             for k, v in primers.items():
                 f.write(f">{k}\n")
                 f.write(f"{v}\n")
-
-    def eblocks_to_gff3(self, eblocks: dict):
-        """
-        This function converts the eBlocks to features that can be read by SnapGene.
-        """
-        self.make_file(self.eblocks_filename, header=True)
-        with open(os.path.join(self.output_dir, self.eblocks_filename), 'a') as f:
-            for k, v in eblocks.items():
-                line = SnapGene.gff3_line(v[0], v[1], k, v[2])
-                f.write('\t'.join(line) + '\n')
 
     def make_file(self, filename, header=False):
         try:
@@ -106,6 +94,16 @@ class SnapGene:
     def remove_empty_lines(self):
         # TODO Remove last empty line from the file
         pass
+
+    def eblocks_to_gff3(self, eblocks: dict, filename='eblocks.gff3'):
+        """
+        This function converts the eBlocks to features that can be read by SnapGene.
+        """
+        self.make_file(filename, header=True)
+        with open(os.path.join(self.output_dir, filename), 'a') as f:
+            for k, v in eblocks.items():
+                line = self.gff3_line(v[0], v[1], k, v[2])
+                f.write('\t'.join(line) + '\n')
 
     @staticmethod
     def gff3_header(length_sequence, version="3.2.1", sequence_name="myseq"):

@@ -18,11 +18,12 @@ class Plot:
                  mutation_instance: Mutation,
                  sequence_instance: Plasmid,
                  output_dir: str = None):
+        
         self.eblocks_design_instance = eblocks_design_instance
         self.mutation_instance = mutation_instance
         self.sequence_instance = sequence_instance
         self.output_dir = output_dir
-        self.eblock_colors = self.generate_eblock_colors()
+        # self.eblock_colors = eblocks_design_instance.eblock_colors()
         self.show = True
         self.save = True
 
@@ -40,7 +41,7 @@ class Plot:
         for k, v in counts.items():
             kn = self.eblocks_design_instance.short_block_name(k)
             labels.append(kn)
-        colors = list(self.eblock_colors.values())[:len(counts) ]
+        colors = list(self.eblocks_design_instance.eblock_colors.values())[:len(counts)]
         ax.bar(range(len(counts)), list(counts.values()), align='center', color=colors)
         plt.xticks(range(len(counts)), labels, rotation=90)
         ax.set_ylabel('Number of mutants per eBlock')
@@ -137,15 +138,6 @@ class Plot:
             self.save_plot(fig, f'eblocks_{self.sequence_instance.seqid}_N{self.mutation_instance.n_mutants}_{self.eblocks_design_instance.optimization_method}.png')
         if not plot_eblocks:
             self.save_plot(fig, f'mutations_{self.sequence_instance.seqid}_N{self.mutation_instance.n_mutants}_{self.eblocks_design_instance.optimization_method}.png')
-
-    @staticmethod
-    def generate_eblock_colors() -> dict:
-        """
-        Create dictionary with colors for plotting eBlocks using the tab10 color scheme.
-        """
-        # TODO Add more colors
-        tab10_colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
-        return {i: tab10_colors[i] for i in range(10)}
 
     def extract_snapgene_features(self):
         """

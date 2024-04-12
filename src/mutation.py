@@ -24,7 +24,12 @@ class Mutation:
                  length_insert: int = None,
                  position: int = None, 
                  wt_residue: str = None, 
-                 mut_residue: str = None):
+                 mut_residue: str = None,
+                 
+                is_singlemutation = False,
+                is_insert = False,
+                is_deletion = False,
+                is_multiplemutation = False):
         
         self.type = type
         self.input = input
@@ -46,6 +51,11 @@ class Mutation:
         self.n_mutantsn = n_mutants
         self.mutations = []
         self.colors = {'Mutation': 'black', 'Insert': 'red', 'Deletion': 'blue', 'Combined': 'green'}
+
+        self.is_singlemutation = is_singlemutation
+        self.is_insert = is_insert
+        self.is_deletion = is_deletion
+        self.is_multiplemutation = is_multiplemutation
 
     def parse_mutations(self, fp: str):
         """
@@ -72,7 +82,8 @@ class Mutation:
                         mutations.append(Mutation(type="Mutation", 
                                                 input=line, 
                                                 mutation=[str_spl_line[0]],
-                                                idx_dna=[idx]))
+                                                idx_dna=[idx],
+                                                is_singlemutation =True))
                     elif (len(str_spl_line) == 2) and (str_spl_line[0] == "Combined"):
                         count += 1
                         muts = str_spl_line[1].split("-")
@@ -83,7 +94,8 @@ class Mutation:
                         mutations.append(Mutation(type="Combined", 
                                                 input=line, 
                                                 mutation=muts,
-                                                idx_dna=idxs))
+                                                idx_dna=idxs,
+                                                is_multiplemutation=True))
                     elif (len(str_spl_line) == 2) and (str_spl_line[0] == "Deletion"):
                         count += 1
                         mut_begin = int(str_spl_line[1].split("-")[0][1:])
@@ -97,7 +109,8 @@ class Mutation:
                                                 idx_dna_deletion_begin=int(mut_begin) *3,
                                                 idx_dna_deletion_end=int(mut_end) *3,
                                                 idx_dna=idxs,
-                                                length_deletion=mut_length * 3))
+                                                length_deletion=mut_length * 3,
+                                                is_deletion=True))
                     elif (len(str_spl_line) == 2) and (str_spl_line[0] == "Insert"):
                         count += 1
                         idx = int(str_spl_line[1].split("-")[0][1:]) * 3
@@ -106,7 +119,8 @@ class Mutation:
                                                   mutation=str_spl_line[1],
                                                   idx_dna=[idx],
                                                   insert=str_spl_line[1].split("-")[1],
-                                                  length_insert=len(str_spl_line[1].split("-")[1]) * 3))
+                                                  length_insert=len(str_spl_line[1].split("-")[1]) * 3,
+                                                  is_insert=True))
                     else:
                         print(f"Please check format of mutation {line}")
                         sys.exit()
