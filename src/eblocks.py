@@ -1,5 +1,6 @@
 import os
 import sys
+import copy
 import numpy as np
 from sklearn.cluster import KMeans
 
@@ -7,15 +8,11 @@ from .mutation import Mutation
 from .sequence import Plasmid
 from .utils import Utils, SnapGene
 
-# TODO Change filepath (str) to Path object
-
-
 
 class Eblock:
     """
     This class contains information of 
     """
-    # TODO Make daughter class of mutation?
     def __init__(self):
 
         self.name: str = None
@@ -30,7 +27,9 @@ class Eblock:
         self.mutant_codon: str = None
         self.insert: str = None
 
+        # Multiple mutations
         self.mutation_idxs = []
+        self.mutant_codons = []
 
     def set_name(self, name: str):
         self.name = name
@@ -108,13 +107,13 @@ class EblockDesign:
         bins = self.make_bins(optimal_clustering)
 
         # Make gene blocks (WT DNA sequences cut to the correct size, according to the bins) and renumber them starting from 1
-        self.make_wt_eblocks(bins)
+        wt_eblocks = self.make_wt_eblocks(bins)
+        self.wt_eblocks = wt_eblocks
 
         # Loop over all mutations and create the eBlocks
         results = {}
         for mutation in self.mutation_instance.mutations:
-            # Create mutated eblock, based on mutation type
-            results = self.make_mutant_eblock(mutation, results)
+            results = self.make_mutant_eblock(mutation, results)  # Create mutated eblock, based on mutation type
 
         # Sort the eblocks based on the index of the first mutation in the eblock and the number of the eblock
         sorted_dict = dict(sorted(results.items(), key=lambda x: (x[1].name, x[1].start_index)))
@@ -129,6 +128,9 @@ class EblockDesign:
             snapgene_instance = SnapGene(output_dir=self.output_dir, 
                                         sequence_instance=self.sequence_instance)
             snapgene_instance.eblocks_to_gff3(eblocks=snapgene_dict)
+
+            # TODO ADD GENE DnaE1 (or whatever to features in snapgene as full gene)
+            # TODO SAVE INDUVIDUAL MUTATIONS AS WELL HERE
                                     
         print("Completed eBlock design.")
 
@@ -239,26 +241,18 @@ class EblockDesign:
         """
         Create wild-type eBlocks
         """
-        # TODO Renumber
         gene_blocks = []
         block_num = 1
         for num in range(0, len(bins), 2):
             eblock = Eblock()
-            eblock.name = f"eBlock-{block_num}"
             eblock.start_index = bins[num]
             eblock.end_index = bins[num+1]
             eblock.sequence = self.sequence_instance.sequence[bins[num]:bins[num+1]]
             gene_blocks.append(eblock)
             block_num += 1
-        self.wt_eblocks = gene_blocks
-        return gene_blocks # self.renumber_gene_blocks(gene_blocks)
-
-    # def renumber_gene_blocks(self, gene_blocks: list):
-    #     renumbered_gene_blocks = {}
-    #     for num, (k, v) in enumerate(sorted(gene_blocks.items(), key=lambda item: int(item[0].split('_')[3])), 1):
-    #         renumbered_gene_blocks[f'Block_{num}_pos_{k.split("_")[3]}_{k.split("_")[4]}'] = v
-    #     return renumbered_gene_blocks
-    
+        gene_blocks = self.renumber_eblock(gene_blocks)
+        return gene_blocks
+        
     def eblock_index(self, eblock: Eblock, idx_mutation: int) -> int:
         """
         Find the index of a mutation in an eblock.
@@ -274,7 +268,7 @@ class EblockDesign:
             if eblock.start_index  < int(mutation_idx) < eblock.end_index:
                 eblocks.append(eblock)
         count = len(eblocks)
-        return eblocks[0], count
+        return copy.deepcopy(eblocks[0]), count  # Copy to avoid editing original class
     
 
     def check_wt_codon(self, eblock: Eblock, mut: str):
@@ -282,7 +276,7 @@ class EblockDesign:
         This function checks if the WT codon at the mutation index is the same as in the mutation.
         """
         all_codons = Utils.DNA_codons()
-        codon = eblock.sequence[eblock.start_index-3:eblock.start_index]
+        codon = eblock.sequence[eblock.mutation_start_index-3:eblock.mutation_start_index]
         result = next((value for key, value in all_codons.items() if key.lower() == codon), None)
         if result is not None and result != mut[0]:
             print(f"WT codon does not match residue {mut}, but is {result}, the codon is {codon}")
@@ -300,13 +294,13 @@ class EblockDesign:
         """
         Mutate gene block based on mutation type
         """
-        if (mutation.type == "Mutation") or (mutation.type == "Combined"):
-            mut_block = eblock.sequence[:eblock.start_index -3] + eblock.mutant_codon + eblock.sequence[eblock.start_index:]
-        elif mutation.type == "Insert":
-            mut_block = eblock.sequence[:eblock.start_index] + eblock.insert + eblock.sequence[eblock.start_index:]
-        elif mutation.type == "Deletion":
-            mut_block = eblock.sequence[:eblock.start_index -3] + eblock.sequence[end_idx -3:]
-        return mut_block
+        if (mutation.is_singlemutation) or (mutation.is_multiplemutation):
+            mutated_eblock = eblock.sequence[:eblock.mutation_start_index -3] + eblock.mutant_codon + eblock.sequence[eblock.mutation_start_index:]
+        elif mutation.is_insert:
+            mutated_eblock = eblock.sequence[:eblock.mutation_start_index] + eblock.insert + eblock.sequence[eblock.mutation_start_index:]
+        elif mutation.is_deletion:
+            mutated_eblock = eblock.sequence[:eblock.mutation_start_index -3] + eblock.sequence[end_idx -3:]
+        return mutated_eblock
     
     def design_insert(self, aas):
         codon_insert = ''  # Sequence to insert in gene block
@@ -345,13 +339,10 @@ class EblockDesign:
 
         if mutation.is_singlemutation:
             eblock, _ = self.eblocks_within_range(mutation.idx_dna[0])
-            eblock.mutation_start_index = self.eblock_index(eblock, mutation.idx_dna[0])
-           
+            eblock.mutation_start_index = self.eblock_index(eblock, mutation.idx_dna[0])    
             self.check_wt_codon(eblock, mutation.mutation[0][0])  # Check if WT codon at index is same residue as mutation
             eblock.mutant_codon = self.select_mut_codon(mutation.mutation[0][-1])
             eblock.sequence = self.mutate_eblock(mutation, eblock)
-            results[mutation] = eblock
-            return results
 
         elif mutation.is_insert:
             eblock, _ = self.eblocks_within_range(mutation.idx_dna[0])  # Find gene block and index of insert
@@ -361,8 +352,6 @@ class EblockDesign:
             eblock.insert = self.design_insert(mutation.insert)
             eblock.sequence = self.mutate_eblock(mutation, eblock)
             self.check_eblock_length(eblock.sequence)  # Check if eBlock is too long including the insert
-            results[mutation] = eblock
-            return results
 
         elif mutation.is_deletion:
             eblock, _ = self.eblocks_within_range(mutation.idx_dna_deletion_begin)
@@ -372,51 +361,55 @@ class EblockDesign:
             self.check_wt_codon(eblock, mutation.mutation[0][0])  # Check if WT codon at index is same residue as mutation
             eblock.sequence = self.mutate_eblock(mutation, eblock, idx_end)
             self.check_eblock_length(eblock.sequence)  # Check if eBlock is too short
-            results[mutation] = eblock
-            return results
-        
+     
         elif mutation.is_multiplemutation:
-            tmp_eblock_name  = None
-            tmp_eblock_value = None
-            lowest_count = None
-            # TODO TEST THIS PART OF THE CODE EXTENSIVELY
+            selected_eblock = None
             for mut_i in mutation.idx_dna:
-                # possible_gene_blocks, counts = self.eblocks_within_range(mut_i)
                 eblock, counts = self.eblocks_within_range(mut_i)
-                if (counts == 1) and (tmp_eblock_name is None):
-                    tmp_eblock_name = eblock.name
-                    tmp_eblock_value = eblock.sequence
-            if tmp_eblock_name is None:
-                all_counts = [counts for _, counts in (self.eblocks_within_range(mut_i) for mut_i in mutation.idx_dna)]
-                lowest_count = min(all_counts)
+                if counts == 1:  # If only one eBlock for mutation > should be correct eBlock
+                    selected_eblock = eblock
+
+            all_counts = [counts for _, counts in (self.eblocks_within_range(mut_i) for mut_i in mutation.idx_dna)]
+            lowest_count = min(all_counts)
             
             for mut_i in mutation.idx_dna:
                 eblock, counts = self.eblocks_within_range(mut_i)
-                if (counts == lowest_count) and (tmp_eblock_name is None):
+                if counts == lowest_count:
                     selected_eblock = eblock
-                    # Try to find indexes of mutations, based on eblock. Check if they are too close to beginning or end of eblock
-                    try:
+                    try:  # Try to find indexes of mutations, based on eblock. Check if they are too close to beginning or end of eblock
                         for mut_i in mutation.idx_dna:
-                            # Check too close to beginning or end
-                            eblock.mutation_start_index = self.eblock_index(selected_eblock, mut_i)
+                            eblock.mutation_start_index = self.eblock_index(selected_eblock, mut_i)  # Check too close to beginning or end
                             if (selected_eblock.mutation_start_index < self.min_overlap) or (selected_eblock.mutation_start_index > (len(selected_eblock.sequence) - self.min_overlap)):
                                 raise Exception("Mutation too close to beginning or end of eBlock")
                     except Exception:
                         continue
-            idxs, codons = [], []
-            for num_i, mut_i in enumerate(mutation.idx_dna):
-                idx = self.eblock_index(selected_eblock, mut_i)
-                idxs.append(idx)
-                
-                # Find most occuring mutant codon based on codon usage for species
-                mut_codon = self.select_mut_codon(mutation.mutation[num_i][-1])
-                codons.append(mut_codon)
 
-                # Check if WT codon at index is same residue as mutation
-                self.check_wt_codon(selected_eblock, mutation.mutation[num_i][0])
-                eblock.sequence = self.mutate_eblock(mutation, selected_eblock)
-            results[mutation] = eblock
-            return results
+            for num_i, mut_i in enumerate(mutation.idx_dna):
+
+                print(mutation.mutation[num_i])
+
+                selected_eblock.mutation_start_index = self.eblock_index(selected_eblock, mut_i)
+                selected_eblock.mutant_codon = self.select_mut_codon(mutation.mutation[num_i][-1])  # Find most occuring mutant codon based on codon usage for species
+                print(selected_eblock.mutant_codon)
+
+                selected_eblock.mutation_idxs.append(selected_eblock.start_index)
+                selected_eblock.mutant_codons.append(selected_eblock.mutant_codon)
+                
+                self.check_wt_codon(selected_eblock, mutation.mutation[num_i][0])  # Check if WT codon at index is same residue as mutation
+                selected_eblock.sequence = self.mutate_eblock(mutation, selected_eblock)
+
+            eblock = selected_eblock
+
+        print('Mutated eBlock', eblock.sequence)
+        results[mutation] = eblock
+        return results
+    
+    @staticmethod
+    def renumber_eblock(eblocks: list):
+        sorted_list = sorted(eblocks, key=lambda x: x.start_index)
+        for i, obj in enumerate(sorted_list, start=1):
+            obj.name = f"eBlock-{i}"
+        return sorted_list
                 
     @staticmethod
     def generate_eblock_colors() -> dict:
