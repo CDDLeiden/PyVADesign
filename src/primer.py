@@ -10,11 +10,22 @@ from Bio.SeqUtils import MeltingTemp as mt, GC
 
 from .mutation import Mutation
 from .sequence import Plasmid
-from .eblocks import Eblocks, EblockDesign
+from .eblocks import EblockDesign
 from .utils import Utils, SnapGene
 
 # TODO Chcek multiple primer binding sites?
 # TODO Show the plasmid sequence area in a plot?
+
+
+class Primer:
+    # TODO Class to store the primers
+    def __init__(self):
+
+        self.name: str = None
+        self.sequence: str = None
+        self.idx_begin: str = None
+        self.idx_end: str = None
+
 
 class DesignPrimers:
     """
@@ -22,7 +33,7 @@ class DesignPrimers:
     """
 
     def __init__(self,
-                 eblock_instance: Eblocks,
+                #  eblock_instance: Eblocks,
                  eblocks_design_instance: EblockDesign,
                  mutation_instance: Mutation,
                  sequence_instance: Plasmid,
