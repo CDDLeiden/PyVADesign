@@ -87,7 +87,8 @@ class SnapGene:
         except FileNotFoundError:
             with open(os.path.join(self.output_dir, filename), 'w') as f:
                 if header:
-                    f.write("\n".join(SnapGene.gff3_header(len(self.sequence_instance.vector.seq)+"\n")))
+                    f.write("\n".join(SnapGene.gff3_header(self.sequence_instance.vector.seq)))
+                    f.write("\n")
                 else:
                     pass
 
@@ -95,14 +96,14 @@ class SnapGene:
         # TODO Remove last empty line from the file
         pass
 
-    def eblocks_to_gff3(self, eblocks: dict, filename='eblocks.gff3'):
+    def eblocks_to_gff3(self, eblocks: dict, type='gene', filename='eblocks.gff3'):
         """
         This function converts the eBlocks to features that can be read by SnapGene.
         """
         self.make_file(filename, header=True)
         with open(os.path.join(self.output_dir, filename), 'a') as f:
             for k, v in eblocks.items():
-                line = self.gff3_line(v[0], v[1], k, v[2])
+                line = self.gff3_line(v[0], v[1], k, v[2], type)
                 f.write('\t'.join(line) + '\n')
 
     @staticmethod
@@ -111,7 +112,7 @@ class SnapGene:
         return result
 
     @staticmethod
-    def gff3_line(begin_pos, end_pos, name, hex_color, type='gene'):
+    def gff3_line(begin_pos, end_pos, name, hex_color, type):
         # TODO Change feature, gene, CDS etc to the correct type
         # TODO Change Myseq to the correct sequence name?
         line = ['myseq', '.', f"{type}", str(begin_pos), str(end_pos), '.', '.', '.', f"Name={name};color={hex_color}"]
@@ -132,16 +133,3 @@ class SnapGene:
     @staticmethod
     def count_substring_occurance(sequence: str, substring: str):
         return str(sequence).count(str(substring))
-    
-
-        # TODO Remove last empty line from the file
-    
-
-    # TODO Check if file exists, otherwise create it and append header gff3 file 
-    
-    # @staticmethod
-    # def write_gff3_line(file, line):
-    #     file.write('\t'.join(line) + '\n')
-
-    # @staticmethod
-    # TDOD remove last empty line in file

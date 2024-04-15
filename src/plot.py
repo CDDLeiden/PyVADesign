@@ -73,7 +73,7 @@ class Plot:
     def plot_eblocks_mutations(self, 
                                plot_eblocks=True, 
                                plot_mutations=True, 
-                               seq_color="#d3d3d3", 
+                               seq_color="#d3d3d3", # TODO Remove this, its in the sequence class
                                figure_width=20, 
                                figure_length=10):
         """
@@ -131,7 +131,10 @@ class Plot:
         if plot_eblocks and plot_mutations and self.save:
             # fig.savefig(os.path.join(output_fp, f'eblocks_{self.sequence_instance.seqid}_N{self.mutation_instance.n_mutants}_{self.eblocks_design_instance.optimization_method}.png'), dpi=100)
             # TODO Fix this (filenames with | are not allowed)
-            self.save_plot(fig, f'eblocks_{self.sequence_instance.seqid}_N{self.mutation_instance.n_mutants}_{self.eblocks_design_instance.optimization_method}.png')
+            if self.eblocks_design_instance.cost_optimization:
+                self.save_plot(fig, f'eblocks_{self.sequence_instance.seqid}_N{self.mutation_instance.n_mutants}_cost.png')
+            elif self.eblocks_design_instance.amount_optimization:
+                self.save_plot(fig, f'eblocks_{self.sequence_instance.seqid}_N{self.mutation_instance.n_mutants}_amount.png')
         if not plot_eblocks:
             self.save_plot(fig, f'mutations_{self.sequence_instance.seqid}_N{self.mutation_instance.n_mutants}_{self.eblocks_design_instance.optimization_method}.png')
 

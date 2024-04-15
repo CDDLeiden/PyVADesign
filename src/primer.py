@@ -1,12 +1,9 @@
 import os
 import sys
 import math
-import random
 import difflib
 import pandas as pd
 from Bio.SeqUtils import MeltingTemp as mt, GC
-# from design_gene_blocks import DesignEblocks
-# from utils_old import load_pickle, extract_filename
 
 from .mutation import Mutation
 from .sequence import Plasmid
@@ -14,7 +11,6 @@ from .eblocks import EblockDesign
 from .utils import Utils, SnapGene
 
 # TODO Chcek multiple primer binding sites?
-# TODO Show the plasmid sequence area in a plot?
 
 
 class Primer:
