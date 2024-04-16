@@ -5,50 +5,83 @@ import sys
 import argparse
 from .eblocks import EblockDesign, Eblocks
 from .primer import DesignPrimers
+from .mutation import Mutation
+from .sequence import Plasmid
+from .utils import SnapGene
+
 
 
 def eBlocksArgParser():
-    parser = argparse.ArgumentParser(description='')
-    parser.add_argument("-i", 
-                        "--input_gene", 
-                        required=True, 
-                        help="FASTA file containing the gene of interest")
-
-
-
-
-    parser.add_argument("-i", "--input_gene", required=True, help="FASTA file containing the gene of interest")
-    parser.add_argument("-sp", "--species", type=str, default="Mycobacterium Smegmatis", help="Species to make calculations for")
-    parser.add_argument("-m", "--mutations", required=True, help="TXT file containing the mutations to make")
-    parser.add_argument("-o", "--output_location", required=True, help="Location where to store the output of the script")
-    args = parser.parse_args()
-    return args
-
-
-def read_arguments():
-    parser = argparse.ArgumentParser(description='')
-    parser.add_argument("-i", "--input_gene", required=True, help="FASTA file containing the gene of interest")
-    parser.add_argument("-sp", "--species", type=str, default="Mycobacterium Smegmatis", help="Species to make calculations for")
-    parser.add_argument("-m", "--mutations", required=True, help="TXT file containing the mutations to make")
-    parser.add_argument("-o", "--output_location", required=True, help="Location where to store the output of the script")
-    parser.add_argument("-s", "--snapgene_file", required=False, help="Snapgene DNA file of the vector for which mutations will be made")
-    args = parser.parse_args()
-    return args
-
-def cleanup(args):
-    to_remove = [os.path.join(args.output_location, "mut_gene_blocks.npy"),
-                 os.path.join(args.output_location, "wt_gene_blocks.npy")]
-    for fp in to_remove:
-        if os.path.exists(fp):
-            os.remove(fp)
-        else:
-            print(f"{fp} does not exist")
+    parser = argparse.ArgumentParser()
+    """
+    Define and read command line arguments.
+    """
+    parser.add_argument("-g", 
+                        "--gene",
+                        type=str,
+                        required=True,
+                        default=None,
+                        help="path to sequence file (.fasta) containing the gene of interest")
     
+    parser.add_argument("-m",
+                        "--mutations",
+                        type=str,
+                        required=True,
+                        default=None,
+                        help="path to file containing mutations to make")
+    
+    parser.add_argument("-o",
+                        "--output",
+                        type=str,
+                        required=True,
+                        default=None,
+                        help="path to output directory")
+    
+    parser.add_argument("-s",
+                        "--species",
+                        type=str,
+                        required=False,
+                        default="Mycobacterium Smegmatis",
+                        help="species to make calculations for")
+    
+    parser.add_argument("-v",
+                        "--vector",
+                        type=str,
+                        required=False,
+                        default=None,
+                        help="path to SnapGene file of the vector for which mutations will be made (.dna)")
+    
+    args = parser.parse_args()
+    return args
+
+
 
 if __name__ == "__main__":
     
-    # First design gene blocks
-    args = read_arguments()
+    args = eBlocksArgParser()
+
+    # Check if output file exists
+    if not os.path.exists(args.output):
+        os.makedirs(args.output)
+
+    # Parse mutations
+    mutation_instance = Mutation()
+    mutation_instance.parse_mutations(args.mutations)
+
+    # Parse sequence
+    sequence_instance = Plasmid()
+    sequence_instance.parse_sequence(args.gene)
+    sequence_instance.parse_vector(args.vector)
+
+    snapgene_instance = SnapGene()
+    snapgene_instance.parse_snapgene(args.vector)
+
+
+
+
+
+
+
     design_eblocks = DesignEblocks(sequence_fp=args.input_gene,
                                    mutations_fp=args.mutations,
                                    output_fp=args.output_location,

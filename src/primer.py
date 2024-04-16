@@ -8,11 +8,13 @@ from Bio.SeqUtils import MeltingTemp as mt, GC
 from .mutation import Mutation
 from .sequence import Plasmid
 from .eblocks import EblockDesign
-from .utils import Utils, SnapGene, OutputToFile
+from .utils import OutputToFile
 
 
 # TODO Think of a solution when the primers are designed at the very beginning of the gene
 # TODO Add examples of complementary and hairpin structures to the tests directory
+# TODO Check hairpin         # TODO Check using this website http://biotools.nubic.northwestern.edu/OligoCalc.html
+# TODO Self dimerization vs hairpin
 
 
 class DesignPrimers:
@@ -39,10 +41,9 @@ class DesignPrimers:
         """
         Run the design of the primers
         """
-
         primerinstance = Primer()
         primers = {}
-        with OutputToFile(os.path.join(self.output_dir, 'primer-warnings.txt')):
+        with OutputToFile(os.path.join(self.output_dir, 'primer-warnings.txt')):  # Save warnings to file
             ivaprimers = self.design_iva_primer()
             for i in ivaprimers:
                 primers[i.name] = i.sequence_5to3
@@ -52,8 +53,7 @@ class DesignPrimers:
                 primers[i.name] = i.sequence_5to3
             self.snapgene_instance.primers_to_fasta(primers=primers)
 
-            # Check primers for hairpin formation and multiple binding sites
-            for k, v in primers.items():
+            for k, v in primers.items():  # Check primers for hairpin formation and multiple binding sites
                 max_hairpin, _, _ = primerinstance.check_hairpin(v)
                 n_binding_sites = primerinstance.check_multiple_binding_sites(vector=self.sequence_instance.vector.seq, sequence=v)
                         
@@ -205,7 +205,6 @@ class Primer:
         return round(GC(primer), 2)
     
     def check_hairpin(self, sequence: str):
-        # TODO Check using this website http://biotools.nubic.northwestern.edu/OligoCalc.html
         max_hairpin = 0
         for i in range(0, len(sequence) +1):
             for j in range(1, len(sequence) +1):
@@ -328,16 +327,14 @@ class IVAprimer(Primer, DesignPrimers):
         dTm_overhangs = abs(self.Tm(primer1.overhang) - self.Tm(primer2.overhang))
         dTm_templates = abs(self.Tm(primer1.template) - self.Tm(primer2.template))
         if dTm_overhangs > threshold:
-            # TODO CHANGE
-            print(f"The overhang temperatures for Fw and Rv primer of {primer1.name} exceed max Tm difference of {threshold} degrees")
+            print(f"The overhang temperatures for {primer1.name} {primer2.name} exceed max Tm difference of {threshold} degrees")
         if dTm_templates > threshold:
-            print(f"The template temperatures for Fw and Rv primer of {primer1.name} exceed max Tm difference {threshold} degrees")
+            print(f"The template temperatures for {primer1.name} {primer2.name} exceed max Tm difference {threshold} degrees")
             
     def check_complementarity(self, primer1, primer2):
-        # Primer pairs should not have complementary regions
         overlap = self.get_overlap(primer1.sequence_5to3, primer2.sequence_5to3)
         if len(overlap) > self.complementarity_threshold:
-            print(f"Complementarity between the IVA primers for {primer1.name} exceeds threshold of {self.complementarity_threshold}")
+            print(f"Complementarity between the primers {primer1.name} {primer2.name} exceeds threshold of {self.complementarity_threshold}")
         return overlap
     
     def get_overlap(self, s1, s2):
@@ -457,5 +454,5 @@ class SEQprimer(Primer, DesignPrimers):
         return self.primers_df
     
     def all_rv_primers(self):
-        # TODO in case FW does not work
+        # TODO in case FW does not work, implement this
         pass
