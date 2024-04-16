@@ -3,16 +3,28 @@ import sys
 import math
 import difflib
 import pandas as pd
-from Bio.SeqUtils import MeltingTemp as mt, GC
+
+from Bio.SeqUtils import MeltingTemp as mt
+from Bio.SeqUtils import gc_fraction
 
 from .mutation import Mutation
 from .sequence import Plasmid
 from .eblocks import EblockDesign
-from .utils import Utils, SnapGene, OutputToFile
+from .utils import OutputToFile
 
 
-# TODO Think of a solution when the primers are designed at the very beginning of the gene
+# TODO Think of a solution when the primers are designed at the very beginning of the gene.
+# - in that case you should look at the vector sequence and design the primers from the end of the gene
+# IVA DESIGN CLASS > make some tests for this
+
+
+
+
+
+
 # TODO Add examples of complementary and hairpin structures to the tests directory
+# TODO Check hairpin         # TODO Check using this website http://biotools.nubic.northwestern.edu/OligoCalc.html
+# TODO Self dimerization vs hairpin
 
 
 class DesignPrimers:
@@ -39,10 +51,9 @@ class DesignPrimers:
         """
         Run the design of the primers
         """
-
         primerinstance = Primer()
         primers = {}
-        with OutputToFile(os.path.join(self.output_dir, 'primer-warnings.txt')):
+        with OutputToFile(os.path.join(self.output_dir, 'primer-warnings.txt')):  # Save warnings to file
             ivaprimers = self.design_iva_primer()
             for i in ivaprimers:
                 primers[i.name] = i.sequence_5to3
@@ -52,8 +63,7 @@ class DesignPrimers:
                 primers[i.name] = i.sequence_5to3
             self.snapgene_instance.primers_to_fasta(primers=primers)
 
-            # Check primers for hairpin formation and multiple binding sites
-            for k, v in primers.items():
+            for k, v in primers.items():  # Check primers for hairpin formation and multiple binding sites
                 max_hairpin, _, _ = primerinstance.check_hairpin(v)
                 n_binding_sites = primerinstance.check_multiple_binding_sites(vector=self.sequence_instance.vector.seq, sequence=v)
                         
@@ -108,9 +118,9 @@ class DesignPrimers:
             ivaprimerdesign.Tm_difference(iva_fw_primer, iva_rv_primer)
             overlap = ivaprimerdesign.check_complementarity(iva_fw_primer, iva_rv_primer)
 
-            # Save primer information
-            df = ivaprimerdesign.primers_to_dataframe(ivaprimers)
-            df.to_csv(os.path.join(self.output_dir, 'IVAprimers.csv'), index=False)
+        # Save primer information
+        df = ivaprimerdesign.primers_to_dataframe(ivaprimers)
+        df.to_csv(os.path.join(self.output_dir, 'IVAprimers.csv'), index=False)
 
         return ivaprimers
 
@@ -147,7 +157,6 @@ class DesignPrimers:
                 else:
                     print("No primer found within the desired range")
 
-        seqprimerdesign.primers = seqprimers
         seqprimerdesign.mapped_primers = self.map_seqprimers_to_mutations(seqprimers)
         self.mapped_seqprimers_to_txt(seqprimerdesign.mapped_primers)  # Save mapped primers to mutations to file
 
@@ -202,10 +211,9 @@ class Primer:
         return round(mt.Tm_NN(sequence), 2)
     
     def gc_content(self, primer):
-        return round(GC(primer), 2)
+        return round(100 * gc_fraction(primer, ambiguous="ignore"), 2)
     
     def check_hairpin(self, sequence: str):
-        # TODO Check using this website http://biotools.nubic.northwestern.edu/OligoCalc.html
         max_hairpin = 0
         for i in range(0, len(sequence) +1):
             for j in range(1, len(sequence) +1):
@@ -278,8 +286,6 @@ class IVAprimer(Primer, DesignPrimers):
                                                               'direction'
                                                               'Tm Template',
                                                               'Tm Overhang']) 
-                                                              # 'end position',
-                                                              # 'begin position'])
 
     def Fw_name(self, n: int):
         return f"IVA_Fw_eBlock_{n}"
@@ -328,16 +334,14 @@ class IVAprimer(Primer, DesignPrimers):
         dTm_overhangs = abs(self.Tm(primer1.overhang) - self.Tm(primer2.overhang))
         dTm_templates = abs(self.Tm(primer1.template) - self.Tm(primer2.template))
         if dTm_overhangs > threshold:
-            # TODO CHANGE
-            print(f"The overhang temperatures for Fw and Rv primer of {primer1.name} exceed max Tm difference of {threshold} degrees")
+            print(f"The overhang temperatures for {primer1.name} {primer2.name} exceed max Tm difference of {threshold} degrees")
         if dTm_templates > threshold:
-            print(f"The template temperatures for Fw and Rv primer of {primer1.name} exceed max Tm difference {threshold} degrees")
+            print(f"The template temperatures for {primer1.name} {primer2.name} exceed max Tm difference {threshold} degrees")
             
     def check_complementarity(self, primer1, primer2):
-        # Primer pairs should not have complementary regions
         overlap = self.get_overlap(primer1.sequence_5to3, primer2.sequence_5to3)
         if len(overlap) > self.complementarity_threshold:
-            print(f"Complementarity between the IVA primers for {primer1.name} exceeds threshold of {self.complementarity_threshold}")
+            print(f"Complementarity between the primers {primer1.name} {primer2.name} exceeds threshold of {self.complementarity_threshold}")
         return overlap
     
     def get_overlap(self, s1, s2):
@@ -346,13 +350,15 @@ class IVAprimer(Primer, DesignPrimers):
         return s1[pos_a:pos_a+size]
     
     def primers_to_dataframe(self, primers):
+        self.primers_df.dropna(axis=1, inplace=True, how='all')
         for i in primers:
-            self.primers_df = self.primers_df.append({'eBlock': i.name,
-                                                        'Overhang': i.overhang,
-                                                        'Template': i.template,
-                                                        'direction': 'Forward' if i.is_forward else 'Reverse',
-                                                        'Tm Template': self.Tm(i.template),
-                                                        'Tm Overhang': self.Tm(i.overhang)}, ignore_index=True)
+            new_row = pd.DataFrame({'eBlock': str(i.name),
+                                    'Overhang': str(i.overhang),
+                                    'Template': str(i.template),
+                                    'direction': 'Forward' if i.is_forward else 'Reverse',
+                                    'Tm Template': float(self.Tm(i.template)),
+                                    'Tm Overhang': float(self.Tm(i.overhang))}, index=[0])
+            self.primers_df = pd.concat([self.primers_df, new_row], ignore_index=True)
         return self.primers_df
     
 
@@ -404,12 +410,13 @@ class SEQprimer(Primer, DesignPrimers):
 
         self.primers = []
         self.primers_df: pd.DataFrame = pd.DataFrame(columns=['eBlock', 
-                                                              'Sequence', 
+                                                              'sequence', 
                                                               'direction',
                                                               'Tm',
                                                               'GC content',
                                                               'begin position',
                                                               'end position'])
+    
         self.mapped_primers = {}
 
     def get_name(self, n: int, number: int):
@@ -437,7 +444,7 @@ class SEQprimer(Primer, DesignPrimers):
             for j in range(i, len(gene_sequence)):
                 option = gene_sequence[i:j]
                 if self.min_primer_length_seq <= len(option) <= self.max_primer_length_seq:
-                    if self.min_gc_content_primer_seq <= GC(option) <= self.max_gc_content_primer_seq:
+                    if self.min_gc_content_primer_seq <= self.gc_content(option) <= self.max_gc_content_primer_seq:
                         if self.gc_clamp:
                             if option[-1].lower() == 'g' or option[-1].lower() == 'c':
                                 result[(i, j)] = option
@@ -446,16 +453,18 @@ class SEQprimer(Primer, DesignPrimers):
         return result
     
     def primers_to_dataframe(self, primers):
+        self.primers_df.dropna(axis=1, inplace=True, how='all')
         for i in primers:
-            self.primers_df = self.primers_df.append({'eBlock': i.name,
-                                                      'Sequence': i.sequence_5to3,
-                                                      'direction': 'Forward' if i.is_forward else 'Reverse',
-                                                      'Tm': self.Tm(i.sequence_5to3),
-                                                      'GC content': self.gc_content(i.sequence_5to3),
-                                                      'begin position': i.idx_start_seq,
-                                                      'end position': i.idx_end_seq}, ignore_index=True)
+            new_row = pd.DataFrame({'eBlock': str(i.name),
+                                    'sequence': str(i.sequence_5to3),
+                                    'direction': 'Forward' if i.is_forward else 'Reverse',
+                                    'Tm': float(self.Tm(i.sequence_5to3)),
+                                    'GC content': float(self.gc_content(i.sequence_5to3)),
+                                    'begin position': int(i.idx_start_seq),
+                                    'end position': int(i.idx_end_seq)}, index=[0])
+            self.primers_df = pd.concat([self.primers_df, new_row], ignore_index=True)
         return self.primers_df
-    
+        
     def all_rv_primers(self):
-        # TODO in case FW does not work
+        # TODO in case FW does not work, implement this
         pass
