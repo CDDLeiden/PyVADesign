@@ -26,7 +26,7 @@ class Eblock:
 
         # Eblock properties
         self.name: str = None
-        # self.block_number: int = None  # TODO
+        self.block_number: int = None
         self.sequence: str = None
         self.start_index: int = None
         self.end_index: int = None
@@ -136,6 +136,8 @@ class EblockDesign:
         self.eblocks = sorted_dict
 
         # Create a GFF3 file for easy visualization of eBlocks in SnapGene
+        # TODO Move this to a separate function
+        # TODO OR, save the mutations as different snapgene files (each mutation in a different file) and then create one single file for the primers etc.
         if self.to_snapgene:
             snapgene_dict = {}
             # Add gene to Snapgene
@@ -144,14 +146,22 @@ class EblockDesign:
             for i in self.wt_eblocks:  # Add WT eBlocks
                 snapgene_dict[i.name] = [i.vector_start_index+1, i.vector_end_index, self.eblock_colors[int(i.block_number)-1]]
             for mutation, eblock in self.eblocks.items():
+                
+                # TODO Add type of mutation = variant here
                 if mutation.is_singlemutation:
+                    start_index = eblock.vector_start_index + eblock.mutation_start_index -2
+                    end_index = start_index + 2
+                    snapgene_dict[mutation.mutation[0]] = [start_index, end_index, self.mutation_instance.colors[mutation.type]]
 
-                    
-                    pass
                 elif mutation.is_insert:
+                    start_index = eblock.vector_start_index + eblock.mutation_start_index -1
+
+
+                    # TODO Skip this one?
                     pass
                 elif mutation.is_deletion:
                     pass
+                
                 elif mutation.is_multiplemutation:
                     pass
 
@@ -198,7 +208,6 @@ class EblockDesign:
         return possibilities
     
     def kmeans_clustering(self, num_clusters: int, n_init=10, random_state=42):
-        # TODO FIX THIS FUNCTION!!! WHAT IF TWO SAME MULTIP MUTATIONS POSISITONS E.G> (L305I, L807I) (L305G, L807G) !!
         mean_idxs_dna = self.mutation_instance.mean_idxs_dna()  # Extract the first index of each mutation in idx_test
         mutation_arr = np.array(mean_idxs_dna, dtype=float).reshape(-1, 1)
         kmeans = KMeans(n_clusters=num_clusters, random_state=random_state, n_init=n_init)  # Initialize KMeans with the number of clusters
