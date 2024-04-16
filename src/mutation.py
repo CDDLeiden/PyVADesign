@@ -72,55 +72,73 @@ class Mutation:
         mutations = []
         with open(fp, "r") as f:
             content = f.readlines()
-            count = 0
+            
             for line in content:
                 try:
                     str_spl_line = line.strip().split()
+
+                    # Single mutation
                     if len(str_spl_line) == 1:
-                        count += 1
                         idx = int(str_spl_line[0][1:-1]) * 3
-                        mutations.append(Mutation(type="Mutation", 
-                                                input=line, 
-                                                mutation=[str_spl_line[0]],
-                                                idx_dna=[idx],
-                                                is_singlemutation =True))
+                        mut = Mutation(
+                            input=line,
+                            mutation=[str_spl_line[0]],
+                            idx_dna=[idx],
+                            is_singlemutation=True,
+                            type = "Mutation")
+                        mutations.append(mut)
+
+                    # Combined mutation
                     elif (len(str_spl_line) == 2) and (str_spl_line[0] == "Combined"):
-                        count += 1
                         muts = str_spl_line[1].split("-")
                         idxs = list()
                         for m in muts:
                             idx = int(m[1:-1]) * 3
                             idxs.append(idx)
-                        mutations.append(Mutation(type="Combined", 
-                                                input=line, 
-                                                mutation=muts,
-                                                idx_dna=idxs,
-                                                is_multiplemutation=True))
+
+                        mut = Mutation(
+                            input=line,
+                            mutation=muts,
+                            idx_dna=idxs,
+                            is_multiplemutation=True,
+                            type = "Combined")
+                        mutations.append(mut)
+
+                    # Deletion
                     elif (len(str_spl_line) == 2) and (str_spl_line[0] == "Deletion"):
-                        count += 1
                         mut_begin = int(str_spl_line[1].split("-")[0][1:])
                         mut_end = int(str_spl_line[1].split("-")[1][1:])
                         mut_length = int(mut_end - mut_begin)
                         idx_end = (mut_begin * 3) + (mut_length * 3)
                         idxs = list(range((mut_begin * 3), idx_end, 3))
-                        mutations.append(Mutation(type="Deletion", 
-                                                input=line, 
-                                                mutation=str_spl_line[1],
-                                                idx_dna_deletion_begin=int(mut_begin) *3,
-                                                idx_dna_deletion_end=int(mut_end) *3,
-                                                idx_dna=idxs,
-                                                length_deletion=mut_length * 3,
-                                                is_deletion=True))
+
+                        mutation = Mutation(
+                            input=line,
+                            mutation=str_spl_line[1],
+                            idx_dna_deletion_begin=int(mut_begin) *3,
+                            idx_dna_deletion_end=int(mut_end) *3,
+                            idx_dna=idxs,
+                            length_deletion=mut_length * 3,
+                            is_deletion=True,
+                            type = "Deletion")
+                        
+                        mutations.append(mutation)
+                        
+                    # Insertion
                     elif (len(str_spl_line) == 2) and (str_spl_line[0] == "Insert"):
-                        count += 1
                         idx = int(str_spl_line[1].split("-")[0][1:]) * 3
-                        mutations.append(Mutation(type="Insert", 
-                                                  input=line, 
-                                                  mutation=str_spl_line[1],
-                                                  idx_dna=[idx],
-                                                  insert=str_spl_line[1].split("-")[1],
-                                                  length_insert=len(str_spl_line[1].split("-")[1]) * 3,
-                                                  is_insert=True))
+
+                        mutation = Mutation(
+                            input=line,
+                            mutation=str_spl_line[1],
+                            idx_dna=[idx],
+                            insert=str_spl_line[1].split("-")[1],
+                            length_insert=len(str_spl_line[1].split("-")[1]) * 3,
+                            is_insert=True,
+                            type = "Insert")
+                        
+                        mutations.append(mutation)
+
                     else:
                         print(f"Please check format of mutation {line}")
                         sys.exit()
@@ -128,24 +146,34 @@ class Mutation:
                     print(f"Please check format of mutation {line}")
                     sys.exit()
 
+        # sort mutation by index
+        mutations = self.sort_mutations(mutations)
         self.mutations = mutations
-        self.n_mutants = count
+        self.n_mutants = len(mutations)
         return mutations
+    
+    def sort_mutations(self, mutations: list):
+        """
+        This function sorts the mutations by the position of the mutation.
+        """
+        sorted_mutations = sorted(mutations, key=lambda x: x.idx_dna[0])
+        return sorted_mutations
     
     def print_mutations(self):
         """
         This function prints the mutations.
         """
-        # TODO Format so that the lines align nicely
+        padding = max([len(mut.input) for mut in self.mutations])
+        padding = 10
         print("The selected mutations are:")
         for mut in self.mutations:
             if type(mut.mutation) == list:  
                 tmp = str(mut.mutation)[1:-1]  # Remove list brackets
                 tmp = tmp.replace("'", "")
-                print(f"\t{mut.type}\t{tmp}")
+                print(f"\t{mut.type.ljust(padding)}\t{tmp.ljust(padding)}")
             else:
                mutation = mut.mutation.replace("'", "")
-               print(f"\t{mut.type}\t{mutation}")
+               print(f"\t{mut.type.ljust(padding)}\t{mutation.ljust(padding)}")
 
     def mean_idxs_dna(self) -> list:
         """
@@ -174,26 +202,26 @@ class Mutation:
         This function checks whether there are any non-natural amino acids.
         """
         for mutation in mutations:
-            if mutation.type == "Mutation":
+            if mutation.is_singlemutation:
                 wt_residue = mutation.mutation[0][0].lower()
                 mut_residue = mutation.mutation[0][-1].lower()
                 if (wt_residue or mut_residue) not in Utils.natural_amino_acids():
                     print(f"Please check for non-natural amino acids in mutation {mutation.input}")
                     sys.exit()
-            elif mutation.type == "Combined":
+            elif mutation.is_multiplemutation:
                 for m in mutation.mutation:
                     wt_residue = m[0].lower()
                     mut_residue = m[-1].lower()
                     if (wt_residue or mut_residue) not in Utils.natural_amino_acids():
                         print(f"Please check for non-natural amino acids in mutation {mutation.input}")
                         sys.exit()
-            elif mutation.type == "Deletion":
+            elif mutation.is_deletion:
                 start_res = mutation.mutation.split("-")[0][0].lower()
                 end_res = mutation.mutation.split("-")[1][0].lower()
                 if (start_res or end_res) not in Utils.natural_amino_acids():
                     print(f"Please check for non-natural amino acids in mutation {mutation.input}")
                     sys.exit()
-            elif mutation.type == "Insert":
+            elif mutation.is_insert:
                 start_res = mutation.mutation.split("-")[0][0].lower()
                 insert = mutation.mutation.split("-")[1]
                 if (start_res or insert) not in Utils.natural_amino_acids():
@@ -206,7 +234,7 @@ class Mutation:
         This function checks the format of the mutations.
         """
         for mutation in mutations:
-            if mutation.type == "Mutation":
+            if mutation.is_singlemutation:
                     if (mutation.mutation[0][0].lower() in Utils.natural_amino_acids()) \
                     and (mutation.mutation[0][-1].lower() in Utils.natural_amino_acids()) \
                     and (isinstance(int(mutation.mutation[0][1:-1]), int)):
@@ -214,7 +242,7 @@ class Mutation:
                     else:
                         print(f"Please check format of mutation: {mutation.input}")
                         sys.exit()
-            elif mutation.type == "Deletion":
+            elif mutation.is_deletion:
                     if (mutation.mutation.split("-")[0][0].lower() in Utils.natural_amino_acids()) \
                     and (mutation.mutation.split("-")[1][0].lower() in Utils.natural_amino_acids()) \
                     and (isinstance(int(mutation.mutation.split("-")[0][1:]), int)) \
@@ -223,7 +251,7 @@ class Mutation:
                     else:
                         print(f"Please check format of mutation: {mutation.input}")
                         sys.exit()
-            elif mutation.type == "Insert":
+            elif mutation.is_insert:
                     if (mutation.mutation.split("-")[0][0].lower() in Utils.natural_amino_acids()) \
                     and (set(''.join(mutation.mutation.split("-")[1]).lower())).issubset(Utils.natural_amino_acids()) \
                     and (isinstance(int(mutation.mutation.split("-")[0][1:]), int)):
@@ -231,7 +259,7 @@ class Mutation:
                     else:
                         print(f"Please check format of mutation: {mutation.input}")
                         sys.exit()
-            elif mutation.type == "Combined":
+            elif mutation.is_multiplemutation:
                 for m in mutation.mutation:
                     if (m[0].lower() in Utils.natural_amino_acids()) \
                     and (m[-1].lower() in Utils.natural_amino_acids()) \
@@ -242,5 +270,3 @@ class Mutation:
                         sys.exit()
             else:
                 pass
-
-        
