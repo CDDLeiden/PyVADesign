@@ -1,0 +1,5 @@
+Complementarity between the primers IVA_Fw_eBlock_2 IVA_Rv_eBlock_2 exceeds threshold of 4
+Complementarity between the primers IVA_Fw_eBlock_3 IVA_Rv_eBlock_3 exceeds threshold of 4
+Multiple binding sites for sequence aaagacatcccgctgtctg in the vector sequence
+Multiple binding sites for sequence acaaggccacctatgagctg in the vector sequence
+Multiple binding sites for sequence acaagggcaagttcaccgac in the vector sequence

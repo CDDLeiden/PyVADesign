@@ -34,9 +34,11 @@ class Eblock:
         self.start_index: int = None
         self.end_index: int = None
 
+        self.eblock_mutation_start_index: int = None
+
         # Vector properties
-        self.vector_start_index: int = None
-        self.vector_end_index: int = None
+        # self.vector_start_index: int = None
+        # self.vector_end_index: int = None
 
         # Mutation properties
         self.mutation: str = None
@@ -63,8 +65,11 @@ class Eblock:
     def set_end_index(self, end_index: int):
         self.end_index = end_index
 
-    def set_vector_indexes(self, vector: str, sequence: str):
-        self.vector_start_index, self.vector_end_index = Plasmid.find_index_in_vector(vector, sequence)
+    # def set_vector_indexes(self, vector: str, sequence: str):
+    #     # TODO Check if this works if vector goes from end of sequence to begin
+    #     vector_start_index, vector_end_index = Plasmid.find_index_in_vector(vector, sequence)
+    #     self.vector_start_index = Plasmid.circular_index(vector_start_index, len(vector))
+    #     self.vector_end_index = Plasmid.circular_index(vector_end_index, len(vector))
 
 
 
@@ -130,6 +135,8 @@ class EblockDesign:
 
         # Make gene blocks (WT DNA sequences sliced to the correct size, according to the bins) and renumber them starting from 1
         self.wt_eblocks = self.make_wt_eblocks(bins)
+        # for i in self.wt_eblocks:
+        #     print(i.start_index, i.end_index, i.name, i.sequence)
 
         # Loop over all mutations and create the eBlocks, based on the WT eBlocks
         results = {}
@@ -146,27 +153,31 @@ class EblockDesign:
             # Add gene to Snapgene
             vector_begin_index, vector_end_index = Plasmid.find_index_in_vector(self.sequence_instance.vector.seq, self.sequence_instance.sequence)
             snapgene_dict[self.sequence_instance.seqid] = [vector_begin_index+1, vector_end_index, self.sequence_instance.color]
+            
             for i in self.wt_eblocks:  # Add WT eBlocks
-                snapgene_dict[i.name] = [i.vector_start_index+1, i.vector_end_index, self.eblock_colors[int(i.block_number)-1]]
-            for mutation, eblock in self.eblocks.items():
+                snapgene_dict[i.name] = [Plasmid.circular_index(i.start_index+1, len(self.sequence_instance.vector.seq)), 
+                                         Plasmid.circular_index(i.end_index, len(self.sequence_instance.vector.seq)),
+                                         self.eblock_colors[int(i.block_number)-1]]
+            
+            # for mutation, eblock in self.eblocks.items():
                 
-                # TODO Add type of mutation = variant here
-                if mutation.is_singlemutation:
-                    start_index = eblock.vector_start_index + eblock.mutation_start_index -2
-                    end_index = start_index + 2
-                    snapgene_dict[mutation.mutation[0]] = [start_index, end_index, self.mutation_instance.colors[mutation.type]]
+                # # TODO Add type of mutation = variant here
+                # if mutation.is_singlemutation:
+                #     start_index = eblock.vector_start_index + eblock.mutation_start_index -2
+                #     end_index = start_index + 2
+                #     snapgene_dict[mutation.mutation[0]] = [start_index, end_index, self.mutation_instance.colors[mutation.type]]
 
-                elif mutation.is_insert:
-                    start_index = eblock.vector_start_index + eblock.mutation_start_index -1
+                # elif mutation.is_insert:
+                #     start_index = eblock.vector_start_index + eblock.mutation_start_index -1
 
 
-                    # TODO Skip this one?
-                    pass
-                elif mutation.is_deletion:
-                    pass
+                #     # TODO Skip this one?
+                #     pass
+                # elif mutation.is_deletion:
+                #     pass
                 
-                elif mutation.is_multiplemutation:
-                    pass
+                # elif mutation.is_multiplemutation:
+                #     pass
 
                 # print(eblock.start_index, eblock.end_index, eblock.name, eblock.sequence, eblock.mutation, eblock.mutant_codon, eblock.insert)
                 # snapgene_dict[mutation.mutation] = [mutation.idx_dna[0], mutation.idx_dna[-1], self.mutation_instance.colors[mutation.type]]
@@ -182,6 +193,7 @@ class EblockDesign:
         self.print_line("Completed eBlock design.")
 
     def find_possible_clusters(self):
+        length_gene = len(self.sequence_instance.sequence)
         possibilities = {} # Store all possible clusterings
         n = 1
         valid_clusters = True
@@ -193,16 +205,26 @@ class EblockDesign:
             cluster_sizes = [max(v) - min(v) for v in clusters.values()]  # Check if the size of the clusters is within bounds
             cluster_sizes = self.check_clusters(clusters, cluster_sizes) # Check if the size of the clusters is within bounds (inserts + deletions)
 
-            max_cluster_size = max(cluster_sizes)
-            min_cluster_size = min(cluster_sizes)
+            clusters_copy = copy.deepcopy(clusters)
+            for k, v in clusters.items():
 
-            if max_cluster_size > (self.max_eblock_length - 2 * self.min_overlap): # Take into account the OH on both sides of the gene block, so decrease max size with 2 times min length of OH
-                n += 1
-            elif min_cluster_size < (self.min_eblock_length - 2 * self.min_overlap):
-                valid_clusters = False
-            else:
-                possibilities[f'cluster N={n}'] = clusters  
-                n += 1
+                size = max(v) - min(v)
+                    
+                if size > (self.max_eblock_length - 2 * self.min_overlap): # Take into account the OH on both sides of the gene block, so decrease max size with 2 times min length of OH
+                    n += 1
+                
+                elif size < (self.min_eblock_length - 2 * self.min_overlap):  # Cluster size too small, increasing the eBlock length         
+                    min_required_length_toadd = (self.min_eblock_length - size) - 2 * self.min_overlap           
+                    if max(v) + min_required_length_toadd <= length_gene:
+                        clusters_copy[k].append(max(v) + min_required_length_toadd)
+                        possibilities[f'cluster N={n}'] = clusters_copy
+                    else:
+                        clusters_copy[k].append(min(v) - min_required_length_toadd)
+                        possibilities[f'cluster N={n}'] = clusters_copy
+                    valid_clusters = False            
+                else:
+                    possibilities[f'cluster N={n}'] = clusters  
+                    n += 1
        
         if len(possibilities) == 0:  # No valid clusters found
             print("No valid clusterings found for current mutations. Please check your input mutations and make sure \
@@ -261,6 +283,7 @@ class EblockDesign:
             bins.append(int(max(value) + self.min_overlap))
         return bins
     
+    
     def make_wt_eblocks(self, bins: list) -> list:
         """
         Create wild-type eBlocks
@@ -268,10 +291,12 @@ class EblockDesign:
         gene_blocks = []
         for num in range(0, len(bins), 2):
             eblock = Eblock()
+            # eblock.set_start_index(Plasmid.circular_index(bins[num], len(self.sequence_instance.vector.seq)))
+            # eblock.set_end_index(Plasmid.circular_index(bins[num+1], len(self.sequence_instance.vector.seq)))
             eblock.set_start_index(bins[num])
             eblock.set_end_index(bins[num+1])
-            eblock.set_sequence(self.sequence_instance.sequence[bins[num]:bins[num+1]])
-            eblock.set_vector_indexes(self.sequence_instance.vector.seq, eblock.sequence)
+            eblock.set_sequence(Plasmid.slice_circular_sequence(self.sequence_instance.vector.seq, eblock.start_index, eblock.end_index))
+            # eblock.set_vector_indexes(self.sequence_instance.vector.seq, eblock.sequence)
             gene_blocks.append(eblock)
         gene_blocks = self.renumber_eblock(gene_blocks)
         return gene_blocks
@@ -280,7 +305,13 @@ class EblockDesign:
         """
         Find the index of a mutation in an eblock.
         """
-        return idx_mutation - eblock.start_index
+        # if gene start later than the eblock starts
+        # TODO DO SOME EXTENSIVE TESTING HERE!
+        if self.sequence_instance.gene_start_idx > eblock.start_index:
+            mutation_index_in_eblock = self.sequence_instance.gene_start_idx - eblock.start_index + idx_mutation
+        else:
+            mutation_index_in_eblock = self.sequence_instance.gene_start_idx + idx_mutation
+        return mutation_index_in_eblock  # idx_mutation - eblock.start_index
         
     def eblocks_within_range(self, mutation_idx: int):
         """
@@ -350,7 +381,13 @@ class EblockDesign:
 
         if mutation.is_singlemutation:
             eblock, _ = self.eblocks_within_range(mutation.idx_dna[0])
-            eblock.mutation_start_index = self.eblock_index(eblock, mutation.idx_dna[0])    
+            eblock.mutation_start_index = self.eblock_index(eblock, mutation.idx_dna[0])
+            # print(mutation.mutation, mutation.idx_dna) # Takes gene sequence here
+            # print("gene_start_idx", self.sequence_instance.gene_start_idx)
+            # print(eblock.start_index, eblock.end_index, eblock.name, eblock.sequence)
+            # print("eBlock.mutation_start_index", eblock.mutation_start_index)
+            # print("idx_dna", mutation.idx_dna[0])
+            # print("mutation", mutation.mutation[0])
             self.check_wt_codon(eblock, mutation.mutation[0][0])  # Check if WT codon at index is same residue as mutation
             eblock.mutant_codon = self.select_mut_codon(mutation.mutation[0][-1])
             eblock.sequence = self.mutate_eblock(mutation, eblock)
