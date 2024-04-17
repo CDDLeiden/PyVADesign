@@ -17,15 +17,18 @@ class Plot:
                  eblocks_design_instance: EblockDesign,
                  mutation_instance: Mutation,
                  sequence_instance: Plasmid,
-                 output_dir: str = None):
+                 output_dir: str = None,
+
+                 show: bool = False,
+                 save: bool = True):
         
         self.eblocks_design_instance = eblocks_design_instance
         self.mutation_instance = mutation_instance
         self.sequence_instance = sequence_instance
         self.output_dir = output_dir
         # self.eblock_colors = eblocks_design_instance.eblock_colors()
-        self.show = True
-        self.save = True
+        self.show = show
+        self.save = save
 
     def save_plot(self, fig, filename, dpi=100, bbox_inches='tight', transparent=True):
         """
@@ -34,7 +37,7 @@ class Plot:
         fig.savefig(os.path.join(self.output_dir, filename), dpi=dpi, bbox_inches=bbox_inches, transparent=transparent)
 
 
-    def plot_histogram_mutations(self, figure_width=8, figure_length=5, show=True, save=True, filename='histogram_mutations.png'):
+    def plot_histogram_mutations(self, figure_width=8, figure_length=5, show=False, save=True, filename='histogram_mutations.png'):
         counts = self.eblocks_design_instance.count_mutations_per_eblock()
         fig, ax = plt.subplots(figsize=(figure_width, figure_length))
         labels = list(counts.keys())

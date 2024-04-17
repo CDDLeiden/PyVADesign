@@ -1,4 +1,7 @@
 import os
+
+os.environ["OMP_NUM_THREADS"] = '1'  # KMeans is not parallelized, so set to 1 thread
+
 import sys
 import copy
 import numpy as np

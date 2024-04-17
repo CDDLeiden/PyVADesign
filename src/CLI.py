@@ -3,11 +3,18 @@
 import os
 import sys
 import argparse
-from .eblocks import EblockDesign, Eblocks
-from .primer import DesignPrimers
-from .mutation import Mutation
-from .sequence import Plasmid
-from .utils import SnapGene
+
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+
+from src.eblocks import EblockDesign
+from src.primer import DesignPrimers
+from src.mutation import Mutation
+from src.sequence import Plasmid
+from src.utils import SnapGene
+from src.plot import Plot
+
+# run command with tutorial data (from root directory):
+# python src/CLI.py -g tutorial/files/A0QX55.fasta -m tutorial/files/mutations.txt -o tutorial/output -v tutorial/files/vector.dna -s data/codon_usage/Mycobacterium_smegmatis.csv
 
 
 
@@ -41,7 +48,7 @@ def eBlocksArgParser():
                         "--species",
                         type=str,
                         required=False,
-                        default="Mycobacterium Smegmatis",
+                        default="./data/codon_usage/Escherichia_coli.csv",
                         help="species to make calculations for")
     
     parser.add_argument("-v",
@@ -73,46 +80,35 @@ if __name__ == "__main__":
     sequence_instance.parse_sequence(args.gene)
     sequence_instance.parse_vector(args.vector)
 
-    snapgene_instance = SnapGene()
-    snapgene_instance.parse_snapgene(args.vector)
+    snapgene_instance = SnapGene(sequence_instance=sequence_instance,
+                                     output_dir=args.output)
+    
+    design_instance = EblockDesign(sequence_instance=sequence_instance,
+                                   mutation_instance=mutation_instance,
+                                   output_dir=args.output,
+                                   codon_usage=args.species)
+    
+    plot_instance = Plot(mutation_instance=mutation_instance,
+                         sequence_instance=sequence_instance,
+                         eblocks_design_instance=design_instance,
+                         output_dir=args.output)
+    
+    
+    # Check the input vector
+    plot_instance.plot_vector(figsize=(7, 7))
 
+    # Next; design eblocks
+    design_instance.run_design_eblocks()
 
-
-
-
-
-
-    design_eblocks = DesignEblocks(sequence_fp=args.input_gene,
-                                   mutations_fp=args.mutations,
-                                   output_fp=args.output_location,
-                                   species=args.species)
-    design_eblocks.run()
+    plot_instance.plot_eblocks_mutations(figure_length=20,
+                                         figure_width=5)
+    plot_instance.plot_histogram_mutations()
 
     # Next; design IVA primers
-    mut_gene_blocks_fp = os.path.join(args.output_location, "mut_gene_blocks.npy")
-    wt_gene_blocks_fp = os.path.join(args.output_location, "wt_gene_blocks.npy")
-
-    design_primers = DesignPrimers(wt_gene_blocks_fp, 
-                                   mut_gene_blocks_fp, 
-                                   args.output_location,
-                                   args.input_gene,
-                                   args.snapgene_file)
-    design_primers.run()
-
-    # Also write results to files that SnapGene can open
-    primers_fp = os.path.join(args.output_location, "IVA_primers.csv")
-    gene_blocks_mutation_info_fp = os.path.join(args.output_location, "gene_blocks.txt")
+    primers_instance = DesignPrimers(mutation_instance=mutation_instance,
+                                     eblocks_design_instance=design_instance,
+                                     sequence_instance=sequence_instance, 
+                                     output_dir=args.output,
+                                     snapgene_instance=snapgene_instance)
     
-    if args.snapgene_file:
-        snapgene_output = SnapGeneOutput(wt_gene_blocks_fp = wt_gene_blocks_fp,
-                                         mut_gene_blocks_fp = mut_gene_blocks_fp,
-                                         primers_fp = primers_fp,
-                                         output_location = args.output_location,
-                                         snapgene_file = args.snapgene_file,
-                                         gene_blocks_info_fp = gene_blocks_mutation_info_fp)
-        snapgene_output.run()
-
-    # Finally; clean-up files when done
-    # cleanup(args)
-
-    print("Done!")
+    primers_instance.run_design()
