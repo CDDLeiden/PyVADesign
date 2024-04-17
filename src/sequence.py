@@ -12,7 +12,17 @@ class Plasmid:
         self.seqid: str = None
         self.organism: str = None
         self.vector: str = None  # Vector sequence with gene cloned into it
+        self.gene_start_idx: int = -1
+        self.gene_end_idx: int = -1
         self.color: str = "#d3d3d3"
+
+    def parse_vector(self, fp: str):
+        """
+        This function parses the vector from a DNA file.
+        """
+        vector = self.read_snapgene_dna_file(fp)
+        self.vector = vector
+        # TODO Add some checks here for the vector
  
     def parse_sequence(self, fp: str) -> str:
         """
@@ -21,21 +31,34 @@ class Plasmid:
         sequence, seqid = self.read_single_fasta(fp)
         self.sequence = sequence
         self.seqid = seqid
+        self.gene_start_idx, self.gene_end_idx = self.find_index_in_vector(vector=self.vector.seq, sequence=self.sequence)
+        print("gene start idx", self.gene_start_idx)
+        print("gene end idx", self.gene_end_idx)
         result = self.check_sequence(sequence)
         return result
     
-    def parse_vector(self, fp: str):
+    @staticmethod
+    def circular_index(index, sequence_length):
         """
-        This function parses the vector from a DNA file.
+        This function returns the circular index of a sequence.
         """
-        vector = self.read_snapgene_dna_file(fp)
-        self.vector = vector
-        # TODO Add some checks here for the vector
-
+        return (index + sequence_length) % sequence_length
+    
+    @staticmethod
+    def slice_circular_sequence(sequence, start_index, end_index):
+        start_index = Plasmid.circular_index(start_index, len(sequence))
+        if end_index < start_index:
+            sliced_sequence = sequence[start_index:] + sequence[:end_index]
+        else:
+            sliced_sequence = sequence[start_index:end_index]
+        return sliced_sequence
+      
     @staticmethod
     def find_index_in_vector(vector, sequence: str):
         idx_begin = str(vector).lower().find(str(sequence).lower())
         idx_end = idx_begin + len(sequence)
+        idx_begin = Plasmid.circular_index(idx_begin, len(vector))
+        idx_end = Plasmid.circular_index(idx_end, len(vector))
         if idx_begin == -1 or idx_end == -1:
             print(f"Gene block {sequence} not found in vector sequence. Check whether your target gene is correct in your vector.")
             sys.exit()
