@@ -32,11 +32,16 @@ class Plasmid:
         self.sequence = sequence
         self.seqid = seqid
         self.gene_start_idx, self.gene_end_idx = self.find_index_in_vector(vector=self.vector.seq, sequence=self.sequence)
-        print("gene start idx", self.gene_start_idx)
-        print("gene end idx", self.gene_end_idx)
         result = self.check_sequence(sequence)
         return result
     
+    def mutate_vector(self, idx_start, idx_end, sequence):
+        """
+        This function mutates the input vector with a given sequence
+        """
+        mutated_vector = self.vector.seq[:idx_start] + sequence + self.vector.seq[idx_end:]
+        return mutated_vector
+        
     @staticmethod
     def circular_index(index, sequence_length):
         """
@@ -147,3 +152,11 @@ class Plasmid:
             rev_nucl = pairs[nucleotide]
             reverse += rev_nucl
         return reverse
+    
+    @staticmethod
+    def save_vector(vector, filename):
+        """
+        This function saves the vector to a file.
+        """
+        with open(filename, "w") as output_handle:
+            SeqIO.write(vector, output_handle, "snapgene")

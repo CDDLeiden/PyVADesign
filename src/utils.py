@@ -229,7 +229,12 @@ class SnapGene:
         
             self.output_dir = output_dir
             self.sequence_instance = sequence_instance
-            
+
+    def make_dir(self, directory='clones'):
+        newpath = os.path.join(self.output_dir, directory)
+        if not os.path.exists(newpath):
+            os.makedirs(newpath)
+        self.output_dir = newpath
             
     def primers_to_fasta(self, primers: dict, filename='primers.fasta'):
         """
@@ -240,7 +245,7 @@ class SnapGene:
             for k, v in primers.items():
                 f.write(f">{k}\n")
                 f.write(f"{v}\n")
-
+    
     def make_file(self, filename, header=False):
         try:
             with open(os.path.join(self.output_dir, filename), 'r') as f:
@@ -253,11 +258,11 @@ class SnapGene:
                 else:
                     pass
 
-    def eblocks_to_gff3(self, eblocks: dict, type='gene', filename='eblocks.gff3'):
+    def eblocks_to_gff3(self, eblocks: dict, type='gene', filename='eblocks.gff3', header=True):
         """
         This function converts the eBlocks to features that can be read by SnapGene.
         """
-        self.make_file(filename, header=True)
+        self.make_file(filename, header=header)
         with open(os.path.join(self.output_dir, filename), 'a') as f:
             for k, v in eblocks.items():
                 line = self.gff3_line(v[0], v[1], k, v[2], type)
