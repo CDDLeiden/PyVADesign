@@ -1,0 +1,65 @@
+LOCUS       Test_sequence          500 bp    DNA     linear   18-APR-2024
+DEFINITION  Example DNA sequence with features for testing.
+ACCESSION   TEST123456
+VERSION     TEST123456.1
+KEYWORDS    .
+SOURCE      Test organism
+  ORGANISM  Test organism
+            Other
+FEATURES             Location/Qualifiers
+     CDS             1..150
+                     /gene="gene1"
+                     /product="protein1"
+     gene            151..300
+                     /gene="gene2"
+     mRNA            301..500
+                     /gene="gene3"
+                     /product="mRNA"
+ORIGIN
+        1 atgcgctagctagctagctagctagctagctagctagctagctagctagctagctagcta
+       51 gctagctagctagctagctagctagctagctagctagctagctagctagctagctagct
+      101 agctagctagctagctagctagctagctagctagctagctagctagctagctagctagc
+      151 tagctagctagctagctagctagctagctagctagctagctagctagctagctagcta
+      201 gctagctagctagctagctagctagctagctagctagctagctagctagctagctagc
+      251 tagctagctagctagctagctagctagctagctagctagctagctagctagctagcta
+      301 gctagctagctagctagctagctagctagctagctagctagctagctagctagctagc
+      351 tagctagctagctagctagctagctagctagctagctagctagctagctagctagcta
+      401 gctagctagctagctagctagctagctagctagctagctagctagctagctagctagc
+      451 tagctagctagctagctagctagctagctagctagctagctagctagctagctagcta
+      501 gctagctagctagctagctagctagctagctagctagctagctagctagctagctagc
+      551 tagctagctagctagctagctagctagctagctagctagctagctagctagctagcta
+      601 gctagctagctagctagctagctagctagctagctagctagctagctagctagctagc
+      651 tagctagctagctagctagctagctagctagctagctagctagctagctagctagcta
+      701 gctagctagctagctagctagctagctagctagctagctagctagctagctagctagc
+      751 tagctagctagctagctagctagctagctagctagctagctagctagctagctagcta
+      801 gctagctagctagctagctagctagctagctagctagctagctagctagctagctagc
+      851 tagctagctagctagctagctagctagctagctagctagctagctagctagctagcta
+      901 gctagctagctagctagctagctagctagctagctagctagctagctagctagctagc
+      951 tagctagctagctagctagctagctagctagctagctagctagctagctagctagcta
+     1001 gctagctagctagctagctagctagctagctagctagctagctagctagctagctagc
+     1051 tagctagctagctagctagctagctagctagctagctagctagctagctagctagcta
+     1101 gctagctagctagctagctagctagctagctagctagctagctagctagctagctagc
+     1151 tagctagctagctagctagctagctagctagctagctagctagctagctagctagcta
+     1201 gctagctagctagctagctagctagctagctagctagctagctagctagctagctagc
+     1251 tagctagctagctagctagctagctagctagctagctagctagctagctagctagcta
+     1301 gctagctagctagctagctagctagctagctagctagctagctagctagctagctagc
+     1351 tagctagctagctagctagctagctagctagctagctagctagctagctagctagcta
+     1401 gctagctagctagctagctagctagctagctagctagctagctagctagctagctagc
+     1451 tagctagctagctagctagctagctagctagctagctagctagctagctagctagcta
+     1501 gctagctagctagctagctagctagctagctagctagctagctagctagctagctagc
+     1551 tagctagctagctagctagctagctagctagctagctagctagctagctagctagcta
+     1601 gctagctagctagctagctagctagctagctagctagctagctagctagctagctagc
+     1651 tagctagctagctagctagctagctagctagctagctagctagctagctagctagcta
+     1701 gctagctagctagctagctagctagctagctagctagctagctagctagctagctagc
+     1751 tagctagctagctagctagctagctagctagctagctagctagctagctagctagcta
+     1801 gctagctagctagctagctagctagctagctagctagctagctagctagctagctagc
+     1851 tagctagctagctagctagctagctagctagctagctagctagctagctagctagcta
+     1901 gctagctagctagctagctagctagctagctagctagctagctagctagctagctagc
+     1951 tagctagctagctagctagctagctagctagctagctagctagctagctagctagcta
+     2001 gctagctagctagctagctagctagctagctagctagctagctagctagctagctagc
+     2051 tagctagctagctagctagctagctagctagctagctagctagctagctagctagcta
+     2101 gctagctagctagctagctagctagctagctagctagctagctagctagctagctagc
+     2151 tagctagctagctagctagctagctagctagctagctagctagctagctagctagcta
+     2201 gctagctagctagctagctagctagctagctagctagctagctagctagctagctagc
+     2251 tag
+//

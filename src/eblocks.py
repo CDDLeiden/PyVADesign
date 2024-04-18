@@ -11,13 +11,9 @@ from .mutation import Mutation
 from .sequence import Plasmid
 from .utils import Utils, SnapGene
 
-
-
 script_dir = os.path.dirname(os.path.abspath(__file__))
-# Navigate one directory upwards to reach the parent directory
-parent_dir = os.path.abspath(os.path.join(script_dir, os.pardir))
-# Navigate to the data directory
-data_dir = os.path.join(parent_dir, "data")
+parent_dir = os.path.abspath(os.path.join(script_dir, os.pardir))  # Navigate one directory upwards to reach the parent directory
+data_dir = os.path.join(parent_dir, "data")  # Navigate to the data directory
 
 
 
@@ -36,22 +32,14 @@ class Eblock:
 
         self.eblock_mutation_start_index: int = None
 
-        # Vector properties
-        # self.vector_start_index: int = None
-        # self.vector_end_index: int = None
-
         # Mutation properties
+        # TODO Check if all used
         self.mutation: str = None
         self.mutation_start_index: int = None
         self.mutation_end_index: int = None
         self.wt_codon: str = None
         self.mutant_codon: str = None
         self.insert: str = None
-
-        # Multiple mutations
-        # TODO Is this used?
-        # self.mutation_idxs = []
-        # self.mutant_codons = []
 
     def set_name(self, name: str):
         self.name = name
@@ -64,12 +52,6 @@ class Eblock:
 
     def set_end_index(self, end_index: int):
         self.end_index = end_index
-
-    # def set_vector_indexes(self, vector: str, sequence: str):
-    #     # TODO Check if this works if vector goes from end of sequence to begin
-    #     vector_start_index, vector_end_index = Plasmid.find_index_in_vector(vector, sequence)
-    #     self.vector_start_index = Plasmid.circular_index(vector_start_index, len(vector))
-    #     self.vector_end_index = Plasmid.circular_index(vector_end_index, len(vector))
 
 
 
@@ -118,6 +100,9 @@ class EblockDesign:
         self.wt_eblocks = {}  # Wild-type gene blocks
         self.eblocks = {}  # Mutated gene blocks
 
+    def set_output_dir(self, output_dir: str):
+        self.output_dir = output_dir
+
 
     def run_design_eblocks(self):
         """
@@ -135,8 +120,9 @@ class EblockDesign:
 
         # Make gene blocks (WT DNA sequences sliced to the correct size, according to the bins) and renumber them starting from 1
         self.wt_eblocks = self.make_wt_eblocks(bins)
-        # for i in self.wt_eblocks:
-        #     print(i.start_index, i.end_index, i.name, i.sequence)
+        for i in self.wt_eblocks:
+            print(i.start_index, i.end_index, i.name, i.sequence)
+            print("lenght of eblock", len(i.sequence))
 
         # Loop over all mutations and create the eBlocks, based on the WT eBlocks
         results = {}
@@ -151,43 +137,24 @@ class EblockDesign:
 
         self.print_line("Completed eBlock design.")
 
-    def output_to_snapgene(self):
-            
-            snapgene_instance = SnapGene(output_dir=self.output_dir, sequence_instance=self.sequence_instance)
-            snapgene_instance.make_dir()
-            for mut, eblock in self.eblocks.items():
-                snapgene_dict = {}
-                snapgene_dict[self.sequence_instance.seqid] = [self.sequence_instance.gene_start_idx, self.sequence_instance.gene_end_idx, self.sequence_instance.color]
-                snapgene_dict[eblock.name] = [eblock.start_index, eblock.end_index, self.eblock_colors[eblock.block_number]]
-                if mut.is_singlemutation:
-                    snapgene_dict[mut.mutation[0]] = [self.sequence_instance.gene_start_idx -2 + eblock.mutation_start_index,
-                                                      self.sequence_instance.gene_start_idx + eblock.mutation_start_index,
-                                                      self.mutation_instance.colors[mut.type]]
-                    snapgene_instance.eblocks_to_gff3(eblocks=snapgene_dict, filename=f"{mut.mutation[0]}.gff3")
-                elif mut.is_insert:
-                    # TODO Remove Insert and Deletion, because in mutated vector they will be different
-                    snapgene_dict[mut.mutation] = [self.sequence_instance.gene_start_idx -2 + eblock.mutation_start_index,
-                                                      self.sequence_instance.gene_start_idx + eblock.mutation_start_index,
-                                                      self.mutation_instance.colors[mut.type]]
-                    snapgene_instance.eblocks_to_gff3(eblocks=snapgene_dict, filename=f"{mut.mutation}.gff3")
-                elif mut.is_deletion:
-                    snapgene_dict[mut.mutation] = [self.sequence_instance.gene_start_idx -2 + eblock.mutation_start_index,
-                                                      self.sequence_instance.gene_start_idx + eblock.mutation_start_index + mut.length_deletion,
-                                                      self.mutation_instance.colors[mut.type]]
-                    snapgene_instance.eblocks_to_gff3(eblocks=snapgene_dict, filename=f"{mut.mutation}.gff3")
-                elif mut.is_multiplemutation:
-                    for i, mut_i in enumerate(mut.idx_dna):
-                        snapgene_dict[mut.mutation[i]] = [self.sequence_instance.gene_start_idx -2 + mut.idx_dna[i],
-                                                      self.sequence_instance.gene_start_idx + mut.idx_dna[i],
-                                                      self.mutation_instance.colors[mut.type]]
-                    snapgene_instance.eblocks_to_gff3(eblocks=snapgene_dict, filename=f"{'-'.join(mut.mutation)}.gff3")
+    def make_dir(self, dirname: str):
+        try:
+            os.makedirs(os.path.join(self.output_dir, f"{dirname}"))
+
+        except FileExistsError:
+            pass
+
+    def reset_output_dir(self, fp: str):
+        self.output_dir = fp
                                              
     def find_possible_clusters(self):
+        # TODO FUX THIS FUNCTION (BUGS!)
         length_gene = len(self.sequence_instance.sequence)
         possibilities = {} # Store all possible clusterings
         n = 1
         valid_clusters = True
         while (valid_clusters) and (n <= len(self.mutation_instance.mutations)):
+            print(f"Trying to find clusters with N={n} mutations ...")
             clusters = {}
             cluster_labels, idxs_reordered = self.kmeans_clustering(num_clusters=n)
 
@@ -196,26 +163,56 @@ class EblockDesign:
             cluster_sizes = self.check_clusters(clusters, cluster_sizes) # Check if the size of the clusters is within bounds (inserts + deletions)
 
             clusters_copy = copy.deepcopy(clusters)
+            increment = False
+            tosmall = 0
+            good = 0
             for k, v in clusters.items():
 
                 size = max(v) - min(v)
+                # print(size)
                     
                 if size > (self.max_eblock_length - 2 * self.min_overlap): # Take into account the OH on both sides of the gene block, so decrease max size with 2 times min length of OH
-                    n += 1
-                
-                elif size < (self.min_eblock_length - 2 * self.min_overlap):  # Cluster size too small, increasing the eBlock length         
-                    min_required_length_toadd = (self.min_eblock_length - size) - 2 * self.min_overlap           
-                    if max(v) + min_required_length_toadd <= length_gene:
+                    increment = True  # cluster sizes are too large
+
+                elif size < (self.min_eblock_length - 2 * self.min_overlap):  # Cluster size too small, increasing the eBlock length
+                    print(f"Cluster size too small, increasing the eBlock length {size}")       
+                    min_required_length_toadd = (self.min_eblock_length - size) - 2 * self.min_overlap 
+                    print("min required length to add:", min_required_length_toadd)          
+                    if max(v) + min_required_length_toadd <= length_gene:  # TODO Why is this?
+                        # print("option 1:", max(v) + min_required_length_toadd)
                         clusters_copy[k].append(max(v) + min_required_length_toadd)
-                        possibilities[f'cluster N={n}'] = clusters_copy
+                        increment = True
+                        tosmall += 1
                     else:
+                        # print("option 2:", min(v) - min_required_length_toadd)
                         clusters_copy[k].append(min(v) - min_required_length_toadd)
-                        possibilities[f'cluster N={n}'] = clusters_copy
-                    valid_clusters = False            
+                        increment = True
+                        tosmall += 1
+
                 else:
-                    possibilities[f'cluster N={n}'] = clusters  
-                    n += 1
+                    # print(f"Cluster size is within bounds: N={n}")
+                    good += 1  
+                    increment = True
+                
+            if increment and (tosmall < 3):  # TODO ARBITRARY NUMBER
+                possibilities[f'cluster N={n}'] = clusters_copy
+                n += 1
+            elif good == len(clusters):
+                possibilities[f'cluster N={n}'] = clusters_copy
+                n += 1
+            else:
+                print("STOP INCREMENTION!!! #####")
+                valid_clusters = False
+        
        
+        for key, value in possibilities.items():
+            # print(key, value)
+            print(key)
+            for k, v in value.items():
+                # print(k, v)
+                print(k, max(v) - min(v))
+
+
         if len(possibilities) == 0:  # No valid clusters found
             print("No valid clusterings found for current mutations. Please check your input mutations and make sure \
                    that the multi-mutants are not too far apart.")
@@ -425,6 +422,63 @@ class EblockDesign:
             eblock = selected_eblock
         results[mutation] = eblock
         return results
+    
+    def output_to_snapgene(self):
+            
+            snapgene_instance = SnapGene(output_dir=self.output_dir, sequence_instance=self.sequence_instance)
+            snapgene_instance.make_dir()  # Make clones-dir
+            original_dir = self.output_dir
+            self.set_output_dir(snapgene_instance.output_dir)
+            self.sequence_instance.output_dir = snapgene_instance.output_dir
+
+            # TODO For test purposes, save wt eblocks to SnapGene
+            snapgene_dict = {}
+            for i in self.wt_eblocks:
+                snapgene_dict[i.name] = [Plasmid.circular_index(i.start_index, len(self.sequence_instance.vector.seq)), 
+                                         Plasmid.circular_index(i.end_index, len(self.sequence_instance.vector.seq)), self.eblock_colors[i.block_number]]
+                snapgene_instance.eblocks_to_gff3(eblocks=snapgene_dict, output_dir=original_dir, filename=f"eblocks.gff3")
+
+            # Loop over all mutations and create mutated vector and features that can be read by snapgene
+            for mut, eblock in self.eblocks.items():
+                snapgene_dict = {}
+                snapgene_dict[self.sequence_instance.seqid] = [self.sequence_instance.gene_start_idx, self.sequence_instance.gene_end_idx, self.sequence_instance.color]
+                snapgene_dict[eblock.name] = [eblock.start_index, eblock.end_index, self.eblock_colors[eblock.block_number]]
+                
+                if mut.is_singlemutation:
+                    filename = mut.mutation[0]
+                    self.make_dir(dirname=filename)
+                    snapgene_dict[mut.mutation[0]] = [self.sequence_instance.gene_start_idx -2 + eblock.mutation_start_index,
+                                                      self.sequence_instance.gene_start_idx + eblock.mutation_start_index,
+                                                      self.mutation_instance.colors[mut.type]]
+
+                elif mut.is_insert:
+                    # TODO Remove Insert and Deletion, because in mutated vector they will be different
+                    filename = mut.mutation
+                    self.make_dir(dirname=filename)
+                    snapgene_dict[mut.mutation] = [self.sequence_instance.gene_start_idx -2 + eblock.mutation_start_index,
+                                                      self.sequence_instance.gene_start_idx + eblock.mutation_start_index,
+                                                      self.mutation_instance.colors[mut.type]]
+
+                elif mut.is_deletion:
+                    filename = mut.mutation 
+                    self.make_dir(dirname=filename)
+                    snapgene_dict[mut.mutation] = [self.sequence_instance.gene_start_idx -2 + eblock.mutation_start_index,
+                                                      self.sequence_instance.gene_start_idx + eblock.mutation_start_index + mut.length_deletion,
+                                                      self.mutation_instance.colors[mut.type]]
+
+                elif mut.is_multiplemutation:
+                    filename = '-'.join(mut.mutation)
+                    self.make_dir(dirname=filename)
+                    for i, _ in enumerate(mut.idx_dna):
+                        snapgene_dict[mut.mutation[i]] = [self.sequence_instance.gene_start_idx -2 + mut.idx_dna[i],
+                                                      self.sequence_instance.gene_start_idx + mut.idx_dna[i],
+                                                      self.mutation_instance.colors[mut.type]]
+                        
+                snapgene_instance.eblocks_to_gff3(eblocks=snapgene_dict, output_dir=os.path.join(snapgene_instance.output_dir, filename), filename=f"{filename}.gff3")
+                mutated_vector = self.sequence_instance.mutate_vector(eblock.start_index, eblock.end_index, eblock.sequence)
+                self.sequence_instance.save_vector(vector=mutated_vector, output_dir=os.path.join(snapgene_instance.output_dir, filename), filename=f"{filename}.dna")
+            self.output_dir = original_dir
+            self.sequence_instance.output_dir = original_dir
         
     def count_mutations_per_eblock(self) -> dict:
         """

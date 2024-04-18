@@ -236,34 +236,34 @@ class SnapGene:
             os.makedirs(newpath)
         self.output_dir = newpath
             
-    def primers_to_fasta(self, primers: dict, filename='primers.fasta'):
+    def primers_to_fasta(self, primers: dict, directory: str, filename='primers.fasta'):
         """
         This function converts the primers to features that can be read by SnapGene.
         """
-        self.make_file(filename, header=False)
+        self.make_file(directory, filename, header=False)
         with open(os.path.join(self.output_dir, filename), 'a') as f:
             for k, v in primers.items():
                 f.write(f">{k}\n")
                 f.write(f"{v}\n")
     
-    def make_file(self, filename, header=False):
+    def make_file(self, directory, filename, header=False):
         try:
-            with open(os.path.join(self.output_dir, filename), 'r') as f:
+            with open(os.path.join(directory, filename), 'r') as f:
                 pass
         except FileNotFoundError:
-            with open(os.path.join(self.output_dir, filename), 'w') as f:
+            with open(os.path.join(directory, filename), 'w') as f:
                 if header:
                     f.write("\n".join(SnapGene.gff3_header(self.sequence_instance.vector.seq)))
                     f.write("\n")
                 else:
                     pass
 
-    def eblocks_to_gff3(self, eblocks: dict, type='gene', filename='eblocks.gff3', header=True):
+    def eblocks_to_gff3(self, eblocks: dict, output_dir, type='gene', filename='eblocks.gff3', header=True):
         """
         This function converts the eBlocks to features that can be read by SnapGene.
         """
-        self.make_file(filename, header=header)
-        with open(os.path.join(self.output_dir, filename), 'a') as f:
+        self.make_file(output_dir, filename, header=header)
+        with open(os.path.join(output_dir, filename), 'a') as f:
             for k, v in eblocks.items():
                 line = self.gff3_line(v[0], v[1], k, v[2], type)
                 f.write('\t'.join(line) + '\n')

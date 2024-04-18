@@ -16,11 +16,7 @@ from .utils import OutputToFile
 # TODO Think of a solution when the primers are designed at the very beginning of the gene.
 # - in that case you should look at the vector sequence and design the primers from the end of the gene
 # IVA DESIGN CLASS > make some tests for this
-
-
-
-
-
+# TODO add primer data to genbankl file feature is  "primer_bind" 
 
 # TODO Add examples of complementary and hairpin structures to the tests directory
 # TODO Check hairpin         # TODO Check using this website http://biotools.nubic.northwestern.edu/OligoCalc.html
@@ -61,7 +57,7 @@ class DesignPrimers:
             seqprimers = self.design_seq_primer()
             for i in seqprimers:
                 primers[i.name] = i.sequence_5to3
-            self.snapgene_instance.primers_to_fasta(primers=primers)
+            self.snapgene_instance.primers_to_fasta(primers=primers, directory=self.output_dir, filename='primers.fasta')
 
             for k, v in primers.items():  # Check primers for hairpin formation and multiple binding sites
                 max_hairpin, _, _ = primerinstance.check_hairpin(v)
@@ -72,23 +68,33 @@ class DesignPrimers:
         Design IVA primers to open-up the expression plasmid
         """
 
-        fw_sequence = self.sequence_instance.sequence
+        fw_sequence = str(self.sequence_instance.vector.seq.lower())
+        print("fw_sequence:", fw_sequence)
         rv_sequence = self.sequence_instance.reverse_complement(fw_sequence)
         
         ivaprimerdesign = IVAprimer()
         ivaprimers = []  # Store all IVA primers in a list
+        ivaprimerdesign.vector_length = len(self.sequence_instance.vector.seq)
 
         for eblock in self.eblocks_design_instance.wt_eblocks:  # Loop over gene blocks and design IVA primers (starting with initial sequences that are optimized later on)
+
+            eblock.start_index = self.sequence_instance.circular_index(eblock.start_index, len(self.sequence_instance.vector.seq))
+            vector_length = len(self.sequence_instance.vector.seq)
+            print("start index:", eblock.start_index, "end index:", eblock.end_index)
 
             init_fw_oh = ivaprimerdesign.Fw_overhang(eblock.end_index, fw_sequence, size=ivaprimerdesign.init_size)
             size = ivaprimerdesign.optimize_size(ivaprimerdesign.max_overhang_temp_IVA, init_fw_oh, eblock.end_index, ivaprimerdesign.init_size, fw_sequence, ivaprimerdesign.Fw_overhang)
             final_fw_oh = ivaprimerdesign.Fw_overhang(eblock.end_index, fw_sequence, size=size)
+            print("init_fw_oh", final_fw_oh)
 
             init_fw_template = ivaprimerdesign.Fw_template(eblock.end_index, fw_sequence, size=ivaprimerdesign.init_size)
+            print("init_fw_template:", init_fw_template)
             size = ivaprimerdesign.optimize_size(ivaprimerdesign.max_template_temp_IVA, init_fw_template, eblock.end_index, ivaprimerdesign.init_size, fw_sequence, ivaprimerdesign.Fw_template)
             final_fw_template = ivaprimerdesign.Fw_template(eblock.end_index, fw_sequence, size)
+            print("final_fw_oh:", final_fw_oh)
 
             init_rv_oh = ivaprimerdesign.Rv_overhang(eblock.start_index, rv_sequence, size=ivaprimerdesign.init_size)
+            print("init_rv_oh:", init_rv_oh)
             size = ivaprimerdesign.optimize_size(ivaprimerdesign.max_overhang_temp_IVA, init_rv_oh, eblock.start_index, ivaprimerdesign.init_size, rv_sequence, ivaprimerdesign.Rv_overhang)
             final_rv_oh = ivaprimerdesign.Rv_overhang(eblock.start_index, rv_sequence, size)
 
@@ -262,7 +268,8 @@ class IVAprimer(Primer, DesignPrimers):
                  max_overhang_temp_IVA: int = 50,
                  max_template_temp_IVA: int = 60,
                  max_oh_length: int = 15,
-                 init_size: int = 10):  # Initial size of the primer
+                 init_size: int = 10,  # Initial size of the primer
+                 vector_length: int = 0):  
         
         super().__init__(name=name, 
                          sequence_5to3=sequence_5to3, 
@@ -279,6 +286,8 @@ class IVAprimer(Primer, DesignPrimers):
         self.template  = template
         self.overhang = overhang
 
+        self.vector_length = vector_length
+
         self.primers = []
         self.primers_df: pd.DataFrame = pd.DataFrame(columns=['eBlock', 
                                                               'Overhang', 
@@ -292,22 +301,36 @@ class IVAprimer(Primer, DesignPrimers):
     
     def Rv_name(self, n: int):
         return f"IVA_Rv_eBlock_{n}"
-
+    
     def Fw_overhang(self, block_end, fw_sequence, size=15):
-        fw_oh = fw_sequence[block_end-size:block_end]
+        fw_oh = fw_sequence[Plasmid.circular_index(block_end-size, self.vector_length):Plasmid.circular_index(block_end, self.vector_length)]
         return fw_oh
         
     def Fw_template(self, block_end, fw_sequence, size=20):
-        fw_template = fw_sequence[block_end:block_end+size]
+        fw_template = fw_sequence[Plasmid.circular_index(block_end, self.vector_length):Plasmid.circular_index(block_end+size, self.vector_length)]
         return fw_template
+    
+    def Rv_overhang(self, block_begin, rv_sequence, size=15):
+        # rv_oh = rv_sequence[Plasmid.circular_index(block_begin, self.vector_length):Plasmid.circular_index(block_begin+size, self.vector_length)]
+        begin = Plasmid.circular_index(block_begin, self.vector_length)
+        print("begin:", begin)
+        end = Plasmid.circular_index(block_begin+size, self.vector_length)
+        print("end:", end)
+        if begin < end:
+            rv_oh = rv_sequence[begin:end]
+        else:
+            sys.exit()
+            # print("rv_oh:", rv_oh)
+            # print(rv_sequence[end:begin])
+            # print(rv_sequence[7849:7859])
+            # print(rv_sequence[0:100])
+        # else:
+        #     rv_oh = rv_sequence[end:begin]
+        return rv_oh
 
     def Rv_template(self, block_begin, rv_sequence, size=20):
-        rv_template = rv_sequence[block_begin-size:block_begin]
+        rv_template = rv_sequence[Plasmid.circular_index(block_begin-size, self.vector_length):Plasmid.circular_index(block_begin, self.vector_length)]
         return rv_template
-
-    def Rv_overhang(self, block_begin, rv_sequence, size=15):
-        rv_oh = rv_sequence[block_begin:block_begin+size]
-        return rv_oh
     
     def combine_Fw_primer(self, overhang, template):
         return overhang + template
