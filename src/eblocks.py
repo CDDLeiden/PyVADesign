@@ -146,52 +146,42 @@ class EblockDesign:
         self.eblocks = sorted_dict
 
         # Create a GFF3 file for easy visualization of eBlocks in SnapGene
-        # TODO Move this to a separate function
-        # TODO OR, save the mutations as different snapgene files (each mutation in a different file) and then create one single file for the primers etc.
         if self.to_snapgene:
-            snapgene_dict = {}
-            # Add gene to Snapgene
-            vector_begin_index, vector_end_index = Plasmid.find_index_in_vector(self.sequence_instance.vector.seq, self.sequence_instance.sequence)
-            snapgene_dict[self.sequence_instance.seqid] = [vector_begin_index+1, vector_end_index, self.sequence_instance.color]
-            
-            for i in self.wt_eblocks:  # Add WT eBlocks
-                snapgene_dict[i.name] = [Plasmid.circular_index(i.start_index+1, len(self.sequence_instance.vector.seq)), 
-                                         Plasmid.circular_index(i.end_index, len(self.sequence_instance.vector.seq)),
-                                         self.eblock_colors[int(i.block_number)-1]]
-            
-            # for mutation, eblock in self.eblocks.items():
-                
-                # # TODO Add type of mutation = variant here
-                # if mutation.is_singlemutation:
-                #     start_index = eblock.vector_start_index + eblock.mutation_start_index -2
-                #     end_index = start_index + 2
-                #     snapgene_dict[mutation.mutation[0]] = [start_index, end_index, self.mutation_instance.colors[mutation.type]]
+            self.output_to_snapgene()
 
-                # elif mutation.is_insert:
-                #     start_index = eblock.vector_start_index + eblock.mutation_start_index -1
-
-
-                #     # TODO Skip this one?
-                #     pass
-                # elif mutation.is_deletion:
-                #     pass
-                
-                # elif mutation.is_multiplemutation:
-                #     pass
-
-                # print(eblock.start_index, eblock.end_index, eblock.name, eblock.sequence, eblock.mutation, eblock.mutant_codon, eblock.insert)
-                # snapgene_dict[mutation.mutation] = [mutation.idx_dna[0], mutation.idx_dna[-1], self.mutation_instance.colors[mutation.type]]
-                # # TODO Add induvidual mutations. Think about the type
-                # # snapgene_dict[mutation]
-                # pass
-                # pass
-                # TODO Add gene to snapgene
-            
-            snapgene_instance = SnapGene(output_dir=self.output_dir, sequence_instance=self.sequence_instance)
-            snapgene_instance.eblocks_to_gff3(eblocks=snapgene_dict)
-                                    
         self.print_line("Completed eBlock design.")
 
+    def output_to_snapgene(self):
+            
+            snapgene_instance = SnapGene(output_dir=self.output_dir, sequence_instance=self.sequence_instance)
+            snapgene_instance.make_dir()
+            for mut, eblock in self.eblocks.items():
+                snapgene_dict = {}
+                snapgene_dict[self.sequence_instance.seqid] = [self.sequence_instance.gene_start_idx, self.sequence_instance.gene_end_idx, self.sequence_instance.color]
+                snapgene_dict[eblock.name] = [eblock.start_index, eblock.end_index, self.eblock_colors[eblock.block_number]]
+                if mut.is_singlemutation:
+                    snapgene_dict[mut.mutation[0]] = [self.sequence_instance.gene_start_idx -2 + eblock.mutation_start_index,
+                                                      self.sequence_instance.gene_start_idx + eblock.mutation_start_index,
+                                                      self.mutation_instance.colors[mut.type]]
+                    snapgene_instance.eblocks_to_gff3(eblocks=snapgene_dict, filename=f"{mut.mutation[0]}.gff3")
+                elif mut.is_insert:
+                    # TODO Remove Insert and Deletion, because in mutated vector they will be different
+                    snapgene_dict[mut.mutation] = [self.sequence_instance.gene_start_idx -2 + eblock.mutation_start_index,
+                                                      self.sequence_instance.gene_start_idx + eblock.mutation_start_index,
+                                                      self.mutation_instance.colors[mut.type]]
+                    snapgene_instance.eblocks_to_gff3(eblocks=snapgene_dict, filename=f"{mut.mutation}.gff3")
+                elif mut.is_deletion:
+                    snapgene_dict[mut.mutation] = [self.sequence_instance.gene_start_idx -2 + eblock.mutation_start_index,
+                                                      self.sequence_instance.gene_start_idx + eblock.mutation_start_index + mut.length_deletion,
+                                                      self.mutation_instance.colors[mut.type]]
+                    snapgene_instance.eblocks_to_gff3(eblocks=snapgene_dict, filename=f"{mut.mutation}.gff3")
+                elif mut.is_multiplemutation:
+                    for i, mut_i in enumerate(mut.idx_dna):
+                        snapgene_dict[mut.mutation[i]] = [self.sequence_instance.gene_start_idx -2 + mut.idx_dna[i],
+                                                      self.sequence_instance.gene_start_idx + mut.idx_dna[i],
+                                                      self.mutation_instance.colors[mut.type]]
+                    snapgene_instance.eblocks_to_gff3(eblocks=snapgene_dict, filename=f"{'-'.join(mut.mutation)}.gff3")
+                                             
     def find_possible_clusters(self):
         length_gene = len(self.sequence_instance.sequence)
         possibilities = {} # Store all possible clusterings
@@ -382,12 +372,6 @@ class EblockDesign:
         if mutation.is_singlemutation:
             eblock, _ = self.eblocks_within_range(mutation.idx_dna[0])
             eblock.mutation_start_index = self.eblock_index(eblock, mutation.idx_dna[0])
-            # print(mutation.mutation, mutation.idx_dna) # Takes gene sequence here
-            # print("gene_start_idx", self.sequence_instance.gene_start_idx)
-            # print(eblock.start_index, eblock.end_index, eblock.name, eblock.sequence)
-            # print("eBlock.mutation_start_index", eblock.mutation_start_index)
-            # print("idx_dna", mutation.idx_dna[0])
-            # print("mutation", mutation.mutation[0])
             self.check_wt_codon(eblock, mutation.mutation[0][0])  # Check if WT codon at index is same residue as mutation
             eblock.mutant_codon = self.select_mut_codon(mutation.mutation[0][-1])
             eblock.sequence = self.mutate_eblock(mutation, eblock)
