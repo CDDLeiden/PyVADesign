@@ -1,0 +1,17 @@
+LOCUS       test_sequence             60 bp    DNA              UNK 18-APR-2024
+DEFINITION  Example DNA sequence.
+ACCESSION   test_sequence
+VERSION     test_sequence
+KEYWORDS    .
+SOURCE      .
+  ORGANISM  Example organism
+            .
+FEATURES             Location/Qualifiers
+     gene            2..50
+                     /gene="gene1"
+     CDS             52..150
+                     /gene="gene1"
+                     /product="protein1"
+ORIGIN
+        1 atgcgctagc tagctagcta gctagctagc tagctagcta gctagctagc tagctagcta
+//

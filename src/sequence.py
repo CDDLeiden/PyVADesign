@@ -1,5 +1,13 @@
+import os
 import sys
 from Bio import SeqIO
+from Bio.Seq import Seq
+from datetime import datetime
+from Bio.SeqRecord import SeqRecord
+from Bio.SeqFeature import SeqFeature, FeatureLocation
+
+
+# TODO Rename Plasmid
 
 
 class Plasmid:
@@ -11,10 +19,46 @@ class Plasmid:
         self.sequence: str = None  # Gene sequence
         self.seqid: str = None
         self.organism: str = None
+        
         self.vector: str = None  # Vector sequence with gene cloned into it
+        self.vector_id: str = None
+
         self.gene_start_idx: int = -1
         self.gene_end_idx: int = -1
         self.color: str = "#d3d3d3"
+
+    def to_gb(self, output_dir, filename):
+        """
+        This function saves the vector to a GenBank file.
+        """
+        # TODO Update this function 
+        # Create a sequence record
+        sequence = Seq("ATGCGCTAGCTAGCTAGCTAGCTAGCTAGCTAGCTAGCTAGCTAGCTAGCTAGCTAGCTA")
+        record = SeqRecord(sequence, id="test_sequence", description="Example DNA sequence")
+        # Add molecule type to annotations
+        record.annotations["molecule_type"] = "DNA"
+        # Add organism information to annotations
+        record.annotations["organism"] = "Example organism"
+        # Add date to the locus line
+        record.annotations["date"] = datetime.today().strftime('%d-%b-%Y').upper()
+        # Add features to the sequence record
+        features = [
+            SeqFeature(FeatureLocation(1, 50), type="gene", qualifiers={"gene": "gene1"}),
+            SeqFeature(FeatureLocation(51, 150), type="CDS", qualifiers={"gene": "gene1", "product": "protein1"}),
+            # Add more features as needed
+        ]
+        record.features.extend(features)
+        # Write the record to a GenBank file
+        SeqIO.write(record, "test_sequence.gb", "genbank")
+
+    def save_vector(self, vector, output_dir, filename):
+        """
+        This function saves the vector to a file.
+        """
+        with open(os.path.join(output_dir, filename), "w") as output_handle:
+            output_handle.write(f">{self.vector_id}\n")
+            for i in range(0, len(vector), 60):
+                output_handle.write(str(vector[i:i+60]) + "\n")
 
     def parse_vector(self, fp: str):
         """
@@ -22,6 +66,8 @@ class Plasmid:
         """
         vector = self.read_snapgene_dna_file(fp)
         self.vector = vector
+        self.vector_id = vector.id
+        # print(self.vector_id)
         # TODO Add some checks here for the vector
  
     def parse_sequence(self, fp: str) -> str:
@@ -152,11 +198,3 @@ class Plasmid:
             rev_nucl = pairs[nucleotide]
             reverse += rev_nucl
         return reverse
-    
-    @staticmethod
-    def save_vector(vector, filename):
-        """
-        This function saves the vector to a file.
-        """
-        with open(filename, "w") as output_handle:
-            SeqIO.write(vector, output_handle, "snapgene")
