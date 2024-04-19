@@ -120,7 +120,7 @@ class Plot:
                 features.append(GraphicFeature(start=i.start_index, 
                                                end=i.end_index, 
                                                strand=+1, 
-                                               color=self.eblocks_design_instance.eblock_colors[num],
+                                               color=self.eblocks_design_instance.eblock_colors[num + 1],
                                                label=f"{i.name}"))
                 
         record = GraphicRecord(sequence_length=len(self.sequence_instance.sequence), features=features)

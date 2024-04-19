@@ -104,7 +104,7 @@ class DesignPrimers:
 
             # Combine template and overhang sequences
             fw_combined = ivaprimerdesign.combine_Fw_primer(final_fw_oh, final_fw_template)
-            rv_combined = ivaprimerdesign.combine_Rv_primer(final_rv_oh, final_rv_template)
+            rv_combined = ivaprimerdesign.combine_Rv_primer(final_rv_template, final_rv_oh)
 
             iva_fw_primer = IVAprimer(name=ivaprimerdesign.Fw_name(eblock.block_number),
                                       sequence_5to3=''.join(fw_combined),

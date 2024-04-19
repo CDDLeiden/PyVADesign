@@ -27,7 +27,7 @@ class Eblock:
         self.name: str = None
         self.block_number: int = None
         self.sequence: str = None
-        self.start_index: int = None
+        self.start_index: int = None  # Start index in vector
         self.end_index: int = None
 
         self.eblock_mutation_start_index: int = None
@@ -127,6 +127,7 @@ class EblockDesign:
         # Loop over all mutations and create the eBlocks, based on the WT eBlocks
         results = {}
         for mutation in self.mutation_instance.mutations:
+            print(mutation.mutation, mutation.idx_dna)
             results = self.make_mutant_eblock(mutation, results)  # Create mutated eblock, based on mutation type
         sorted_dict = dict(sorted(results.items(), key=lambda x: (x[1].name, x[1].start_index)))  # Sort the eblocks based on the index of the first mutation in the eblock and the number of the eblock
         self.eblocks = sorted_dict
@@ -154,10 +155,11 @@ class EblockDesign:
         n = 1
         valid_clusters = True
         while (valid_clusters) and (n <= len(self.mutation_instance.mutations)):
-            print(f"Trying to find clusters with N={n} mutations ...")
+            
+            # print(f"Trying to find clusters with N={n} mutations ...")
+            
             clusters = {}
             cluster_labels, idxs_reordered = self.kmeans_clustering(num_clusters=n)
-
             clusters = self.cluster_size(clusters, cluster_labels, idxs_reordered)  # Add size of clusters
             cluster_sizes = [max(v) - min(v) for v in clusters.values()]  # Check if the size of the clusters is within bounds
             cluster_sizes = self.check_clusters(clusters, cluster_sizes) # Check if the size of the clusters is within bounds (inserts + deletions)
@@ -166,52 +168,67 @@ class EblockDesign:
             increment = False
             tosmall = 0
             good = 0
+            tobig = 0
+
+            # Loop over cluster and increase size if necessary
             for k, v in clusters.items():
 
                 size = max(v) - min(v)
-                # print(size)
+                # print(f"Size of cluster N={n} {k} is {size}")
                     
                 if size > (self.max_eblock_length - 2 * self.min_overlap): # Take into account the OH on both sides of the gene block, so decrease max size with 2 times min length of OH
                     increment = True  # cluster sizes are too large
+                    tobig += 1
 
                 elif size < (self.min_eblock_length - 2 * self.min_overlap):  # Cluster size too small, increasing the eBlock length
-                    print(f"Cluster size too small, increasing the eBlock length {size}")       
+                    # print(f"Cluster size too small, increasing the eBlock length {size}")       
                     min_required_length_toadd = (self.min_eblock_length - size) - 2 * self.min_overlap 
-                    print("min required length to add:", min_required_length_toadd)          
+                    # print("min required length to add:", min_required_length_toadd)          
                     if max(v) + min_required_length_toadd <= length_gene:  # TODO Why is this?
                         # print("option 1:", max(v) + min_required_length_toadd)
                         clusters_copy[k].append(max(v) + min_required_length_toadd)
                         increment = True
                         tosmall += 1
+                        good += 1
                     else:
                         # print("option 2:", min(v) - min_required_length_toadd)
                         clusters_copy[k].append(min(v) - min_required_length_toadd)
                         increment = True
                         tosmall += 1
+                        good += 1
 
                 else:
                     # print(f"Cluster size is within bounds: N={n}")
                     good += 1  
                     increment = True
-                
-            if increment and (tosmall < 3):  # TODO ARBITRARY NUMBER
+
+            to_small_threshold = 2
+            sizes = [max(v) - min(v) for v in clusters_copy.values()]
+            # print(f"sizes of clusters: {sizes}")
+            # print(f"too small: {tosmall}, good: {good}, too big: {tobig}, increment: {increment}")
+
+            if tosmall > to_small_threshold:
+                increment = False
+
+            if (good == len(clusters)) and (tosmall < to_small_threshold):
+                # print("All clusters are within bounds")
                 possibilities[f'cluster N={n}'] = clusters_copy
                 n += 1
-            elif good == len(clusters):
-                possibilities[f'cluster N={n}'] = clusters_copy
+            elif tobig > 0:
                 n += 1
             else:
-                print("STOP INCREMENTION!!! #####")
+                # print("STOP INCREMENTION!!! #####")
                 valid_clusters = False
         
-       
-        for key, value in possibilities.items():
-            # print(key, value)
-            print(key)
-            for k, v in value.items():
-                # print(k, v)
-                print(k, max(v) - min(v))
-
+        # Show clusters
+        # print("Possible clusterings:")
+        # print("############################")
+        # for key, value in possibilities.items():
+        #     # print(key, value)
+        #     print(key)
+        #     for k, v in value.items():
+        #         # print(k, v)
+        #         print(k, max(v) - min(v))
 
         if len(possibilities) == 0:  # No valid clusters found
             print("No valid clusterings found for current mutations. Please check your input mutations and make sure \
@@ -297,7 +314,9 @@ class EblockDesign:
         if self.sequence_instance.gene_start_idx > eblock.start_index:
             mutation_index_in_eblock = self.sequence_instance.gene_start_idx - eblock.start_index + idx_mutation
         else:
-            mutation_index_in_eblock = self.sequence_instance.gene_start_idx + idx_mutation
+
+            mutation_index_in_eblock = (idx_mutation - eblock.start_index) + self.sequence_instance.gene_start_idx
+            # mutation_index_in_eblock = self.sequence_instance.gene_start_idx + idx_mutation
         return mutation_index_in_eblock  # idx_mutation - eblock.start_index
         
     def eblocks_within_range(self, mutation_idx: int):
@@ -317,6 +336,9 @@ class EblockDesign:
         """
         all_codons = Utils.DNA_codons()
         codon = eblock.sequence[eblock.mutation_start_index-3:eblock.mutation_start_index]
+        print("test1:", self.sequence_instance.vector.seq[eblock.start_index + eblock.mutation_start_index -3:eblock.start_index + eblock.mutation_start_index])
+        print("test2:", self.sequence_instance.sequence[eblock.start_index + eblock.mutation_start_index-3:eblock.start_index + eblock.mutation_start_index])
+        print("test3:", eblock.sequence[eblock.mutation_start_index-3:eblock.mutation_start_index])
         result = next((value for key, value in all_codons.items() if key.lower() == codon), None)
         if result is not None and result != mut[0]:
             print(f"WT codon does not match residue {mut}, but is {result}, the codon is {codon}")
@@ -369,6 +391,8 @@ class EblockDesign:
         if mutation.is_singlemutation:
             eblock, _ = self.eblocks_within_range(mutation.idx_dna[0])
             eblock.mutation_start_index = self.eblock_index(eblock, mutation.idx_dna[0])
+            print(f"eblock name {eblock.name} mutation start index {eblock.mutation_start_index} mutation index {mutation.idx_dna[0]}")
+            print(f"eblock start index {eblock.start_index} eblock end index {eblock.end_index}")
             self.check_wt_codon(eblock, mutation.mutation[0][0])  # Check if WT codon at index is same residue as mutation
             eblock.mutant_codon = self.select_mut_codon(mutation.mutation[0][-1])
             eblock.sequence = self.mutate_eblock(mutation, eblock)
