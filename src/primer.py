@@ -311,21 +311,12 @@ class IVAprimer(Primer, DesignPrimers):
         return fw_template
     
     def Rv_overhang(self, block_begin, rv_sequence, size=15):
-        # rv_oh = rv_sequence[Plasmid.circular_index(block_begin, self.vector_length):Plasmid.circular_index(block_begin+size, self.vector_length)]
         begin = Plasmid.circular_index(block_begin, self.vector_length)
-        print("begin:", begin)
         end = Plasmid.circular_index(block_begin+size, self.vector_length)
-        print("end:", end)
         if begin < end:
             rv_oh = rv_sequence[begin:end]
         else:
             sys.exit()
-            # print("rv_oh:", rv_oh)
-            # print(rv_sequence[end:begin])
-            # print(rv_sequence[7849:7859])
-            # print(rv_sequence[0:100])
-        # else:
-        #     rv_oh = rv_sequence[end:begin]
         return rv_oh
 
     def Rv_template(self, block_begin, rv_sequence, size=20):

@@ -26,7 +26,6 @@ class Plot:
         self.mutation_instance = mutation_instance
         self.sequence_instance = sequence_instance
         self.output_dir = output_dir
-        # self.eblock_colors = eblocks_design_instance.eblock_colors()
         self.show = show
         self.save = save
 
@@ -36,8 +35,10 @@ class Plot:
         """
         fig.savefig(os.path.join(self.output_dir, filename), dpi=dpi, bbox_inches=bbox_inches, transparent=transparent)
 
-
-    def plot_histogram_mutations(self, figure_width=8, figure_length=5, show=False, save=True, filename='histogram_mutations.png'):
+    def plot_histogram_mutations(self, figure_width=8, figure_length=5, filename='histogram_mutations.png'):
+        """
+        Show for every eBlock the number of mutations you can make.
+        """
         counts = self.eblocks_design_instance.count_mutations_per_eblock()
         fig, ax = plt.subplots(figsize=(figure_width, figure_length))
         labels = list(counts.keys())
@@ -46,15 +47,16 @@ class Plot:
         plt.xticks(range(len(counts)), labels, rotation=90)
         ax.set_ylabel('Number of mutants per eBlock')
         ax.set_title(f'Number of mutants per eBlock')
-        if save:
+        if self.save:
             self.save_plot(fig, filename)
-        if show:
+        if self.show:
             plt.show()
+        else:
+            plt.close()
         
-
     def plot_mutation_legend(self, legend_alpha=0.2, font_size='x-large', marker_size=10, linestyle='None', marker='o', loc='center', bbox_to_anchor=(0.5, 0.5)):
         """
-        Plot legend for eBlocks plot
+        Legend for eBlocks plot
         """
         # Create an empty plot with no data points
         fig, ax = plt.subplots(figsize=(3, 2))
@@ -76,12 +78,13 @@ class Plot:
     def plot_eblocks_mutations(self, 
                                plot_eblocks=True, 
                                plot_mutations=True, 
-                               seq_color="#d3d3d3", # TODO Remove this, its in the sequence class
                                figure_width=20, 
                                figure_length=10):
         """
         Plot mutations and selected eBlocks.
         """
+
+        # Check if mutations and sequence are available
         if self.mutation_instance.mutations is None:
             print("No mutations found. Please run the mutation class first.")
             sys.exit()
@@ -90,39 +93,43 @@ class Plot:
             sys.exit()
 
         features = []
-        # Add gene to plot
+        
+        # Add GoI to plot
         features.append(GraphicFeature(start=0, 
-                                        end=len(self.sequence_instance.sequence), 
-                                        strand=+1, 
-                                        color=seq_color, 
-                                        label=f"{self.sequence_instance.seqid}"))
+                                       end=len(self.sequence_instance.sequence) +3, 
+                                       strand=+1, 
+                                       color=Plasmid().color, 
+                                       label=f"{self.sequence_instance.seqid}"))
 
         # Add mutations to plot
         if plot_mutations:
             for num, mut in enumerate(self.mutation_instance.mutations):
-                if (mut.type == "Mutation") or (mut.type == "Insert") or (mut.type == "Deletion"):
+                if not mut.is_multiplemutation:
                     features.append(GraphicFeature(start=int(mut.idx_dna[0]), 
-                                                    end=int(mut.idx_dna[0]) + 3,
-                                                    strand=+1, 
-                                                    color=self.mutation_instance.colors[mut.type],
-                                                    label=f"{''.join(mut.mutation)}"))
-                elif mut.type == "Combined":
-                        for num, _ in enumerate(mut.idx_dna):
-                            features.append(GraphicFeature(start=int(mut.idx_dna[num]), 
-                                                            end=int(mut.idx_dna[num]) + 3,
-                                                            strand=+1, 
-                                                            color=self.mutation_instance.colors['Combined'], 
-                                                            label=f"{mut.mutation[num]}"))
+                                                   end=int(mut.idx_dna[0]) + 3,
+                                                   strand=+1, 
+                                                   color=self.mutation_instance.colors[mut.type],
+                                                   label=f"{''.join(mut.mutation)}"))
 
+                else:
+                    for num, _ in enumerate(mut.idx_dna):
+                        features.append(GraphicFeature(start=int(mut.idx_dna[num]), 
+                                                       end=int(mut.idx_dna[num]) + 3,
+                                                       strand=+1, 
+                                                       color=self.mutation_instance.colors['Combined'], 
+                                                       label=f"{mut.mutation[num]}"))
+                        
         # Add eBlocks to plot
         if plot_eblocks:
             for num, i in enumerate(self.eblocks_design_instance.wt_eblocks):
+
                 features.append(GraphicFeature(start=i.start_index, 
-                                               end=i.end_index, 
+                                               end=i.end_index if i.end_index < len(self.sequence_instance.sequence) else len(self.sequence_instance.sequence) + 3, 
                                                strand=+1, 
                                                color=self.eblocks_design_instance.eblock_colors[num + 1],
                                                label=f"{i.name}"))
-                
+
+            
         record = GraphicRecord(sequence_length=len(self.sequence_instance.sequence), features=features)
         fig_size = (figure_length, figure_width)
         fig, ax = plt.subplots(figsize=fig_size) 
@@ -131,9 +138,8 @@ class Plot:
             plt.show()
         else:
             plt.close()
+
         if plot_eblocks and plot_mutations and self.save:
-            # fig.savefig(os.path.join(output_fp, f'eblocks_{self.sequence_instance.seqid}_N{self.mutation_instance.n_mutants}_{self.eblocks_design_instance.optimization_method}.png'), dpi=100)
-            # TODO Fix this (filenames with | are not allowed)
             if self.eblocks_design_instance.cost_optimization:
                 self.save_plot(fig, f'eblocks_{self.sequence_instance.seqid}_N{self.mutation_instance.n_mutants}_cost.png')
             elif self.eblocks_design_instance.amount_optimization:
@@ -180,7 +186,6 @@ class Plot:
         if self.sequence_instance.organism:
                 vector_features.append(Feature("source", [Location(0, len(self.sequence_instance.vector.seq))], {"organism": f"{self.sequence_instance.organism}"}))
         return vector_features
-
 
     def plot_vector(self, figsize=(8,8), fontsize=10):
         """
