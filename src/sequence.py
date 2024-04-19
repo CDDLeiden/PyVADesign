@@ -7,49 +7,54 @@ from Bio.SeqRecord import SeqRecord
 from Bio.SeqFeature import SeqFeature, FeatureLocation
 
 
-# TODO Rename Plasmid
-
 
 class Plasmid:
     """
     This class contains functions to parse and translate DNA sequences and vectors.
     """
 
-    def __init__(self):
-        self.sequence: str = None  # Gene sequence
-        self.seqid: str = None
-        self.organism: str = None
+    def __init__(self,
+                 sequence: str = None,  # Gene sequence # TODO Rename to Gene sequence?
+                 seqid: str = None,
+                 organism: str = None,
+                 vector: str = None,  # Vector sequence with gene cloned into it
+                 vector_id: str = None,
+                 gene_start_idx: int = -1,
+                 gene_end_idx: int = -1,
+                 color: str = "#d3d3d3"):  # TODO Obtain color from mutation colors
         
-        self.vector: str = None  # Vector sequence with gene cloned into it
-        self.vector_id: str = None
+        self.sequence = sequence  # GoI
+        self.seqid = seqid
+        self.organism = organism
+        self.vector = vector
+        self.vector_id = vector_id
+        self.gene_start_idx = gene_start_idx
+        self.gene_end_idx = gene_end_idx
+        self.color = color
 
-        self.gene_start_idx: int = -1
-        self.gene_end_idx: int = -1
-        self.color: str = "#d3d3d3"
-
-    def to_gb(self, output_dir, filename):
-        """
-        This function saves the vector to a GenBank file.
-        """
-        # TODO Update this function 
-        # Create a sequence record
-        sequence = Seq("ATGCGCTAGCTAGCTAGCTAGCTAGCTAGCTAGCTAGCTAGCTAGCTAGCTAGCTAGCTA")
-        record = SeqRecord(sequence, id="test_sequence", description="Example DNA sequence")
-        # Add molecule type to annotations
-        record.annotations["molecule_type"] = "DNA"
-        # Add organism information to annotations
-        record.annotations["organism"] = "Example organism"
-        # Add date to the locus line
-        record.annotations["date"] = datetime.today().strftime('%d-%b-%Y').upper()
-        # Add features to the sequence record
-        features = [
-            SeqFeature(FeatureLocation(1, 50), type="gene", qualifiers={"gene": "gene1"}),
-            SeqFeature(FeatureLocation(51, 150), type="CDS", qualifiers={"gene": "gene1", "product": "protein1"}),
-            # Add more features as needed
-        ]
-        record.features.extend(features)
-        # Write the record to a GenBank file
-        SeqIO.write(record, "test_sequence.gb", "genbank")
+    # def to_gb(self, output_dir, filename):
+    #     """
+    #     This function saves the vector to a GenBank file.
+    #     """
+    #     # TODO Update this function 
+    #     # Create a sequence record
+    #     sequence = Seq("ATGCGCTAGCTAGCTAGCTAGCTAGCTAGCTAGCTAGCTAGCTAGCTAGCTAGCTAGCTA")
+    #     record = SeqRecord(sequence, id="test_sequence", description="Example DNA sequence")
+    #     # Add molecule type to annotations
+    #     record.annotations["molecule_type"] = "DNA"
+    #     # Add organism information to annotations
+    #     record.annotations["organism"] = "Example organism"
+    #     # Add date to the locus line
+    #     record.annotations["date"] = datetime.today().strftime('%d-%b-%Y').upper()
+    #     # Add features to the sequence record
+    #     features = [
+    #         SeqFeature(FeatureLocation(1, 50), type="gene", qualifiers={"gene": "gene1"}),
+    #         SeqFeature(FeatureLocation(51, 150), type="CDS", qualifiers={"gene": "gene1", "product": "protein1"}),
+    #         # Add more features as needed
+    #     ]
+    #     record.features.extend(features)
+    #     # Write the record to a GenBank file
+    #     SeqIO.write(record, "test_sequence.gb", "genbank")
 
     def save_vector(self, vector, output_dir, filename):
         """
@@ -91,7 +96,7 @@ class Plasmid:
     @staticmethod
     def circular_index(index, sequence_length):
         """
-        This function returns the circular index of a sequence.
+        This function returns the circular (=positive) index in a sequence.
         """
         return (index + sequence_length) % sequence_length
     

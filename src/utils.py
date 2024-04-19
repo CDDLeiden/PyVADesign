@@ -25,32 +25,28 @@ class Utils:
         protein_sequence = Plasmid.translate_sequence(nucleotide_sequence)
         residues = [i + str(j) for i, j in zip(protein_sequence, range(1, len(protein_sequence) + 1))]
 
-        # Do not make the mutations at the very beginning and end of the protein sequence, because this will result in difficulties with the primers
-        # TODO FIX THIS (you should be able to make mutations at beginning and end of sequence)
-        usable_residues = protein_sequence[20:-20]
-
         random_mutations = {}
 
         # List containing all natural amino acids and options for our mutations
         amino_acids = Utils.natural_amino_acids()
 
         # Randomly select single mutations
-        selected_single_mutants = self.random_single_mutation(usable_residues, amino_acids, n_single_mutations)
+        selected_single_mutants = self.random_single_mutation(residues, amino_acids, n_single_mutations)
         random_mutations['single_mutations'] = selected_single_mutants
         print(f"Generated {n_single_mutations} single mutations: ", selected_single_mutants)
 
         # Randomly select double mutations
-        selected_double_mutants = self.random_multiple_mutation(usable_residues, amino_acids, n_multiple_mutations)
+        selected_double_mutants = self.random_multiple_mutation(residues, amino_acids, n_multiple_mutations)
         random_mutations['double_mutations'] = selected_double_mutants
         print(f"Generated {n_multiple_mutations} paired mutations: ", selected_double_mutants)
 
         # Randomly select insertions
-        selected_insertions = self.random_insert(usable_residues, amino_acids, n_insertions)
+        selected_insertions = self.random_insert(residues, amino_acids, n_insertions)
         random_mutations['insertions'] = selected_insertions
         print(f"Generated {n_insertions} insertions: ", selected_insertions)
 
         # Randomly select deletions
-        selected_deletions = self.random_deletion(usable_residues, n_deletions)
+        selected_deletions = self.random_deletion(residues, n_deletions)
         random_mutations['deletions'] = selected_deletions
         print(f"Generated {n_deletions} deletions: ", selected_deletions)
 
@@ -217,6 +213,7 @@ class Utils:
             codon_usage_no_U[newkey] = value
         return codon_usage_no_U
     
+
 
 class SnapGene:
     """
