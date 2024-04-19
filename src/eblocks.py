@@ -6,14 +6,20 @@ import sys
 import copy
 import numpy as np
 from sklearn.cluster import KMeans
+from sklearn.metrics.pairwise import euclidean_distances
 
 from .mutation import Mutation
 from .sequence import Plasmid
 from .utils import Utils, SnapGene
 
+
 script_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.abspath(os.path.join(script_dir, os.pardir))  # Navigate one directory upwards to reach the parent directory
 data_dir = os.path.join(parent_dir, "data")  # Navigate to the data directory
+
+
+# TODO Make check if output files already exist in directory, if so, ask if they should be overwritten
+# TODO SnapGene > visualizer
 
 
 
@@ -190,26 +196,60 @@ class EblockDesign:
             sys.exit()
         return possibilities
     
-    def kmeans_clustering(self, num_clusters: int, n_init=10, random_state=42):
-        mean_idxs_dna = self.mutation_instance.mean_idxs_dna()  # Extract the first index of each mutation in idx_test
-        mutation_arr = np.array(mean_idxs_dna, dtype=float).reshape(-1, 1)
-        kmeans = KMeans(n_clusters=num_clusters, random_state=random_state, n_init=n_init)  # Initialize KMeans with the number of clusters
-        cluster_labels = kmeans.fit_predict(mutation_arr)
-        indices = []  # Add the remaining indices of the pairs to the assigned cluster
-        for mutation in self.mutation_instance.mutations:
-            if len(mutation.idx_dna) > 1: 
-                pair = mutation.idx_dna
-                mean_pair_value = np.mean(pair)
-                idx = list(mutation_arr).index(mean_pair_value)
-                indices.append(idx)
-                cluster_label = cluster_labels[idx]
-                cluster_labels = np.concatenate((cluster_labels, np.full(len(pair), cluster_label)))
-                mean_idxs_dna.extend(pair)
-        to_remove = sorted(set(indices), reverse=True)  # Remove the mean values from the list of indices and cluster labels
-        for i in to_remove:
-            del mean_idxs_dna[i]
-            cluster_labels = np.delete(cluster_labels, i)
-        return cluster_labels, mean_idxs_dna
+    def custom_distance(self, x, y):
+        return abs(x - y)
+    
+    def kmeans_clustering(self, 
+                          num_clusters: int, 
+                          n_init=10, 
+                          random_state=42):
+        X = []
+        constraints = []
+        for i in self.mutation_instance.mutations:
+            if i.is_singlemutation:
+                X.append(i.idx_dna[0])
+            elif i.is_insert:
+                start_insert = i.idx_dna[0]
+                end_insert = i.idx_dna[0] + i.length_insert
+                constraints.append((start_insert, end_insert))
+                X.append(start_insert)
+                X.append(end_insert)
+            elif i.is_deletion:  # TODO Double check this one
+                X.append(i.idx_dna_deletion_begin)
+            elif i.is_multiplemutation:
+                idxs = []
+                for j in i.idx_dna:
+                    idxs.append(j)
+                    X.append(j)
+                constraints.append(tuple(idxs))
+        X = np.array(X)
+        X.reshape(-1, 1)
+        kmeans = CustomKMeans(constraints, n_clusters=num_clusters)  # Initialize KMeans with the number of clusters
+        kmeans.fit(X.reshape(-1, 1))
+        labels = kmeans.labels_
+        return labels.tolist(), X.tolist()
+
+    # def kmeans_clustering(self, num_clusters: int, n_init=10, random_state=42):
+    #     mean_idxs_dna = self.mutation_instance.mean_idxs_dna()  # Extract the first index of each mutation
+    #     mutation_arr = np.array(mean_idxs_dna, dtype=float).reshape(-1, 1)
+    #     kmeans = KMeans(n_clusters=num_clusters, random_state=random_state, n_init=n_init)  # Initialize KMeans with the number of clusters
+    #     cluster_labels = kmeans.fit_predict(mutation_arr)
+    #     indices = []  # Add the remaining indices of the pairs to the assigned cluster
+    #     for mutation in self.mutation_instance.mutations:
+    #         if len(mutation.idx_dna) > 1: 
+    #             pair = mutation.idx_dna
+    #             mean_pair_value = np.mean(pair)
+    #             idx = list(mutation_arr).index(mean_pair_value)
+    #             indices.append(idx)
+    #             cluster_label = cluster_labels[idx]
+    #             cluster_labels = np.concatenate((cluster_labels, np.full(len(pair), cluster_label)))
+    #             mean_idxs_dna.extend(pair)
+    #     to_remove = sorted(set(indices), reverse=True)  # Remove the mean values from the list of indices and cluster labels
+    #     for i in to_remove:
+    #         del mean_idxs_dna[i]
+    #         cluster_labels = np.delete(cluster_labels, i)
+    #     print(cluster_labels, mean_idxs_dna)
+    #     return cluster_labels, mean_idxs_dna
     
     def choose_clusters(self, clusters: dict) -> dict:
         if self.cost_optimization:
@@ -236,7 +276,7 @@ class EblockDesign:
     def make_bins(self, clusters: dict):
         bins = []
         for _, value in clusters.items():
-            bins.append(int(min(value) - self.min_overlap))
+            bins.append(int(min(value) - self.min_overlap))  # add overlap
             bins.append(int(max(value) + self.min_overlap))
         return bins
     
@@ -246,10 +286,12 @@ class EblockDesign:
         """
         gene_blocks = []
         for num in range(0, len(bins), 2):
+            start_index = self.sequence_instance.gene_start_idx + bins[num]
+            end_index = self.sequence_instance.gene_start_idx + bins[num+1]
             eblock = Eblock(
-                start_index=bins[num],
-                end_index=bins[num+1],
-                sequence=Plasmid.slice_circular_sequence(self.sequence_instance.vector.seq, bins[num], bins[num+1]))
+                start_index=start_index,
+                end_index=end_index,
+                sequence=Plasmid.slice_circular_sequence(self.sequence_instance.vector.seq, start_index, end_index))
             gene_blocks.append(eblock)
         gene_blocks = self.renumber_eblock(gene_blocks)
         return gene_blocks
@@ -405,37 +447,43 @@ class EblockDesign:
 
             # Loop over all mutations and create mutated vector and features that can be read by snapgene
             for mut, eblock in self.eblocks.items():
+                print(f"Mutation: {mut.mutation} in eBlock: {eblock.name}")
                 snapgene_dict = {}
                 snapgene_dict[self.sequence_instance.seqid] = [self.sequence_instance.gene_start_idx, self.sequence_instance.gene_end_idx, self.sequence_instance.color]
                 snapgene_dict[eblock.name] = [eblock.start_index, eblock.end_index, self.eblock_colors[eblock.block_number]]
-                
+                    
                 if mut.is_singlemutation:
                     filename = mut.mutation[0]
-                    snapgene_dict[mut.mutation[0]] = [self.sequence_instance.gene_start_idx -2 + eblock.mutation_start_index,
-                                                      self.sequence_instance.gene_start_idx + eblock.mutation_start_index,
-                                                      self.mutation_instance.colors[mut.type]]
+                    snapgene_dict[mut.mutation[0]] = [self.sequence_instance.gene_start_idx -3 + mut.idx_dna[0],
+                                                    self.sequence_instance.gene_start_idx + mut.idx_dna[0],
+                                                    self.mutation_instance.colors[mut.type]]
 
                 elif mut.is_insert:
                     # TODO Remove Insert and Deletion, because in mutated vector they will be different
                     filename = mut.mutation
-                    snapgene_dict[mut.mutation] = [self.sequence_instance.gene_start_idx -2 + eblock.mutation_start_index,
-                                                      self.sequence_instance.gene_start_idx + eblock.mutation_start_index,
+                    snapgene_dict[mut.mutation] = [self.sequence_instance.gene_start_idx -3 + mut.idx_dna[0],
+                                                      self.sequence_instance.gene_start_idx + mut.idx_dna[0],
                                                       self.mutation_instance.colors[mut.type]]
 
                 elif mut.is_deletion:
                     filename = mut.mutation 
-                    snapgene_dict[mut.mutation] = [self.sequence_instance.gene_start_idx -2 + eblock.mutation_start_index,
-                                                      self.sequence_instance.gene_start_idx + eblock.mutation_start_index + mut.length_deletion,
+                    snapgene_dict[mut.mutation] = [self.sequence_instance.gene_start_idx -3 + mut.idx_dna[0],
+                                                      self.sequence_instance.gene_start_idx + mut.idx_dna[0],
                                                       self.mutation_instance.colors[mut.type]]
 
                 elif mut.is_multiplemutation:
                     filename = '-'.join(mut.mutation)
                     for i, _ in enumerate(mut.idx_dna):
-                        snapgene_dict[mut.mutation[i]] = [self.sequence_instance.gene_start_idx -2 + mut.idx_dna[i],
+                        snapgene_dict[mut.mutation[i]] = [self.sequence_instance.gene_start_idx -3 + mut.idx_dna[i],
                                                       self.sequence_instance.gene_start_idx + mut.idx_dna[i],
                                                       self.mutation_instance.colors[mut.type]]
+                        
+                for k, v in snapgene_dict.items():
+                    print(k, v)
+
                 self.make_dir(dirname=filename)
                 snapgene_instance.eblocks_to_gff3(eblocks=snapgene_dict, output_dir=os.path.join(snapgene_instance.output_dir, filename), filename=f"{filename}.gff3")
+                snapgene_instance.eblocks_to_genbank(eblocks=snapgene_dict, output_dir=os.path.join(snapgene_instance.output_dir, filename), filename=f"{filename}.gb")
                 mutated_vector = self.sequence_instance.mutate_vector(eblock.start_index, eblock.end_index, eblock.sequence)
                 self.sequence_instance.save_vector(vector=mutated_vector, output_dir=os.path.join(snapgene_instance.output_dir, filename), filename=f"{filename}.dna")
             
@@ -518,3 +566,20 @@ class EblockDesign:
                         '#aec7e8','#ffbb78','#98df8a','#ff9896','#c5b0d5','#c49c94','#f7b6d2','#c7c7c7','#dbdb8d','#9edae5',
                         '#393b79','#ff7f0e','#2ca02c','#8c564b','#e377c2','#7f7f7f','#bcbd22','#17becf']
         return {i: tab10_colors[i] for i in range(len(tab10_colors))}
+    
+
+
+class CustomKMeans(KMeans):
+    def __init__(self, constraints_same, n_clusters, init='k-means++', n_init=10, max_iter=300, tol=1e-4, verbose=0, random_state=None, copy_x=True, algorithm='lloyd'):
+        super().__init__(n_clusters=n_clusters, init=init, n_init=n_init, max_iter=max_iter, tol=tol, verbose=verbose, random_state=random_state, copy_x=copy_x, algorithm=algorithm)
+        self.constraints_same = constraints_same
+
+    def _euclidean_distances(self, X, Y):
+        distances = euclidean_distances(X, Y)
+        
+        for pair in self.constraints_same:
+            idx1, idx2 = pair
+            distances[idx1, idx2] *= 0.5
+            distances[idx2, idx1] *= 0.5
+
+        return distances

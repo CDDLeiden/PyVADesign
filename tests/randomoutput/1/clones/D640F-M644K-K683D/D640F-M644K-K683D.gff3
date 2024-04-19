@@ -1,0 +1,7 @@
+##gff-version 3.2.1
+##sequence-region myseq 1 7871
+myseq	.	gene	13	3568	.	.	.	Name=dnaE1;color=#d3d3d3
+myseq	.	gene	1748	2158	.	.	.	Name=eBlock-5;color=#8c564b
+myseq	.	gene	1931	1933	.	.	.	Name=D640F;color=green
+myseq	.	gene	1943	1945	.	.	.	Name=M644K;color=green
+myseq	.	gene	2060	2062	.	.	.	Name=K683D;color=green

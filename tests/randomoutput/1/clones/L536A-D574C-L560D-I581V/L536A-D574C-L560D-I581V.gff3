@@ -1,0 +1,8 @@
+##gff-version 3.2.1
+##sequence-region myseq 1 7871
+myseq	.	gene	13	3568	.	.	.	Name=dnaE1;color=#d3d3d3
+myseq	.	gene	1355	1768	.	.	.	Name=eBlock-4;color=#9467bd
+myseq	.	gene	1619	1621	.	.	.	Name=L536A;color=green
+myseq	.	gene	1733	1735	.	.	.	Name=D574C;color=green
+myseq	.	gene	1691	1693	.	.	.	Name=L560D;color=green
+myseq	.	gene	1754	1756	.	.	.	Name=I581V;color=green

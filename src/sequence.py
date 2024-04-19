@@ -32,30 +32,6 @@ class Plasmid:
         self.gene_end_idx = gene_end_idx
         self.color = color
 
-    # def to_gb(self, output_dir, filename):
-    #     """
-    #     This function saves the vector to a GenBank file.
-    #     """
-    #     # TODO Update this function 
-    #     # Create a sequence record
-    #     sequence = Seq("ATGCGCTAGCTAGCTAGCTAGCTAGCTAGCTAGCTAGCTAGCTAGCTAGCTAGCTAGCTA")
-    #     record = SeqRecord(sequence, id="test_sequence", description="Example DNA sequence")
-    #     # Add molecule type to annotations
-    #     record.annotations["molecule_type"] = "DNA"
-    #     # Add organism information to annotations
-    #     record.annotations["organism"] = "Example organism"
-    #     # Add date to the locus line
-    #     record.annotations["date"] = datetime.today().strftime('%d-%b-%Y').upper()
-    #     # Add features to the sequence record
-    #     features = [
-    #         SeqFeature(FeatureLocation(1, 50), type="gene", qualifiers={"gene": "gene1"}),
-    #         SeqFeature(FeatureLocation(51, 150), type="CDS", qualifiers={"gene": "gene1", "product": "protein1"}),
-    #         # Add more features as needed
-    #     ]
-    #     record.features.extend(features)
-    #     # Write the record to a GenBank file
-    #     SeqIO.write(record, "test_sequence.gb", "genbank")
-
     def save_vector(self, vector, output_dir, filename):
         """
         This function saves the vector to a file.
@@ -85,7 +61,7 @@ class Plasmid:
         self.gene_start_idx, self.gene_end_idx = self.find_index_in_vector(vector=self.vector.seq, sequence=self.sequence)
         result = self.check_sequence(sequence)
         return result
-    
+        
     def mutate_vector(self, idx_start, idx_end, sequence):
         """
         This function mutates the input vector with a given sequence
