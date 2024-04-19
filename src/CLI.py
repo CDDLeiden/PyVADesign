@@ -16,6 +16,8 @@ from src.plot import Plot
 # run command with tutorial data (from root directory):
 # python src/CLI.py -g tutorial/files/A0QX55.fasta -m tutorial/files/mutations.txt -o tutorial/output -v tutorial/files/vector.dna -s data/codon_usage/Mycobacterium_smegmatis.csv
 
+# python src/CLI.py -g tutorial/files/A0QX55.fasta -m tutorial/files/mutations_begin_end_of_gene.txt -o tutorial/output -v tutorial/files/vector.dna -s data/codon_usage/Mycobacterium_smegmatis.csv
+
 
 
 def eBlocksArgParser():
@@ -77,8 +79,9 @@ if __name__ == "__main__":
 
     # Parse sequence
     sequence_instance = Plasmid()
-    sequence_instance.parse_sequence(args.gene)
     sequence_instance.parse_vector(args.vector)
+    sequence_instance.parse_sequence(args.gene)
+
 
     snapgene_instance = SnapGene(sequence_instance=sequence_instance,
                                      output_dir=args.output)
