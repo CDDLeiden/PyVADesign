@@ -21,25 +21,28 @@ class Eblock:
     """
     This class contains information about eBlocks and mutations in the eBlocks.
     """
-    def __init__(self):
-
-        # Eblock properties
-        self.name: str = None
-        self.block_number: int = None
-        self.sequence: str = None
-        self.start_index: int = None  # Start index in vector
-        self.end_index: int = None
-
-        self.eblock_mutation_start_index: int = None
-
-        # Mutation properties
-        # TODO Check if all used
-        self.mutation: str = None
-        self.mutation_start_index: int = None
-        self.mutation_end_index: int = None
-        self.wt_codon: str = None
-        self.mutant_codon: str = None
-        self.insert: str = None
+    def __init__(self,
+                 name: str = None,
+                 block_number: int = None,
+                 sequence: str = None,
+                 start_index: int = None,
+                 end_index: int = None,
+                 mutation_start_index: int = None,
+                 mutation_end_index: int = None,
+                 wt_codon: str = None,
+                 mutant_codon: str = None,
+                 insert: str = None):
+        
+        self.name = name
+        self.block_number = block_number
+        self.sequence = sequence
+        self.start_index = start_index
+        self.end_index = end_index
+        self.mutation_start_index = mutation_start_index
+        self.mutation_end_index = mutation_end_index
+        self.wt_codon = wt_codon
+        self.mutant_codon = mutant_codon
+        self.insert = insert
 
     def set_name(self, name: str):
         self.name = name
@@ -54,7 +57,6 @@ class Eblock:
         self.end_index = end_index
 
 
-
 class EblockDesign:
     """
     This class contains functions to design eBlocks based on mutations in a gene sequence.
@@ -66,11 +68,11 @@ class EblockDesign:
 
                  cost_optimization: bool = True,
                  amount_optimization: bool = False,
-                 to_snapgene: bool = True,
+                 to_snapgene: bool = True,  # TODO Change name to more general
                  verbose: bool = True,
                  codon_usage: str = os.path.join(data_dir, "codon_usage", "Escherichia_coli.csv"),
 
-                # IDT parameters
+                # IDT values
                  bp_price: float = 0.05,
                  max_eblock_length: int = 1500,
                  min_eblock_length: int = 300,
@@ -82,13 +84,6 @@ class EblockDesign:
         self.sequence_instance = sequence_instance
         self.output_dir = output_dir
 
-        # IDT parameters
-        self.bp_price = bp_price
-        self.max_eblock_length = max_eblock_length
-        self.min_eblock_length = min_eblock_length
-        self.min_overlap = min_overlap
-        self.min_order = min_order
-
         self.cost_optimization = cost_optimization
         self.amount_optimization = amount_optimization
         self.eblock_colors = self.generate_eblock_colors()
@@ -96,17 +91,22 @@ class EblockDesign:
         self.verbose = verbose
         self.codon_usage = codon_usage
 
-        # Store eBlocks results
-        self.wt_eblocks = {}  # Wild-type gene blocks
-        self.eblocks = {}  # Mutated gene blocks
+        # IDT parameters
+        self.bp_price = bp_price
+        self.max_eblock_length = max_eblock_length
+        self.min_eblock_length = min_eblock_length
+        self.min_overlap = min_overlap
+        self.min_order = min_order
 
-    def set_output_dir(self, output_dir: str):
-        self.output_dir = output_dir
+        # Store WT and mutated gene blocks
+        self.wt_eblocks: dict = {}  # Wild-type gene blocks
+        self.eblocks: dict = {}  # Mutated gene blocks
 
+        self.validate_optimization_parameters()
 
     def run_design_eblocks(self):
         """
-        This function runs the design process for eblocks.
+        This function runs the design process for eBlocks.
         """
 
         self.print_line("Starting eBlock design ...")
@@ -120,43 +120,29 @@ class EblockDesign:
 
         # Make gene blocks (WT DNA sequences sliced to the correct size, according to the bins) and renumber them starting from 1
         self.wt_eblocks = self.make_wt_eblocks(bins)
-        for i in self.wt_eblocks:
-            print(i.start_index, i.end_index, i.name, i.sequence)
-            print("lenght of eblock", len(i.sequence))
 
         # Loop over all mutations and create the eBlocks, based on the WT eBlocks
         results = {}
         for mutation in self.mutation_instance.mutations:
-            print(mutation.mutation, mutation.idx_dna)
-            results = self.make_mutant_eblock(mutation, results)  # Create mutated eblock, based on mutation type
+            results = self.make_mutant_eblock(mutation, results)  # Create mutated eBlock, based on mutation type
         sorted_dict = dict(sorted(results.items(), key=lambda x: (x[1].name, x[1].start_index)))  # Sort the eblocks based on the index of the first mutation in the eblock and the number of the eblock
         self.eblocks = sorted_dict
 
         # Create a GFF3 file for easy visualization of eBlocks in SnapGene
+        # TODO paramter save_clones?
         if self.to_snapgene:
             self.output_to_snapgene()
 
         self.print_line("Completed eBlock design.")
-
-    def make_dir(self, dirname: str):
-        try:
-            os.makedirs(os.path.join(self.output_dir, f"{dirname}"))
-
-        except FileExistsError:
-            pass
-
-    def reset_output_dir(self, fp: str):
-        self.output_dir = fp
                                              
-    def find_possible_clusters(self):
-        # TODO FUX THIS FUNCTION (BUGS!)
-        length_gene = len(self.sequence_instance.sequence)
+    def find_possible_clusters(self, threshold_small_clusters=2):
+        """
+        This function finds all possible clusterings of the mutations based on the index of the mutations.
+        """
         possibilities = {} # Store all possible clusterings
         n = 1
         valid_clusters = True
         while (valid_clusters) and (n <= len(self.mutation_instance.mutations)):
-            
-            # print(f"Trying to find clusters with N={n} mutations ...")
             
             clusters = {}
             cluster_labels, idxs_reordered = self.kmeans_clustering(num_clusters=n)
@@ -165,71 +151,39 @@ class EblockDesign:
             cluster_sizes = self.check_clusters(clusters, cluster_sizes) # Check if the size of the clusters is within bounds (inserts + deletions)
 
             clusters_copy = copy.deepcopy(clusters)
-            increment = False
-            tosmall = 0
-            good = 0
-            tobig = 0
+            cluster_too_small = 0
+            cluster_correct = 0
+            cluster_too_big = 0
 
             # Loop over cluster and increase size if necessary
             for k, v in clusters.items():
 
-                size = max(v) - min(v)
-                # print(f"Size of cluster N={n} {k} is {size}")
-                    
+                size = max(v) - min(v)                    
                 if size > (self.max_eblock_length - 2 * self.min_overlap): # Take into account the OH on both sides of the gene block, so decrease max size with 2 times min length of OH
-                    increment = True  # cluster sizes are too large
-                    tobig += 1
+                    cluster_too_big += 1
 
-                elif size < (self.min_eblock_length - 2 * self.min_overlap):  # Cluster size too small, increasing the eBlock length
-                    # print(f"Cluster size too small, increasing the eBlock length {size}")       
-                    min_required_length_toadd = (self.min_eblock_length - size) - 2 * self.min_overlap 
-                    # print("min required length to add:", min_required_length_toadd)          
-                    if max(v) + min_required_length_toadd <= length_gene:  # TODO Why is this?
-                        # print("option 1:", max(v) + min_required_length_toadd)
+                elif size < (self.min_eblock_length - 2 * self.min_overlap):  # Cluster size too small, increasing the eBlock length to fit requirements    
+                    min_required_length_toadd = (self.min_eblock_length - size) - 2 * self.min_overlap       
+                    if max(v) + min_required_length_toadd <= len(self.sequence_instance.sequence):
                         clusters_copy[k].append(max(v) + min_required_length_toadd)
-                        increment = True
-                        tosmall += 1
-                        good += 1
+                        cluster_too_small += 1
+                        cluster_correct += 1
                     else:
-                        # print("option 2:", min(v) - min_required_length_toadd)
                         clusters_copy[k].append(min(v) - min_required_length_toadd)
-                        increment = True
-                        tosmall += 1
-                        good += 1
+                        cluster_too_small += 1
+                        cluster_correct += 1
 
                 else:
-                    # print(f"Cluster size is within bounds: N={n}")
-                    good += 1  
-                    increment = True
+                    cluster_correct += 1  
 
-            to_small_threshold = 2
-            sizes = [max(v) - min(v) for v in clusters_copy.values()]
-            # print(f"sizes of clusters: {sizes}")
-            # print(f"too small: {tosmall}, good: {good}, too big: {tobig}, increment: {increment}")
-
-            if tosmall > to_small_threshold:
-                increment = False
-
-            if (good == len(clusters)) and (tosmall < to_small_threshold):
-                # print("All clusters are within bounds")
+            if (cluster_correct == len(clusters)) and (cluster_too_small < threshold_small_clusters):
                 possibilities[f'cluster N={n}'] = clusters_copy
                 n += 1
-            elif tobig > 0:
+            elif cluster_too_big > 0:
                 n += 1
             else:
-                # print("STOP INCREMENTION!!! #####")
                 valid_clusters = False
         
-        # Show clusters
-        # print("Possible clusterings:")
-        # print("############################")
-        # for key, value in possibilities.items():
-        #     # print(key, value)
-        #     print(key)
-        #     for k, v in value.items():
-        #         # print(k, v)
-        #         print(k, max(v) - min(v))
-
         if len(possibilities) == 0:  # No valid clusters found
             print("No valid clusterings found for current mutations. Please check your input mutations and make sure \
                    that the multi-mutants are not too far apart.")
@@ -251,8 +205,7 @@ class EblockDesign:
                 cluster_label = cluster_labels[idx]
                 cluster_labels = np.concatenate((cluster_labels, np.full(len(pair), cluster_label)))
                 mean_idxs_dna.extend(pair)
-        # Remove the mean values from the list of indices and cluster labels
-        to_remove = sorted(set(indices), reverse=True)
+        to_remove = sorted(set(indices), reverse=True)  # Remove the mean values from the list of indices and cluster labels
         for i in to_remove:
             del mean_idxs_dna[i]
             cluster_labels = np.delete(cluster_labels, i)
@@ -287,20 +240,16 @@ class EblockDesign:
             bins.append(int(max(value) + self.min_overlap))
         return bins
     
-    
     def make_wt_eblocks(self, bins: list) -> list:
         """
         Create wild-type eBlocks
         """
         gene_blocks = []
         for num in range(0, len(bins), 2):
-            eblock = Eblock()
-            # eblock.set_start_index(Plasmid.circular_index(bins[num], len(self.sequence_instance.vector.seq)))
-            # eblock.set_end_index(Plasmid.circular_index(bins[num+1], len(self.sequence_instance.vector.seq)))
-            eblock.set_start_index(bins[num])
-            eblock.set_end_index(bins[num+1])
-            eblock.set_sequence(Plasmid.slice_circular_sequence(self.sequence_instance.vector.seq, eblock.start_index, eblock.end_index))
-            # eblock.set_vector_indexes(self.sequence_instance.vector.seq, eblock.sequence)
+            eblock = Eblock(
+                start_index=bins[num],
+                end_index=bins[num+1],
+                sequence=Plasmid.slice_circular_sequence(self.sequence_instance.vector.seq, bins[num], bins[num+1]))
             gene_blocks.append(eblock)
         gene_blocks = self.renumber_eblock(gene_blocks)
         return gene_blocks
@@ -309,15 +258,11 @@ class EblockDesign:
         """
         Find the index of a mutation in an eblock.
         """
-        # if gene start later than the eblock starts
-        # TODO DO SOME EXTENSIVE TESTING HERE!
         if self.sequence_instance.gene_start_idx > eblock.start_index:
             mutation_index_in_eblock = self.sequence_instance.gene_start_idx - eblock.start_index + idx_mutation
         else:
-
             mutation_index_in_eblock = (idx_mutation - eblock.start_index) + self.sequence_instance.gene_start_idx
-            # mutation_index_in_eblock = self.sequence_instance.gene_start_idx + idx_mutation
-        return mutation_index_in_eblock  # idx_mutation - eblock.start_index
+        return mutation_index_in_eblock
         
     def eblocks_within_range(self, mutation_idx: int):
         """
@@ -336,9 +281,6 @@ class EblockDesign:
         """
         all_codons = Utils.DNA_codons()
         codon = eblock.sequence[eblock.mutation_start_index-3:eblock.mutation_start_index]
-        print("test1:", self.sequence_instance.vector.seq[eblock.start_index + eblock.mutation_start_index -3:eblock.start_index + eblock.mutation_start_index])
-        print("test2:", self.sequence_instance.sequence[eblock.start_index + eblock.mutation_start_index-3:eblock.start_index + eblock.mutation_start_index])
-        print("test3:", eblock.sequence[eblock.mutation_start_index-3:eblock.mutation_start_index])
         result = next((value for key, value in all_codons.items() if key.lower() == codon), None)
         if result is not None and result != mut[0]:
             print(f"WT codon does not match residue {mut}, but is {result}, the codon is {codon}")
@@ -378,7 +320,8 @@ class EblockDesign:
         length_eblock = len(eblock_seq)
         if not self.min_eblock_length <= length_eblock <= self.max_eblock_length:
             if length_eblock > self.max_eblock_length:
-                print("Codon insert is too long for eBlock")
+                print(f"eBlock is too long, length is {length_eblock}, maximum length is {self.max_eblock_length}")
+                sys.exit()
             else:
                 print(f"Codon insert is too short for mutation eBlock, length is {length_eblock}, minimum length is {self.min_eblock_length}")
                 sys.exit()
@@ -391,8 +334,6 @@ class EblockDesign:
         if mutation.is_singlemutation:
             eblock, _ = self.eblocks_within_range(mutation.idx_dna[0])
             eblock.mutation_start_index = self.eblock_index(eblock, mutation.idx_dna[0])
-            print(f"eblock name {eblock.name} mutation start index {eblock.mutation_start_index} mutation index {mutation.idx_dna[0]}")
-            print(f"eblock start index {eblock.start_index} eblock end index {eblock.end_index}")
             self.check_wt_codon(eblock, mutation.mutation[0][0])  # Check if WT codon at index is same residue as mutation
             eblock.mutant_codon = self.select_mut_codon(mutation.mutation[0][-1])
             eblock.sequence = self.mutate_eblock(mutation, eblock)
@@ -455,12 +396,12 @@ class EblockDesign:
             self.set_output_dir(snapgene_instance.output_dir)
             self.sequence_instance.output_dir = snapgene_instance.output_dir
 
-            # TODO For test purposes, save wt eblocks to SnapGene
-            snapgene_dict = {}
-            for i in self.wt_eblocks:
-                snapgene_dict[i.name] = [Plasmid.circular_index(i.start_index, len(self.sequence_instance.vector.seq)), 
-                                         Plasmid.circular_index(i.end_index, len(self.sequence_instance.vector.seq)), self.eblock_colors[i.block_number]]
-                snapgene_instance.eblocks_to_gff3(eblocks=snapgene_dict, output_dir=original_dir, filename=f"eblocks.gff3")
+            # For test purposes, save wt eblocks to SnapGene
+            # snapgene_dict = {}
+            # for i in self.wt_eblocks:
+            #     snapgene_dict[i.name] = [Plasmid.circular_index(i.start_index, len(self.sequence_instance.vector.seq)), 
+            #                              Plasmid.circular_index(i.end_index, len(self.sequence_instance.vector.seq)), self.eblock_colors[i.block_number]]
+            #     snapgene_instance.eblocks_to_gff3(eblocks=snapgene_dict, output_dir=original_dir, filename=f"eblocks.gff3")
 
             # Loop over all mutations and create mutated vector and features that can be read by snapgene
             for mut, eblock in self.eblocks.items():
@@ -470,7 +411,6 @@ class EblockDesign:
                 
                 if mut.is_singlemutation:
                     filename = mut.mutation[0]
-                    self.make_dir(dirname=filename)
                     snapgene_dict[mut.mutation[0]] = [self.sequence_instance.gene_start_idx -2 + eblock.mutation_start_index,
                                                       self.sequence_instance.gene_start_idx + eblock.mutation_start_index,
                                                       self.mutation_instance.colors[mut.type]]
@@ -478,29 +418,27 @@ class EblockDesign:
                 elif mut.is_insert:
                     # TODO Remove Insert and Deletion, because in mutated vector they will be different
                     filename = mut.mutation
-                    self.make_dir(dirname=filename)
                     snapgene_dict[mut.mutation] = [self.sequence_instance.gene_start_idx -2 + eblock.mutation_start_index,
                                                       self.sequence_instance.gene_start_idx + eblock.mutation_start_index,
                                                       self.mutation_instance.colors[mut.type]]
 
                 elif mut.is_deletion:
                     filename = mut.mutation 
-                    self.make_dir(dirname=filename)
                     snapgene_dict[mut.mutation] = [self.sequence_instance.gene_start_idx -2 + eblock.mutation_start_index,
                                                       self.sequence_instance.gene_start_idx + eblock.mutation_start_index + mut.length_deletion,
                                                       self.mutation_instance.colors[mut.type]]
 
                 elif mut.is_multiplemutation:
                     filename = '-'.join(mut.mutation)
-                    self.make_dir(dirname=filename)
                     for i, _ in enumerate(mut.idx_dna):
                         snapgene_dict[mut.mutation[i]] = [self.sequence_instance.gene_start_idx -2 + mut.idx_dna[i],
                                                       self.sequence_instance.gene_start_idx + mut.idx_dna[i],
                                                       self.mutation_instance.colors[mut.type]]
-                        
+                self.make_dir(dirname=filename)
                 snapgene_instance.eblocks_to_gff3(eblocks=snapgene_dict, output_dir=os.path.join(snapgene_instance.output_dir, filename), filename=f"{filename}.gff3")
                 mutated_vector = self.sequence_instance.mutate_vector(eblock.start_index, eblock.end_index, eblock.sequence)
                 self.sequence_instance.save_vector(vector=mutated_vector, output_dir=os.path.join(snapgene_instance.output_dir, filename), filename=f"{filename}.dna")
+            
             self.output_dir = original_dir
             self.sequence_instance.output_dir = original_dir
         
@@ -530,6 +468,26 @@ class EblockDesign:
                     if mutation.idx_dna in value:
                         cluster_sizes[key] -= mutation.length_deletion
         return cluster_sizes
+    
+    def set_output_dir(self, output_dir: str):
+        self.output_dir = output_dir
+
+    def make_dir(self, dirname: str):
+        try:
+            os.makedirs(os.path.join(self.output_dir, f"{dirname}"))
+        except FileExistsError:
+            pass
+
+    def validate_optimization_parameters(self):
+        """
+        Check if the optimization parameters are set correctly.
+        """
+        if not self.cost_optimization and not self.amount_optimization:
+            print("Please set either cost_optimization or amount_optimization to True.")
+            sys.exit()
+        if self.cost_optimization and self.amount_optimization:
+            print("Please set either cost_optimization or amount_optimization to True, not both.")
+            sys.exit()
     
     def print_line(self, txt):
         if self.verbose:
