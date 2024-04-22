@@ -18,10 +18,6 @@ parent_dir = os.path.abspath(os.path.join(script_dir, os.pardir))  # Navigate on
 data_dir = os.path.join(parent_dir, "data")  # Navigate to the data directory
 
 
-# TODO Make check if output files already exist in directory, if so, ask if they should be overwritten
-# TODO SnapGene > visualizer
-
-
 
 class Eblock:
     """
@@ -33,6 +29,8 @@ class Eblock:
                  sequence: str = None,
                  start_index: int = None,
                  end_index: int = None,
+                 bin_start: int = None,
+                 bin_end: int = None,
                  mutation_start_index: int = None,
                  mutation_end_index: int = None,
                  wt_codon: str = None,
@@ -44,6 +42,8 @@ class Eblock:
         self.sequence = sequence
         self.start_index = start_index
         self.end_index = end_index
+        self.bin_start = bin_start
+        self.bin_end = bin_end
         self.mutation_start_index = mutation_start_index
         self.mutation_end_index = mutation_end_index
         self.wt_codon = wt_codon
@@ -63,6 +63,7 @@ class Eblock:
         self.end_index = end_index
 
 
+
 class EblockDesign:
     """
     This class contains functions to design eBlocks based on mutations in a gene sequence.
@@ -74,7 +75,7 @@ class EblockDesign:
 
                  cost_optimization: bool = True,
                  amount_optimization: bool = False,
-                 to_snapgene: bool = True,  # TODO Change name to more general
+                 clone_files: bool = True,
                  verbose: bool = True,
                  codon_usage: str = os.path.join(data_dir, "codon_usage", "Escherichia_coli.csv"),
 
@@ -93,7 +94,7 @@ class EblockDesign:
         self.cost_optimization = cost_optimization
         self.amount_optimization = amount_optimization
         self.eblock_colors = self.generate_eblock_colors()
-        self.to_snapgene = to_snapgene
+        self.clone_files = clone_files
         self.verbose = verbose
         self.codon_usage = codon_usage
 
@@ -134,10 +135,9 @@ class EblockDesign:
         sorted_dict = dict(sorted(results.items(), key=lambda x: (x[1].name, x[1].start_index)))  # Sort the eblocks based on the index of the first mutation in the eblock and the number of the eblock
         self.eblocks = sorted_dict
 
-        # Create a GFF3 file for easy visualization of eBlocks in SnapGene
-        # TODO paramter save_clones?
-        if self.to_snapgene:
-            self.output_to_snapgene()
+        # Create a GFF3/gb file for easy visualization of eBlocks in sequence editor tools
+        if self.clone_files:
+            self.make_clones()
 
         self.print_line("Completed eBlock design.")
                                              
@@ -196,13 +196,7 @@ class EblockDesign:
             sys.exit()
         return possibilities
     
-    def custom_distance(self, x, y):
-        return abs(x - y)
-    
-    def kmeans_clustering(self, 
-                          num_clusters: int, 
-                          n_init=10, 
-                          random_state=42):
+    def kmeans_clustering(self, num_clusters: int):
         X = []
         constraints = []
         for i in self.mutation_instance.mutations:
@@ -222,8 +216,7 @@ class EblockDesign:
                     idxs.append(j)
                     X.append(j)
                 constraints.append(tuple(idxs))
-        X = np.array(X)
-        X.reshape(-1, 1)
+        X = np.asarray(X).reshape(-1, 1).flatten()
         kmeans = CustomKMeans(constraints, n_clusters=num_clusters)  # Initialize KMeans with the number of clusters
         kmeans.fit(X.reshape(-1, 1))
         labels = kmeans.labels_
@@ -289,8 +282,10 @@ class EblockDesign:
             start_index = self.sequence_instance.gene_start_idx + bins[num]
             end_index = self.sequence_instance.gene_start_idx + bins[num+1]
             eblock = Eblock(
-                start_index=start_index,
-                end_index=end_index,
+                start_index=start_index,  # start index in the vector
+                end_index=end_index, 
+                bin_start=bins[num],  # start index in the gene
+                bin_end=bins[num+1],
                 sequence=Plasmid.slice_circular_sequence(self.sequence_instance.vector.seq, start_index, end_index))
             gene_blocks.append(eblock)
         gene_blocks = self.renumber_eblock(gene_blocks)
@@ -430,7 +425,7 @@ class EblockDesign:
         results[mutation] = eblock
         return results
     
-    def output_to_snapgene(self):
+    def make_clones(self):
             
             snapgene_instance = SnapGene(output_dir=self.output_dir, sequence_instance=self.sequence_instance)
             snapgene_instance.make_dir()  # Make clones-dir
@@ -447,7 +442,6 @@ class EblockDesign:
 
             # Loop over all mutations and create mutated vector and features that can be read by snapgene
             for mut, eblock in self.eblocks.items():
-                print(f"Mutation: {mut.mutation} in eBlock: {eblock.name}")
                 snapgene_dict = {}
                 snapgene_dict[self.sequence_instance.seqid] = [self.sequence_instance.gene_start_idx, self.sequence_instance.gene_end_idx, self.sequence_instance.color]
                 snapgene_dict[eblock.name] = [eblock.start_index, eblock.end_index, self.eblock_colors[eblock.block_number]]
@@ -459,16 +453,9 @@ class EblockDesign:
                                                     self.mutation_instance.colors[mut.type]]
 
                 elif mut.is_insert:
-                    # TODO Remove Insert and Deletion, because in mutated vector they will be different
                     filename = mut.mutation
                     snapgene_dict[mut.mutation] = [self.sequence_instance.gene_start_idx -3 + mut.idx_dna[0],
-                                                      self.sequence_instance.gene_start_idx + mut.idx_dna[0],
-                                                      self.mutation_instance.colors[mut.type]]
-
-                elif mut.is_deletion:
-                    filename = mut.mutation 
-                    snapgene_dict[mut.mutation] = [self.sequence_instance.gene_start_idx -3 + mut.idx_dna[0],
-                                                      self.sequence_instance.gene_start_idx + mut.idx_dna[0],
+                                                      self.sequence_instance.gene_start_idx + + mut.idx_dna[0] + mut.length_insert,
                                                       self.mutation_instance.colors[mut.type]]
 
                 elif mut.is_multiplemutation:
@@ -478,15 +465,13 @@ class EblockDesign:
                                                       self.sequence_instance.gene_start_idx + mut.idx_dna[i],
                                                       self.mutation_instance.colors[mut.type]]
                         
-                for k, v in snapgene_dict.items():
-                    print(k, v)
-
                 self.make_dir(dirname=filename)
-                snapgene_instance.eblocks_to_gff3(eblocks=snapgene_dict, output_dir=os.path.join(snapgene_instance.output_dir, filename), filename=f"{filename}.gff3")
-                snapgene_instance.eblocks_to_genbank(eblocks=snapgene_dict, output_dir=os.path.join(snapgene_instance.output_dir, filename), filename=f"{filename}.gb")
+                Utils.check_directory(os.path.join(snapgene_instance.output_dir, filename), self.verbose)
                 mutated_vector = self.sequence_instance.mutate_vector(eblock.start_index, eblock.end_index, eblock.sequence)
                 self.sequence_instance.save_vector(vector=mutated_vector, output_dir=os.path.join(snapgene_instance.output_dir, filename), filename=f"{filename}.dna")
-            
+                snapgene_instance.eblocks_to_gff3(eblocks=snapgene_dict, output_dir=os.path.join(snapgene_instance.output_dir, filename), filename=f"{filename}.gff3")
+                snapgene_instance.eblocks_to_genbank(vector=mutated_vector, eblocks=snapgene_dict, output_dir=os.path.join(snapgene_instance.output_dir, filename), filename=f"{filename}.gb")
+                
             self.output_dir = original_dir
             self.sequence_instance.output_dir = original_dir
         

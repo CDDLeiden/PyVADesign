@@ -123,8 +123,8 @@ class Plot:
         if plot_eblocks:
             for num, i in enumerate(self.eblocks_design_instance.wt_eblocks):
 
-                features.append(GraphicFeature(start=i.start_index, 
-                                               end=i.end_index if i.end_index < len(self.sequence_instance.sequence) else len(self.sequence_instance.sequence) + 3, 
+                features.append(GraphicFeature(start=i.bin_start, 
+                                               end=i.bin_end,
                                                strand=+1, 
                                                color=self.eblocks_design_instance.eblock_colors[num + 1],
                                                label=f"{i.name}"))
