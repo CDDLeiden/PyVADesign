@@ -1,0 +1,17 @@
+eBlock,Overhang,Template,direction,Tm Template,Tm Overhang
+IVA_Fw_eBlock_1,ccgagaacgccacc,ggtctgcgcaacctgttcaagc,Forward,59.18,47.71
+IVA_Rv_eBlock_1,ggaagcacgtggacg,gccaagtagacgccccagga,Reverse,58.13,48.93
+IVA_Fw_eBlock_2,ggccgccgagatg,cgccagatctgggacgacgaag,Forward,59.37,47.02
+IVA_Rv_eBlock_2,acctgcggctcgag,gactcgttcaccagcgcgt,Reverse,57.56,49.17
+IVA_Fw_eBlock_3,cgagcgcacctcg,atgcccgacatcgatatcgacttcga,Forward,59.8,47.82
+IVA_Rv_eBlock_3,tctacgcggtctagacc,atggacttcagccggcggc,Reverse,59.75,48.9
+IVA_Fw_eBlock_4,ccatcggtctgctgaaa,atggacttcctgggcctgcg,Forward,58.77,48.33
+IVA_Rv_eBlock_4,gcgtccagtagtggaag,ccggtgctggcccagc,Reverse,57.8,48.6
+IVA_Fw_eBlock_5,gcctcatcgtctatcaagag,cagatcatgcgcatcgcgcag,Forward,59.55,49.51
+IVA_Rv_eBlock_5,tccggtagccagacg,accctaatgggccgcacgc,Reverse,59.74,48.56
+IVA_Fw_eBlock_6,gtgctcccgccc,gacgtcaacgaatctggcttgaacttc,Forward,58.75,45.54
+IVA_Rv_eBlock_6,ggatgccggagtagca,gcgctctaggagcggctct,Reverse,58.3,49.57
+IVA_Fw_eBlock_7,cggggcatcccctc,aacggtgtggcacacttgctg,Forward,58.4,48.97
+IVA_Rv_eBlock_7,gcgggctgcagttg,cgagccgtagtggcacgagg,Reverse,59.57,49.37
+IVA_Fw_eBlock_8,gggagttagtgaagagcg,gccaccgaggccgggag,Forward,59.38,48.86
+IVA_Rv_eBlock_8,taggggagttgccacac,ccctgacatgcagagccccg,Reverse,59.48,49.76

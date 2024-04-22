@@ -21,6 +21,7 @@ from .utils import OutputToFile
 # TODO Add examples of complementary and hairpin structures to the tests directory
 # TODO Check hairpin         # TODO Check using this website http://biotools.nubic.northwestern.edu/OligoCalc.html
 # TODO Self dimerization vs hairpin
+# TODO Primer3 checkout
 
 
 class DesignPrimers:
@@ -69,7 +70,6 @@ class DesignPrimers:
         """
 
         fw_sequence = str(self.sequence_instance.vector.seq.lower())
-        print("fw_sequence:", fw_sequence)
         rv_sequence = self.sequence_instance.reverse_complement(fw_sequence)
         
         ivaprimerdesign = IVAprimer()
@@ -80,21 +80,16 @@ class DesignPrimers:
 
             eblock.start_index = self.sequence_instance.circular_index(eblock.start_index, len(self.sequence_instance.vector.seq))
             vector_length = len(self.sequence_instance.vector.seq)
-            print("start index:", eblock.start_index, "end index:", eblock.end_index)
 
             init_fw_oh = ivaprimerdesign.Fw_overhang(eblock.end_index, fw_sequence, size=ivaprimerdesign.init_size)
             size = ivaprimerdesign.optimize_size(ivaprimerdesign.max_overhang_temp_IVA, init_fw_oh, eblock.end_index, ivaprimerdesign.init_size, fw_sequence, ivaprimerdesign.Fw_overhang)
             final_fw_oh = ivaprimerdesign.Fw_overhang(eblock.end_index, fw_sequence, size=size)
-            print("init_fw_oh", final_fw_oh)
 
             init_fw_template = ivaprimerdesign.Fw_template(eblock.end_index, fw_sequence, size=ivaprimerdesign.init_size)
-            print("init_fw_template:", init_fw_template)
             size = ivaprimerdesign.optimize_size(ivaprimerdesign.max_template_temp_IVA, init_fw_template, eblock.end_index, ivaprimerdesign.init_size, fw_sequence, ivaprimerdesign.Fw_template)
             final_fw_template = ivaprimerdesign.Fw_template(eblock.end_index, fw_sequence, size)
-            print("final_fw_oh:", final_fw_oh)
 
             init_rv_oh = ivaprimerdesign.Rv_overhang(eblock.start_index, rv_sequence, size=ivaprimerdesign.init_size)
-            print("init_rv_oh:", init_rv_oh)
             size = ivaprimerdesign.optimize_size(ivaprimerdesign.max_overhang_temp_IVA, init_rv_oh, eblock.start_index, ivaprimerdesign.init_size, rv_sequence, ivaprimerdesign.Rv_overhang)
             final_rv_oh = ivaprimerdesign.Rv_overhang(eblock.start_index, rv_sequence, size)
 
