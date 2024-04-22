@@ -208,8 +208,9 @@ class EblockDesign:
                 constraints.append((start_insert, end_insert))
                 X.append(start_insert)
                 X.append(end_insert)
-            elif i.is_deletion:  # TODO Double check this one
+            elif i.is_deletion:
                 X.append(i.idx_dna_deletion_begin)
+                X.append(i.idx_dna_deletion_end)
             elif i.is_multiplemutation:
                 idxs = []
                 for j in i.idx_dna:
@@ -442,32 +443,43 @@ class EblockDesign:
 
             # Loop over all mutations and create mutated vector and features that can be read by snapgene
             for mut, eblock in self.eblocks.items():
+                print(mut.mutation, eblock.name)
                 snapgene_dict = {}
-                snapgene_dict[self.sequence_instance.seqid] = [self.sequence_instance.gene_start_idx, self.sequence_instance.gene_end_idx, self.sequence_instance.color]
-                snapgene_dict[eblock.name] = [eblock.start_index, eblock.end_index, self.eblock_colors[eblock.block_number]]
+                if not mut.is_deletion:
+                    snapgene_dict[eblock.name] = [eblock.start_index, eblock.end_index, self.eblock_colors[eblock.block_number]]
+                    snapgene_dict[self.sequence_instance.seqid] = [self.sequence_instance.gene_start_idx, self.sequence_instance.gene_end_idx, self.sequence_instance.color]
+                
                     
                 if mut.is_singlemutation:
                     filename = mut.mutation[0]
-                    snapgene_dict[mut.mutation[0]] = [self.sequence_instance.gene_start_idx -3 + mut.idx_dna[0],
-                                                    self.sequence_instance.gene_start_idx + mut.idx_dna[0],
-                                                    self.mutation_instance.colors[mut.type]]
+                    start = self.sequence_instance.gene_start_idx -3 + mut.idx_dna[0]
+                    end = self.sequence_instance.gene_start_idx + mut.idx_dna[0]
+                    snapgene_dict[mut.mutation[0]] = [start, end, self.mutation_instance.colors[mut.type]]
 
                 elif mut.is_insert:
                     filename = mut.mutation
-                    snapgene_dict[mut.mutation] = [self.sequence_instance.gene_start_idx -3 + mut.idx_dna[0],
-                                                      self.sequence_instance.gene_start_idx + + mut.idx_dna[0] + mut.length_insert,
-                                                      self.mutation_instance.colors[mut.type]]
+                    start = self.sequence_instance.gene_start_idx -3 + mut.idx_dna[0]
+                    end = self.sequence_instance.gene_start_idx + mut.idx_dna[0] + mut.length_insert
+                    snapgene_dict[mut.mutation] = [start, end, self.mutation_instance.colors[mut.type]]
+                    
+                elif mut.is_deletion:
+                    filename = mut.mutation
+                    start = self.sequence_instance.gene_start_idx -6 + mut.idx_dna_deletion_begin
+                    end = self.sequence_instance.gene_start_idx -3 + mut.idx_dna_deletion_begin
+                    snapgene_dict[mut.mutation] = [start, end, self.mutation_instance.colors[mut.type]]
+                    snapgene_dict[self.sequence_instance.seqid] = [self.sequence_instance.gene_start_idx, self.sequence_instance.gene_end_idx - mut.length_deletion, self.sequence_instance.color]
+                    snapgene_dict[eblock.name] = [eblock.start_index, eblock.end_index - mut.length_deletion, self.eblock_colors[eblock.block_number]]
 
                 elif mut.is_multiplemutation:
                     filename = '-'.join(mut.mutation)
                     for i, _ in enumerate(mut.idx_dna):
-                        snapgene_dict[mut.mutation[i]] = [self.sequence_instance.gene_start_idx -3 + mut.idx_dna[i],
-                                                      self.sequence_instance.gene_start_idx + mut.idx_dna[i],
-                                                      self.mutation_instance.colors[mut.type]]
+                        start = self.sequence_instance.gene_start_idx -3 + mut.idx_dna[i]
+                        end = self.sequence_instance.gene_start_idx + mut.idx_dna[i]
+                        snapgene_dict[mut.mutation[i]] = [start, end, self.mutation_instance.colors[mut.type]]
                         
                 self.make_dir(dirname=filename)
                 Utils.check_directory(os.path.join(snapgene_instance.output_dir, filename), self.verbose)
-                mutated_vector = self.sequence_instance.mutate_vector(eblock.start_index, eblock.end_index, eblock.sequence)
+                mutated_vector = self.sequence_instance.mutate_vector(self.sequence_instance.circular_index(eblock.start_index, len(self.sequence_instance.vector.seq)), self.sequence_instance.circular_index(eblock.end_index, len(self.sequence_instance.vector.seq)), eblock.sequence)
                 self.sequence_instance.save_vector(vector=mutated_vector, output_dir=os.path.join(snapgene_instance.output_dir, filename), filename=f"{filename}.dna")
                 snapgene_instance.eblocks_to_gff3(eblocks=snapgene_dict, output_dir=os.path.join(snapgene_instance.output_dir, filename), filename=f"{filename}.gff3")
                 snapgene_instance.eblocks_to_genbank(vector=mutated_vector, eblocks=snapgene_dict, output_dir=os.path.join(snapgene_instance.output_dir, filename), filename=f"{filename}.gb")
