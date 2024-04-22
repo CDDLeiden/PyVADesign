@@ -64,6 +64,20 @@ class Utils:
             codon_usage_no_U[newkey] = value
         return codon_usage_no_U
     
+    @staticmethod
+    def check_directory(directory, verbose):
+        # Check if the directory exists
+        if not os.path.exists(directory):
+            raise FileNotFoundError(f"Directory {directory} does not exist.")
+        # Check if the directory is empty
+        if not os.listdir(directory):
+            if verbose:
+                print(f"Directory {directory} is empty.")
+        else:
+            if verbose:
+                print(f"Directory {directory} is not empty. Files might get overwritten or appended to.")
+
+
 
 
 class SnapGene:
@@ -117,19 +131,16 @@ class SnapGene:
                 f.write('\t'.join(line) + '\n')
 
 
-    def eblocks_to_genbank(self, eblocks: dict, output_dir, type='gene', filename='eblocks.gb', header=True):
+    def eblocks_to_genbank(self, vector, eblocks: dict, output_dir, type='gene', filename='eblocks.gb', header=True):
         """
         This function saves a vector to a GenBank (gb) file
         """
-        # snapgene_dict[self.sequence_instance.seqid] = [self.sequence_instance.gene_start_idx, self.sequence_instance.gene_end_idx, self.sequence_instance.color]
-        sequence = Seq(self.sequence_instance.vector.seq)
+        sequence = Seq(vector)
         record = SeqRecord(sequence, id=self.sequence_instance.seqid, description="")
         record.annotations["molecule_type"] = "DNA"
         record.annotations["organism"] = self.sequence_instance.organism
         record.annotations["date"] = datetime.today().strftime('%d-%b-%Y').upper()
-        
-        # Add eBlock and mutations as features
-        features = []
+        features = []  # Add eBlock and mutations as features
         for k, v in eblocks.items():
             feature = SeqFeature(FeatureLocation(v[0], v[1]), type=type, qualifiers={"gene": k, "color": v[2]})
             features.append(feature)
@@ -164,8 +175,8 @@ class SnapGene:
     def count_substring_occurance(sequence: str, substring: str):
         return str(sequence).count(str(substring))
     
-    def remove_empty_lines(self):
-        # TODO Remove last empty line from the file
+    @staticmethod
+    def parse_codon_usage():
         pass
 
 

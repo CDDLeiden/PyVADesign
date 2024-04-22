@@ -1,9 +1,0 @@
-eBlock,sequence,direction,Tm,GC content,begin position,end position
-SEQ1_eBlock-1,cctgcacaaccacaccgagtattc,Forward,58.04,54.17,135,458
-SEQ2_eBlock-2,tgacgatgatggccgagaac,Forward,54.44,55.0,422,817
-SEQ3_eBlock-3,ttgttgtgtgtgcagacc,Forward,50.12,50.0,820,1266
-SEQ4_eBlock-4,tgcccgacatcgatatcgac,Forward,54.07,55.0,1355,1768
-SEQ5_eBlock-5,catcatcaccggctgggattac,Forward,55.28,54.55,1803,2213
-SEQ6_eBlock-6,actatgccgaccgcaagaac,Forward,55.01,55.0,2132,2536
-SEQ7_eBlock-7,tacatggccggtctgttgac,Forward,54.24,55.0,2524,2991
-SEQ8_eBlock-8,tcaccatcaaggtgcccgatgatg,Forward,59.06,54.17,2990,3577

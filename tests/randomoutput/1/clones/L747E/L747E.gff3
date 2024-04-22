@@ -1,5 +1,0 @@
-##gff-version 3.2.1
-##sequence-region myseq 1 7871
-myseq	.	gene	13	3568	.	.	.	Name=dnaE1;color=#d3d3d3
-myseq	.	gene	2132	2536	.	.	.	Name=eBlock-6;color=#e377c2
-myseq	.	gene	133	135	.	.	.	Name=L747E;color=black
