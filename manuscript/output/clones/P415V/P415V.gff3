@@ -1,0 +1,8 @@
+##gff-version 3.2.1
+##sequence-region myseq 1 6878
+myseq	.	gene	1074	2462	.	.	.	Name=eBlock-2;color=#2ca02c
+myseq	.	gene	13	2575	.	.	.	Name=Gene;color=#d3d3d3
+myseq	.	gene	1255	1258	.	.	.	Name=P415V;color=black
+myseq	.	gene	1149	1511	.	.	.	Name=eBlock-3;color=#d62728
+myseq	.	gene	13	2575	.	.	.	Name=Gene;color=#d3d3d3
+myseq	.	gene	1255	1258	.	.	.	Name=P415V;color=black

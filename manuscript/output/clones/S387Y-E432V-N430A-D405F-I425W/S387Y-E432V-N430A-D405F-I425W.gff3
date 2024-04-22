@@ -1,0 +1,16 @@
+##gff-version 3.2.1
+##sequence-region myseq 1 6878
+myseq	.	gene	1074	2462	.	.	.	Name=eBlock-2;color=#2ca02c
+myseq	.	gene	13	2575	.	.	.	Name=Gene;color=#d3d3d3
+myseq	.	gene	1171	1174	.	.	.	Name=S387Y;color=green
+myseq	.	gene	1306	1309	.	.	.	Name=E432V;color=green
+myseq	.	gene	1300	1303	.	.	.	Name=N430A;color=green
+myseq	.	gene	1225	1228	.	.	.	Name=D405F;color=green
+myseq	.	gene	1285	1288	.	.	.	Name=I425W;color=green
+myseq	.	gene	1149	1511	.	.	.	Name=eBlock-3;color=#d62728
+myseq	.	gene	13	2575	.	.	.	Name=Gene;color=#d3d3d3
+myseq	.	gene	1171	1174	.	.	.	Name=S387Y;color=green
+myseq	.	gene	1306	1309	.	.	.	Name=E432V;color=green
+myseq	.	gene	1300	1303	.	.	.	Name=N430A;color=green
+myseq	.	gene	1225	1228	.	.	.	Name=D405F;color=green
+myseq	.	gene	1285	1288	.	.	.	Name=I425W;color=green

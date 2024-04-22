@@ -1,0 +1,8 @@
+##gff-version 3.2.1
+##sequence-region myseq 1 6878
+myseq	.	gene	742	754	.	.	.	Name=A244-NLI;color=red
+myseq	.	gene	147	1067	.	.	.	Name=eBlock-1;color=#ff7f0e
+myseq	.	gene	13	2584	.	.	.	Name=Gene;color=#d3d3d3
+myseq	.	gene	742	754	.	.	.	Name=A244-NLI;color=red
+myseq	.	gene	720	1133	.	.	.	Name=eBlock-2;color=#2ca02c
+myseq	.	gene	13	2584	.	.	.	Name=Gene;color=#d3d3d3

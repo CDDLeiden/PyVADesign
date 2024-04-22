@@ -1,0 +1,8 @@
+##gff-version 3.2.1
+##sequence-region myseq 1 6878
+myseq	.	gene	1074	2462	.	.	.	Name=eBlock-2;color=#2ca02c
+myseq	.	gene	13	2575	.	.	.	Name=Gene;color=#d3d3d3
+myseq	.	gene	1684	1687	.	.	.	Name=L558E;color=black
+myseq	.	gene	1563	1898	.	.	.	Name=eBlock-4;color=#9467bd
+myseq	.	gene	13	2575	.	.	.	Name=Gene;color=#d3d3d3
+myseq	.	gene	1684	1687	.	.	.	Name=L558E;color=black

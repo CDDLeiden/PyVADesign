@@ -7,7 +7,7 @@ from Bio import SeqIO
 from Bio.Seq import Seq
 from datetime import datetime
 from Bio.SeqRecord import SeqRecord
-from Bio.SeqFeature import SeqFeature, FeatureLocation
+from Bio.SeqFeature import SeqFeature, FeatureLocation, CompoundLocation
 
 # from .sequence import Plasmid
 # TODO Make insert + deletion clones
@@ -131,22 +131,57 @@ class SnapGene:
                 f.write('\t'.join(line) + '\n')
 
 
-    def eblocks_to_genbank(self, vector, eblocks: dict, output_dir, type='gene', filename='eblocks.gb', header=True):
+    def eblocks_to_genbank(self, wtvector, mutvector, eblocks: dict, output_dir, type='gene', filename='eblocks.gb', header=True):
         """
         This function saves a vector to a GenBank (gb) file
         """
-        sequence = Seq(vector)
+        sequence = Seq(mutvector)
         record = SeqRecord(sequence, id=self.sequence_instance.seqid, description="")
         record.annotations["molecule_type"] = "DNA"
         record.annotations["organism"] = self.sequence_instance.organism
         record.annotations["date"] = datetime.today().strftime('%d-%b-%Y').upper()
         features = []  # Add eBlock and mutations as features
         for k, v in eblocks.items():
-            feature = SeqFeature(FeatureLocation(v[0], v[1]), type=type, qualifiers={"gene": k, "color": v[2]})
-            features.append(feature)
+            print(k, v)
+            if v[0] > v[1]: # Start index is larger than end index
+                # location1 = FeatureLocation(v[0], len(vector))
+                # location2 = FeatureLocation(0, v[1])
+                # feature1 = SeqFeature(location1, type=type, qualifiers={"gene": k, "color": v[2]})
+                # feature2 = SeqFeature(location2, type=type, qualifiers={"gene": k, "color": v[2]})
+                print(len(mutvector))
+                joint_location = CompoundLocation([FeatureLocation(v[0], len(mutvector)), FeatureLocation(0, v[1])])
+                joint_feature = SeqFeature(joint_location, type="gene", qualifiers={"gene": k, "color": v[2]})
+                features.append(joint_feature)
+            else:
+                feature = SeqFeature(FeatureLocation(v[0], v[1]), type=type, qualifiers={"gene": k, "color": v[2]})
+                features.append(feature)
         record.features.extend(features)     
         outpath = os.path.join(output_dir, filename)
         SeqIO.write(record, outpath, "genbank")
+
+    def add_primers_to_genbank_file(self, genbank_file, primer):
+        """
+        This function saves primer data to an existing GenBank file
+        """
+        seq_record = SeqIO.read(genbank_file, "genbank")
+        print(seq_record.id)
+        if primer.is_forward:
+            site = {"start": int(primer.idx_start), "end": int(primer.idx_end), "sequence": str(primer.sequence_5to3)}
+        elif primer.is_reverse:
+            site = {"start": int(primer.idx_start), "end": int(primer.idx_end), "sequence": self.sequence_instance.invert_sequence(primer.sequence_5to3)}
+        else:
+            raise ValueError("Primer is neither forward nor reverse.")
+        # Add primer binding sites as features to the SeqRecord
+        feature_location = FeatureLocation(start=site["start"], end=site["end"])
+        feature = SeqFeature(location=feature_location, type="primer_bind")
+        feature.qualifiers["note"] = primer.name
+        feature.qualifiers["primer_sequence"] = site["sequence"]
+        seq_record.features.append(feature)
+        # Print the features to identify any issues
+        for feature in seq_record.features:
+            print(feature)
+
+        SeqIO.write(seq_record, genbank_file, "genbank")
 
     @staticmethod
     def gff3_header(length_sequence, version="3.2.1", sequence_name="myseq"):
@@ -183,7 +218,7 @@ class SnapGene:
 
 class OutputToFile:
     """
-    Context manager for redirecting stdout to a file.
+    Context manager for redirecting stdout to a file
     """
     def __init__(self, filepath):
         self.filename = filepath

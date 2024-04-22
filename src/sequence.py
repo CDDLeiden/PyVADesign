@@ -7,6 +7,8 @@ from Bio.SeqRecord import SeqRecord
 from Bio.SeqFeature import SeqFeature, FeatureLocation
 
 
+# .dna file can also be opened in benchling
+
 
 class Plasmid:
     """
@@ -45,7 +47,14 @@ class Plasmid:
         """
         This function parses the vector from a DNA file.
         """
-        vector = self.read_snapgene_dna_file(fp)
+        if fp.endswith(".dna"):
+            vector = self.read_snapgene_dna_file(fp)
+        elif fp.endswith(".gb"):
+            vector = self.read_genbank_file(fp)
+        else:
+            print("Please provide a SnapGene or GenBank file.")
+            sys.exit()
+        print(vector.id)
         self.vector = vector
         self.vector_id = vector.id
         # print(self.vector_id)
@@ -62,11 +71,25 @@ class Plasmid:
         result = self.check_sequence(sequence)
         return result
         
-    def mutate_vector(self, idx_start, idx_end, sequence):
+    def mutate_vector(self, idx_start, idx_end, sequence, mutation_type):
         """
         This function mutates the input vector with a given sequence
         """
-        mutated_vector = self.vector.seq[:idx_start] + sequence + self.vector.seq[idx_end:]
+        # TODO WRITE A FUNCTION TO CHECK THE LENGTH OF THE MUTATED VECTOR
+        # TODO FUND OUT WHAT IS WRONG WITH THIS FUNCTION!!
+        if (idx_start < idx_end) and (idx_start >= 0):
+            mutated_vector = self.vector.seq[:idx_start] + sequence + self.vector.seq[idx_end:]
+        elif (idx_start > idx_end):
+            restoend = len(self.vector.seq) - idx_start
+            mutated_vector = sequence[restoend:] + self.vector.seq[idx_end:idx_start] + sequence[:restoend]
+        else:
+            print("Error in mutation")  # TODO 
+            sys.exit()
+
+        if mutation_type == "Mutation" or mutation_type == "Combined":  # Check whether vector length is correct
+            if len(mutated_vector) != len(self.vector.seq):
+                print("Error in mutation")
+                sys.exit()
         return mutated_vector
         
     @staticmethod
@@ -100,6 +123,12 @@ class Plasmid:
     def read_snapgene_dna_file(fp: str):
         with open(fp, 'rb') as handle:
             for record in SeqIO.parse(handle, "snapgene"):
+                return record
+            
+    @staticmethod
+    def read_genbank_file(fp: str):
+        with open(fp, 'r') as handle:
+            for record in SeqIO.parse(handle, "genbank"):
                 return record
         
     @staticmethod
