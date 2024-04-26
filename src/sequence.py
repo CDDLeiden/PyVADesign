@@ -66,18 +66,18 @@ class Plasmid:
         """
         This function mutates the input vector with a given sequence
         """
-        print(self.vector.seq)
-        if idx_start < idx_end:
+        if (idx_start < idx_end) and (idx_start >= 0):
             mutated_vector = self.vector.seq[:idx_start] + sequence + self.vector.seq[idx_end:]
-        elif idx_start > idx_end:
+        elif (idx_start > idx_end):
             restoend = len(self.vector.seq) - idx_start
             print("restoend", restoend)
-            print("sequence:", len(sequence), sequence)
-            print("vector", self.vector.seq[idx_end:idx_start])
-            print("end", sequence[:restoend])
             mutated_vector = sequence[restoend:] + self.vector.seq[idx_end:idx_start] + sequence[:restoend]
-        print(idx_start, idx_end, len(sequence))
-        print(len(mutated_vector))
+            # TODO WORKING ON THIS FUNCTION
+            mutated_vector = sequence[:restoend] + sequence[restoend:] + self.vector.seq[idx_end:idx_start] + sequence[:restoend]
+            # mutated_vector = sequence[restoend:] + self.vector.seq[:idx_start].seq[idx_end:idx_start] + sequence[:restoend]
+        else:
+            print("Error in mutation")  # TODO 
+            sys.exit()
         return mutated_vector
         
     @staticmethod

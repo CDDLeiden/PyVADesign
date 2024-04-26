@@ -11,6 +11,7 @@ class Mutation:
     def __init__(self, 
                  type: str = None,
                  input: str = None,
+                 name: str = None,
                  mutation: list = None,
                  n_mutants: int = None,
                  insert: str = None,
@@ -33,6 +34,7 @@ class Mutation:
         
         self.type = type
         self.input = input
+        self.name = name
         self.mutation = mutation
         self.position = position
         self.idx_dna = idx_dna
@@ -81,6 +83,7 @@ class Mutation:
                     if len(str_spl_line) == 1:
                         idx = int(str_spl_line[0][1:-1]) * 3
                         mut = Mutation(
+                            name=str_spl_line[0],
                             input=line,
                             mutation=[str_spl_line[0]],
                             idx_dna=[idx],
@@ -97,6 +100,7 @@ class Mutation:
                             idxs.append(idx)
 
                         mut = Mutation(
+                            name='-'.join(muts),
                             input=line,
                             mutation=muts,
                             idx_dna=idxs,
@@ -113,6 +117,7 @@ class Mutation:
                         idxs = list(range((mut_begin * 3), idx_end, 3))
 
                         mutation = Mutation(
+                            name=str_spl_line[1],
                             input=line,
                             mutation=str_spl_line[1],
                             idx_dna_deletion_begin=int(mut_begin) *3,
@@ -129,6 +134,7 @@ class Mutation:
                         idx = int(str_spl_line[1].split("-")[0][1:]) * 3
 
                         mutation = Mutation(
+                            name=str_spl_line[1],
                             input=line,
                             mutation=str_spl_line[1],
                             idx_dna=[idx],

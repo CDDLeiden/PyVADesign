@@ -10,12 +10,9 @@ from Bio.SeqUtils import gc_fraction
 from .mutation import Mutation
 from .sequence import Plasmid
 from .eblocks import EblockDesign
-from .utils import OutputToFile
+from .utils import OutputToFile, SnapGene
 
 
-# TODO Think of a solution when the primers are designed at the very beginning of the gene.
-# - in that case you should look at the vector sequence and design the primers from the end of the gene
-# IVA DESIGN CLASS > make some tests for this
 # TODO add primer data to genbankl file feature is  "primer_bind" 
 
 # TODO Add examples of complementary and hairpin structures to the tests directory
@@ -49,20 +46,33 @@ class DesignPrimers:
         Run the design of the primers
         """
         primerinstance = Primer()
+        snapgene_instance = SnapGene(sequence_instance=self.sequence_instance, output_dir=self.output_dir)
         primers = {}
         with OutputToFile(os.path.join(self.output_dir, 'primer-warnings.txt')):  # Save warnings to file
             ivaprimers = self.design_iva_primer()
             for i in ivaprimers:
                 primers[i.name] = i.sequence_5to3
 
+            # Add primers to Genbank file
+            for mut, eblock in self.eblocks_design_instance.eblocks.items():
+                matching_fw_primer = [i for i in ivaprimers if i.name == f"IVA_Fw_eBlock_{eblock.block_number}"]
+                matching_rv_primer = [i for i in ivaprimers if i.name == f"IVA_Rv_eBlock_{eblock.block_number}"]
+                snapgene_instance.add_primers_to_genbank_file(genbank_file=os.path.join(self.output_dir, 'clones', f"{mut.name}", f"{mut.name}.gb"), primer=matching_fw_primer[0])
+                snapgene_instance.add_primers_to_genbank_file(genbank_file=os.path.join(self.output_dir, 'clones', f"{mut.name}", f"{mut.name}.gb"), primer=matching_rv_primer[0])
+        
+ 
             seqprimers = self.design_seq_primer()
             for i in seqprimers:
                 primers[i.name] = i.sequence_5to3
             self.snapgene_instance.primers_to_fasta(primers=primers, directory=self.output_dir, filename='primers.fasta')
 
+            # TODO Add primers to Genbank file
+
             for k, v in primers.items():  # Check primers for hairpin formation and multiple binding sites
                 max_hairpin, _, _ = primerinstance.check_hairpin(v)
                 n_binding_sites = primerinstance.check_multiple_binding_sites(vector=self.sequence_instance.vector.seq, sequence=v)
+
+            # add to ebl
                         
     def design_iva_primer(self):
         """
@@ -106,6 +116,12 @@ class DesignPrimers:
                                       is_forward=True,
                                       template=''.join(final_fw_template),
                                       overhang=''.join(final_fw_oh))
+            
+            idx_start, idx_end = IVAprimer.find_index_in_vector(fw_sequence, ''.join(fw_combined))
+            print(f"Index start {idx_start} and index end {idx_end}")
+            iva_fw_primer.idx_start = idx_start[0]
+            iva_fw_primer.idx_end = idx_end[0]
+
             ivaprimers.append(iva_fw_primer)
             
             iva_rv_primer = IVAprimer(name=ivaprimerdesign.Rv_name(eblock.block_number),
@@ -113,6 +129,12 @@ class DesignPrimers:
                                       is_reverse=True,
                                       template=''.join(final_rv_template),
                                       overhang=''.join(final_rv_oh))
+            
+            idx_start, idx_end = IVAprimer.find_index_in_vector(rv_sequence, ''.join(rv_combined))
+            print(f"Index start {idx_start} and index end {idx_end}")
+            iva_rv_primer.idx_start = idx_start[0]
+            iva_rv_primer.idx_end = idx_end[0]
+
             ivaprimers.append(iva_rv_primer)
                 
             # Check primers and make sure they are within the desired parameters
@@ -153,6 +175,11 @@ class DesignPrimers:
                                      idx_end_seq=ei - diff,
                                      primer_idx_strt=closest_range[0],
                                      primer_idx_end=closest_range[1])
+                    
+                    start_idx, end_idx = SEQprimer.find_index_in_vector(str(self.sequence_instance.vector.seq).lower(), str(closest_primer).lower())
+                    prim.idx_start = start_idx[0]
+                    prim.idx_end = end_idx[0]
+
                     seqprimers.append(prim)
                     count += 1
                 else:
@@ -199,7 +226,10 @@ class Primer:
                  complementarity_threshold: int = 4,
                  hairpin_threshold: int = 4,
                  is_forward: bool = False,
-                 is_reverse: bool = False):
+                 is_reverse: bool = False,
+                 
+                 idx_start: int = None,
+                 idx_end: int = None):
 
         self.name = name
         self.sequence_5to3 = sequence_5to3
@@ -207,6 +237,8 @@ class Primer:
         self.hairpin_threshold = hairpin_threshold
         self.is_forward = is_forward
         self.is_reverse = is_reverse
+        self.idx_start = idx_start
+        self.idx_end = idx_end
 
     def Tm(self, sequence):
         return round(mt.Tm_NN(sequence), 2)
@@ -228,6 +260,35 @@ class Primer:
                             max_hairpin = len(fragment)
                             # print(f"Hairpin formation in sequence {sequence} exceeds threshold of {self.hairpin_threshold} ({len(fragment)}) with {fragment} and {complementary_inverted}")
         return max_hairpin, fragment, complementary_inverted
+    
+    @staticmethod
+    def find_index_in_vector(vector, primer):
+        circular_string = vector + vector
+        start_index = 0
+        start_indexes = []
+        end_indexes = []
+
+        while True:
+            index = circular_string.find(primer, start_index)
+            if index == -1:
+                break
+            if index >= len(vector):
+                new_index = index - len(vector)
+                if new_index not in start_indexes:
+                    start_indexes.append(new_index)
+                    end_indexes.append(new_index + len(primer))
+            else:
+                if index not in start_indexes:
+                    start_indexes.append(index)
+                    end_indexes.append(index + len(primer))
+            start_index = index + len(primer)
+
+        if len(start_indexes) > 1:
+            # TODO What to do here? add them all?
+            print(f"Multiple binding sites for primer {primer} in the vector sequence")
+            sys.exit()
+
+        return start_indexes, end_indexes
     
     @staticmethod
     def check_multiple_binding_sites(vector: str, sequence: str):
@@ -255,9 +316,12 @@ class IVAprimer(Primer, DesignPrimers):
                  hairpin_threshold: int = 4,
                  is_forward: bool = False,
                  is_reverse: bool = False,
-
+                 
                  template: str = None,
                  overhang: str = None,
+
+                 idx_start: int = None,
+                 idx_end: int = None,
 
                  # IVA primer properties
                  max_overhang_temp_IVA: int = 50,
@@ -271,7 +335,9 @@ class IVAprimer(Primer, DesignPrimers):
                          complementarity_threshold=complementarity_threshold, 
                          hairpin_threshold=hairpin_threshold, 
                          is_forward=is_forward,
-                         is_reverse=is_reverse)
+                         is_reverse=is_reverse,
+                         idx_start=idx_start,
+                         idx_end=idx_end)
                          
         self.max_overhang_temp_IVA = max_overhang_temp_IVA
         self.max_template_temp_IVA = max_template_temp_IVA
@@ -311,7 +377,7 @@ class IVAprimer(Primer, DesignPrimers):
         if begin < end:
             rv_oh = rv_sequence[begin:end]
         else:
-            sys.exit()
+            rv_oh = rv_sequence[begin:] + rv_sequence[:end]
         return rv_oh
 
     def Rv_template(self, block_begin, rv_sequence, size=20):
@@ -383,6 +449,9 @@ class SEQprimer(Primer, DesignPrimers):
                  is_forward: bool = False,
                  is_reverse: bool = False,
 
+                 idx_start: int = None,
+                 idx_end: int = None,
+
                 # SEQ primer properties
                  min_primer_length_seq: int = 18,
                  max_primer_length_seq: int = 24,
@@ -402,7 +471,9 @@ class SEQprimer(Primer, DesignPrimers):
                          complementarity_threshold=complementarity_threshold,
                          hairpin_threshold=hairpin_threshold,
                          is_forward=is_forward,
-                         is_reverse=is_reverse)
+                         is_reverse=is_reverse,
+                         idx_start=idx_start,
+                         idx_end=idx_end)
                          
         self.min_primer_length_seq = min_primer_length_seq
         self.max_primer_length_seq = max_primer_length_seq
