@@ -131,24 +131,25 @@ class SnapGene:
                 f.write('\t'.join(line) + '\n')
 
 
-    def eblocks_to_genbank(self, vector, eblocks: dict, output_dir, type='gene', filename='eblocks.gb', header=True):
+    def eblocks_to_genbank(self, wtvector, mutvector, eblocks: dict, output_dir, type='gene', filename='eblocks.gb', header=True):
         """
         This function saves a vector to a GenBank (gb) file
         """
-        sequence = Seq(vector)
+        sequence = Seq(mutvector)
         record = SeqRecord(sequence, id=self.sequence_instance.seqid, description="")
         record.annotations["molecule_type"] = "DNA"
         record.annotations["organism"] = self.sequence_instance.organism
         record.annotations["date"] = datetime.today().strftime('%d-%b-%Y').upper()
         features = []  # Add eBlock and mutations as features
         for k, v in eblocks.items():
-            print("v[0]", v[0], "v[1]", v[1])
+            print(k, v)
             if v[0] > v[1]: # Start index is larger than end index
                 # location1 = FeatureLocation(v[0], len(vector))
                 # location2 = FeatureLocation(0, v[1])
                 # feature1 = SeqFeature(location1, type=type, qualifiers={"gene": k, "color": v[2]})
                 # feature2 = SeqFeature(location2, type=type, qualifiers={"gene": k, "color": v[2]})
-                joint_location = CompoundLocation([FeatureLocation(v[0], len(vector)), FeatureLocation(0, v[1])])
+                print(len(mutvector))
+                joint_location = CompoundLocation([FeatureLocation(v[0], len(mutvector)), FeatureLocation(0, v[1])])
                 joint_feature = SeqFeature(joint_location, type="gene", qualifiers={"gene": k, "color": v[2]})
                 features.append(joint_feature)
             else:
@@ -173,10 +174,9 @@ class SnapGene:
         # Add primer binding sites as features to the SeqRecord
         feature_location = FeatureLocation(start=site["start"], end=site["end"])
         feature = SeqFeature(location=feature_location, type="primer_bind")
-        feature.qualifiers["note"] = "Primer binding site"
+        feature.qualifiers["note"] = primer.name
         feature.qualifiers["primer_sequence"] = site["sequence"]
         seq_record.features.append(feature)
-
         # Print the features to identify any issues
         for feature in seq_record.features:
             print(feature)

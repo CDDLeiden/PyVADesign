@@ -124,9 +124,13 @@ class EblockDesign:
 
         # Define the beginning and end of each gene block, based on the clusters and include the minimum overlap
         bins = self.make_bins(optimal_clustering)
+        # print("bins", bins)
 
         # Make gene blocks (WT DNA sequences sliced to the correct size, according to the bins) and renumber them starting from 1
         self.wt_eblocks = self.make_wt_eblocks(bins)
+
+        # for i in self.wt_eblocks:
+        #     print("i.name", i.name, "i.start_index", i.start_index, "i.end_index", i.end_index, "i.bin_start", i.bin_start, "i.bin_end", i.bin_end)
 
         # Loop over all mutations and create the eBlocks, based on the WT eBlocks
         results = {}
@@ -260,6 +264,7 @@ class EblockDesign:
         for num in range(0, len(bins), 2):
             start_index = self.sequence_instance.gene_start_idx + bins[num]
             end_index = self.sequence_instance.gene_start_idx + bins[num+1]
+            print("start_index", start_index, "end_index", self.sequence_instance.gene_start_idx + bins[num+1])
             eblock = Eblock(
                 start_index=self.sequence_instance.circular_index(start_index, len(self.sequence_instance.vector.seq)),  # start index in the vector
                 end_index=self.sequence_instance.circular_index(end_index, len(self.sequence_instance.vector.seq)), 
@@ -274,10 +279,19 @@ class EblockDesign:
         """
         Find the index of a mutation in an eblock.
         """
-        if self.sequence_instance.gene_start_idx > eblock.start_index:
-            mutation_index_in_eblock = self.sequence_instance.gene_start_idx - eblock.start_index + idx_mutation
-        else:
+        # print("idx_mutation", idx_mutation)
+        # print("eblock.start_index", eblock.start_index)
+        # print("self.sequence_instance.gene_start_idx", self.sequence_instance.gene_start_idx)
+        # if self.sequence_instance.gene_start_idx > eblock.start_index:
+        #     mutation_index_in_eblock = self.sequence_instance.gene_start_idx - eblock.start_index + idx_mutation
+        if (eblock.start_index > eblock.end_index) and (self.sequence_instance.gene_start_idx < eblock.start_index):
+            mutation_idx_in_gene  = self.sequence_instance.gene_start_idx + idx_mutation
+            residues_to_end = len(self.sequence_instance.vector.seq) - eblock.start_index
+            mutation_index_in_eblock = residues_to_end + mutation_idx_in_gene
+        elif (eblock.start_index < eblock.end_index) and (self.sequence_instance.gene_start_idx < eblock.start_index):
             mutation_index_in_eblock = (idx_mutation - eblock.start_index) + self.sequence_instance.gene_start_idx
+        else:
+            print("Error in mutation index calculation")
         return mutation_index_in_eblock
         
     def eblocks_within_range(self, mutation_idx: int):
@@ -300,12 +314,15 @@ class EblockDesign:
         This function checks if the WT codon at the mutation index is the same as in the mutation.
         """
         all_codons = Utils.DNA_codons()
-        codon = eblock.sequence[eblock.mutation_start_index-3:eblock.mutation_start_index]
+        codon = eblock.sequence[eblock.mutation_start_index-3:eblock.mutation_start_index].lower()
         result = next((value for key, value in all_codons.items() if key.lower() == codon), None)
-        if result is not None and result != mut[0]:
+        if result != mut[0]:
             print(f"WT codon does not match residue {mut}, but is {result}, the codon is {codon}")
-            print("This is probably due to the fact that paired mutations are not in the same eBlock")
             sys.exit()
+        # if result is not None and result != mut[0]:
+        #     print(f"WT codon does not match residue {mut}, but is {result}, the codon is {codon}")
+        #     # print("This is probably due to the fact that paired mutations are not in the same eBlock")
+        #     sys.exit()
 
     def select_mut_codon(self, res: str):
         all_codons = Utils.DNA_codons()
@@ -354,6 +371,14 @@ class EblockDesign:
         if mutation.is_singlemutation:
             eblock, _ = self.eblocks_within_range(mutation.idx_dna[0])
             eblock.mutation_start_index = self.eblock_index(eblock, mutation.idx_dna[0])
+            print(mutation.mutation)
+            # print("mutation_start_index:", eblock.mutation_start_index)
+            # print("eblock.start_index", eblock.start_index)
+            # print("eblock.end_index", eblock.end_index)
+            # print("eblock.bin_start", eblock.bin_start)
+            # print("eblock.bin_end", eblock.bin_end)
+            # print("eblock.sequence", eblock.sequence)
+            # print("mutation.idx_dna[0]", mutation.idx_dna[0])
             self.check_wt_codon(eblock, mutation.mutation[0][0])  # Check if WT codon at index is same residue as mutation
             eblock.mutant_codon = self.select_mut_codon(mutation.mutation[0][-1])
             eblock.sequence = self.mutate_eblock(mutation, eblock)
@@ -425,10 +450,11 @@ class EblockDesign:
 
             # Loop over all mutations and create mutated vector and features that can be read by snapgene
             for mut, eblock in self.eblocks.items():
+                print(mut.mutation)
                 print("eblock.start_index", eblock.start_index)
                 print("eblock.end_index", eblock.end_index)
                 snapgene_dict = {}
-                if not mut.is_deletion:
+                if not (mut.is_deletion) and not (mut.is_insert):
                     snapgene_dict[eblock.name] = [eblock.start_index, eblock.end_index, self.eblock_colors[eblock.block_number]]
                     # snapgene_dict[eblock.name] = [self.sequence_instance.circular_index(eblock.start_index, len(self.sequence_instance.vector.seq)),
                     #                               self.sequence_instance.circular_index(eblock.end_index, len(self.sequence_instance.vector.seq)),
@@ -442,7 +468,7 @@ class EblockDesign:
                 filename = mut.name
                     
                 if mut.is_singlemutation:
-                    # filename = mut.mutation[0]
+
                     start = self.sequence_instance.gene_start_idx -3 + mut.idx_dna[0]
                     end = self.sequence_instance.gene_start_idx + mut.idx_dna[0]
                     snapgene_dict[mut.name] = [start, end, self.mutation_instance.colors[mut.type]]
@@ -451,16 +477,18 @@ class EblockDesign:
                     #                            self.mutation_instance.colors[mut.type]]
 
                 elif mut.is_insert:
-                    # filename = mut.mutation
+                    
                     start = self.sequence_instance.gene_start_idx -3 + mut.idx_dna[0]
                     end = self.sequence_instance.gene_start_idx + mut.idx_dna[0] + mut.length_insert
                     snapgene_dict[mut.name] = [start, end, self.mutation_instance.colors[mut.type]]
+                    snapgene_dict[eblock.name] = [eblock.start_index, eblock.end_index + mut.length_insert, self.eblock_colors[eblock.block_number]]
+                    snapgene_dict[self.sequence_instance.seqid] = [self.sequence_instance.gene_start_idx, self.sequence_instance.gene_end_idx + mut.length_insert, self.sequence_instance.color]
                     # snapgene_dict[mut.name] = [self.sequence_instance.circular_index(start, len(self.sequence_instance.vector.seq)),
                     #                            self.sequence_instance.circular_index(end, len(self.sequence_instance.vector.seq)),
                     #                            self.mutation_instance.colors[mut.type]]
                     
                 elif mut.is_deletion:
-                    # filename = mut.mutation
+
                     start = self.sequence_instance.gene_start_idx -6 + mut.idx_dna_deletion_begin
                     end = self.sequence_instance.gene_start_idx -3 + mut.idx_dna_deletion_begin
                     snapgene_dict[mut.name] = [start, end, self.mutation_instance.colors[mut.type]]
@@ -471,7 +499,15 @@ class EblockDesign:
                     # snapgene_dict[self.sequence_instance.seqid] = [self.sequence_instance.circular_index(self.sequence_instance.gene_start_idx, len(self.sequence_instance.vector.seq)),
                     #                                                self.sequence_instance.circular_index(self.sequence_instance.gene_end_idx - mut.length_deletion, len(self.sequence_instance.vector.seq)),
                     #                                                self.sequence_instance.color]
-                    snapgene_dict[eblock.name] = [eblock.start_index, eblock.end_index - mut.length_deletion, self.eblock_colors[eblock.block_number]]
+                    # TODO FIX THIS
+                    if eblock.start_index < eblock.end_index:
+                        snapgene_dict[eblock.name] = [eblock.start_index, eblock.end_index - mut.length_deletion, self.eblock_colors[eblock.block_number]]
+                    else:
+                        # TODO FIX THIS DECENTLY
+                        restoend = len(self.sequence_instance.vector.seq) - eblock.start_index
+                        newlength = len(self.sequence_instance.vector.seq) - mut.length_deletion
+                        newstart = newlength - restoend
+                        snapgene_dict[eblock.name] = [newstart, eblock.end_index - mut.length_deletion, self.eblock_colors[eblock.block_number]]
                     # snapgene_dict[eblock.name] = [self.sequence_instance.circular_index(eblock.start_index, len(self.sequence_instance.vector.seq)),
                     #                               self.sequence_instance.circular_index(eblock.end_index - mut.length_deletion, len(self.sequence_instance.vector.seq)),
                     #                               self.eblock_colors[eblock.block_number]]
@@ -488,12 +524,13 @@ class EblockDesign:
                         
                 self.make_dir(dirname=filename)
                 Utils.check_directory(os.path.join(snapgene_instance.output_dir, filename), self.verbose)
-                mutated_vector = self.sequence_instance.mutate_vector(eblock.start_index, eblock.end_index, eblock.sequence)
-                print(filename, len(self.sequence_instance.vector.seq))
-                print("length mutated vector", len(mutated_vector))
+                mutated_vector = self.sequence_instance.mutate_vector(eblock.start_index, eblock.end_index, eblock.sequence, mutation_type=mut.type)
+                # print(filename, len(self.sequence_instance.vector.seq))
+                # print("length mutated vector", len(mutated_vector))
                 self.sequence_instance.save_vector(vector=mutated_vector, output_dir=os.path.join(snapgene_instance.output_dir, filename), filename=f"{filename}.dna")
                 snapgene_instance.eblocks_to_gff3(eblocks=snapgene_dict, output_dir=os.path.join(snapgene_instance.output_dir, filename), filename=f"{filename}.gff3")
-                snapgene_instance.eblocks_to_genbank(vector=mutated_vector, eblocks=snapgene_dict, output_dir=os.path.join(snapgene_instance.output_dir, filename), filename=f"{filename}.gb")
+                # TODO FIX THIS FUNCTION
+                snapgene_instance.eblocks_to_genbank(wtvector=self.sequence_instance.vector.seq, mutvector=mutated_vector, eblocks=snapgene_dict, output_dir=os.path.join(snapgene_instance.output_dir, filename), filename=f"{filename}.gb")
                 
             self.output_dir = original_dir
             self.sequence_instance.output_dir = original_dir

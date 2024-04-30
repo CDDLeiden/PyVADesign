@@ -7,6 +7,8 @@ from Bio.SeqRecord import SeqRecord
 from Bio.SeqFeature import SeqFeature, FeatureLocation
 
 
+# .dna file can also be opened in benchling
+
 
 class Plasmid:
     """
@@ -62,22 +64,25 @@ class Plasmid:
         result = self.check_sequence(sequence)
         return result
         
-    def mutate_vector(self, idx_start, idx_end, sequence):
+    def mutate_vector(self, idx_start, idx_end, sequence, mutation_type):
         """
         This function mutates the input vector with a given sequence
         """
+        # TODO WRITE A FUNCTION TO CHECK THE LENGTH OF THE MUTATED VECTOR
+        # TODO FUND OUT WHAT IS WRONG WITH THIS FUNCTION!!
         if (idx_start < idx_end) and (idx_start >= 0):
             mutated_vector = self.vector.seq[:idx_start] + sequence + self.vector.seq[idx_end:]
         elif (idx_start > idx_end):
             restoend = len(self.vector.seq) - idx_start
-            print("restoend", restoend)
             mutated_vector = sequence[restoend:] + self.vector.seq[idx_end:idx_start] + sequence[:restoend]
-            # TODO WORKING ON THIS FUNCTION
-            mutated_vector = sequence[:restoend] + sequence[restoend:] + self.vector.seq[idx_end:idx_start] + sequence[:restoend]
-            # mutated_vector = sequence[restoend:] + self.vector.seq[:idx_start].seq[idx_end:idx_start] + sequence[:restoend]
         else:
             print("Error in mutation")  # TODO 
             sys.exit()
+
+        if mutation_type == "Mutation" or mutation_type == "Combined":  # Check whether vector length is correct
+            if len(mutated_vector) != len(self.vector.seq):
+                print("Error in mutation")
+                sys.exit()
         return mutated_vector
         
     @staticmethod
