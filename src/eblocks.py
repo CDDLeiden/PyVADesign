@@ -236,7 +236,7 @@ class EblockDesign:
         elif self.amount_optimization:
             self.print_line("Optimizing based on number of eBlocks ...")
             fewest_blocks, best_clustering = min((len(value), value) for value in clusters.values())
-            self.print_line(f"Fewest blocks: {fewest_blocks} with cluster {best_clustering}")
+            self.print_line(f"Lowest number of eBlocks: {fewest_blocks}")
             return best_clustering
 
     def calculate_cost(self, clusters: dict) -> float:
@@ -264,7 +264,7 @@ class EblockDesign:
         for num in range(0, len(bins), 2):
             start_index = self.sequence_instance.gene_start_idx + bins[num]
             end_index = self.sequence_instance.gene_start_idx + bins[num+1]
-            print("start_index", start_index, "end_index", self.sequence_instance.gene_start_idx + bins[num+1])
+            # print("start_index", start_index, "end_index", self.sequence_instance.gene_start_idx + bins[num+1])
             eblock = Eblock(
                 start_index=self.sequence_instance.circular_index(start_index, len(self.sequence_instance.vector.seq)),  # start index in the vector
                 end_index=self.sequence_instance.circular_index(end_index, len(self.sequence_instance.vector.seq)), 
@@ -371,7 +371,7 @@ class EblockDesign:
         if mutation.is_singlemutation:
             eblock, _ = self.eblocks_within_range(mutation.idx_dna[0])
             eblock.mutation_start_index = self.eblock_index(eblock, mutation.idx_dna[0])
-            print(mutation.mutation)
+            # print(mutation.mutation)
             # print("mutation_start_index:", eblock.mutation_start_index)
             # print("eblock.start_index", eblock.start_index)
             # print("eblock.end_index", eblock.end_index)
@@ -450,9 +450,9 @@ class EblockDesign:
 
             # Loop over all mutations and create mutated vector and features that can be read by snapgene
             for mut, eblock in self.eblocks.items():
-                print(mut.mutation)
-                print("eblock.start_index", eblock.start_index)
-                print("eblock.end_index", eblock.end_index)
+                # print(mut.mutation)
+                # print("eblock.start_index", eblock.start_index)
+                # print("eblock.end_index", eblock.end_index)
                 snapgene_dict = {}
                 if not (mut.is_deletion) and not (mut.is_insert):
                     snapgene_dict[eblock.name] = [eblock.start_index, eblock.end_index, self.eblock_colors[eblock.block_number]]
