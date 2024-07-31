@@ -1,0 +1,14 @@
+##gff-version 3.2.1
+##sequence-region myseq 1 6878
+myseq	.	gene	201	1307	.	.	.	Name=eBlock-1;color=#ff7f0e
+myseq	.	gene	13	2575	.	.	.	Name=Gene;color=#d3d3d3
+myseq	.	gene	664	667	.	.	.	Name=G218M;color=green
+myseq	.	gene	796	799	.	.	.	Name=R262N;color=green
+myseq	.	gene	673	676	.	.	.	Name=D221E;color=green
+myseq	.	gene	793	796	.	.	.	Name=E261N;color=green
+myseq	.	gene	201	824	.	.	.	Name=eBlock-1;color=#ff7f0e
+myseq	.	gene	13	2575	.	.	.	Name=Gene;color=#d3d3d3
+myseq	.	gene	664	667	.	.	.	Name=G218M;color=green
+myseq	.	gene	796	799	.	.	.	Name=R262N;color=green
+myseq	.	gene	673	676	.	.	.	Name=D221E;color=green
+myseq	.	gene	793	796	.	.	.	Name=E261N;color=green

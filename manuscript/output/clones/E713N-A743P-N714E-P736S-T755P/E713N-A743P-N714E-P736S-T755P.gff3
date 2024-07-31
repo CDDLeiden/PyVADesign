@@ -1,0 +1,16 @@
+##gff-version 3.2.1
+##sequence-region myseq 1 6878
+myseq	.	gene	1401	2540	.	.	.	Name=eBlock-2;color=#2ca02c
+myseq	.	gene	13	2575	.	.	.	Name=Gene;color=#d3d3d3
+myseq	.	gene	2149	2152	.	.	.	Name=E713N;color=green
+myseq	.	gene	2239	2242	.	.	.	Name=A743P;color=green
+myseq	.	gene	2152	2155	.	.	.	Name=N714E;color=green
+myseq	.	gene	2218	2221	.	.	.	Name=P736S;color=green
+myseq	.	gene	2275	2278	.	.	.	Name=T755P;color=green
+myseq	.	gene	1401	2540	.	.	.	Name=eBlock-2;color=#2ca02c
+myseq	.	gene	13	2575	.	.	.	Name=Gene;color=#d3d3d3
+myseq	.	gene	2149	2152	.	.	.	Name=E713N;color=green
+myseq	.	gene	2239	2242	.	.	.	Name=A743P;color=green
+myseq	.	gene	2152	2155	.	.	.	Name=N714E;color=green
+myseq	.	gene	2218	2221	.	.	.	Name=P736S;color=green
+myseq	.	gene	2275	2278	.	.	.	Name=T755P;color=green

@@ -47,7 +47,14 @@ class Plasmid:
         """
         This function parses the vector from a DNA file.
         """
-        vector = self.read_snapgene_dna_file(fp)
+        if fp.endswith(".dna"):
+            vector = self.read_snapgene_dna_file(fp)
+        elif fp.endswith(".gb"):
+            vector = self.read_genbank_file(fp)
+        else:
+            print("Please provide a SnapGene or GenBank file.")
+            sys.exit()
+        print(vector.id)
         self.vector = vector
         self.vector_id = vector.id
         # print(self.vector_id)
@@ -116,6 +123,12 @@ class Plasmid:
     def read_snapgene_dna_file(fp: str):
         with open(fp, 'rb') as handle:
             for record in SeqIO.parse(handle, "snapgene"):
+                return record
+            
+    @staticmethod
+    def read_genbank_file(fp: str):
+        with open(fp, 'r') as handle:
+            for record in SeqIO.parse(handle, "genbank"):
                 return record
         
     @staticmethod

@@ -120,6 +120,8 @@ class EblockDesign:
 
         # Divide the target gene into clusters based on the mutations
         valid_clusters = self.find_possible_clusters()
+        for key, value in valid_clusters.items():
+            print(key, value)
         optimal_clustering = self.choose_cluster(valid_clusters)
 
         # Define the beginning and end of each gene block, based on the clusters and include the minimum overlap
@@ -142,6 +144,9 @@ class EblockDesign:
         # Create a GFF3/gb file for easy visualization of eBlocks in sequence editor tools
         if self.clone_files:
             self.make_clones()
+
+        # Save eBlocks to a CSV file
+        self.eblocks_to_csv()
 
         self.print_line("Completed eBlock design.")
                                              
@@ -230,7 +235,10 @@ class EblockDesign:
     def choose_cluster(self, clusters: dict) -> dict:
         if self.cost_optimization:
             self.print_line("Optimizing based on price per bp ...")
+            for key, value in clusters.items():
+                print(key, self.calculate_cost(value))
             lowest_cost, best_clustering = min((self.calculate_cost(value), value) for value in clusters.values())
+            print(lowest_cost, best_clustering)
             self.print_line(f"Lowest estimated cost: €{lowest_cost} (given price per bp of €{self.bp_price})")
             return best_clustering
         elif self.amount_optimization:
@@ -585,6 +593,15 @@ class EblockDesign:
     def print_line(self, txt):
         if self.verbose:
             print(txt)
+
+    def eblocks_to_csv(self, filename="eblocks.csv"):
+        """
+        Save eBlocks to a CSV file.
+        """
+        with open(os.path.join(self.output_dir, filename), 'w') as f:
+            f.write("eBlock,Start,End,Sequence\n")
+            for key, value in self.eblocks.items():
+                f.write(f"{value.name},{value.start_index},{value.end_index},{value.sequence}\n")
 
     @staticmethod
     def renumber_eblock(eblocks: list):

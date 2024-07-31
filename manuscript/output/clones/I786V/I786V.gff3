@@ -1,0 +1,8 @@
+##gff-version 3.2.1
+##sequence-region myseq 1 6878
+myseq	.	gene	1203	2417	.	.	.	Name=eBlock-2;color=#2ca02c
+myseq	.	gene	13	2575	.	.	.	Name=Gene;color=#d3d3d3
+myseq	.	gene	2368	2371	.	.	.	Name=I786V;color=black
+myseq	.	gene	2199	2499	.	.	.	Name=eBlock-4;color=#9467bd
+myseq	.	gene	13	2575	.	.	.	Name=Gene;color=#d3d3d3
+myseq	.	gene	2368	2371	.	.	.	Name=I786V;color=black

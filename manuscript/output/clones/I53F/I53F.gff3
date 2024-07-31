@@ -1,0 +1,8 @@
+##gff-version 3.2.1
+##sequence-region myseq 1 6878
+myseq	.	gene	147	1058	.	.	.	Name=eBlock-1;color=#ff7f0e
+myseq	.	gene	13	2575	.	.	.	Name=Gene;color=#d3d3d3
+myseq	.	gene	169	172	.	.	.	Name=I53F;color=black
+myseq	.	gene	147	626	.	.	.	Name=eBlock-1;color=#ff7f0e
+myseq	.	gene	13	2575	.	.	.	Name=Gene;color=#d3d3d3
+myseq	.	gene	169	172	.	.	.	Name=I53F;color=black

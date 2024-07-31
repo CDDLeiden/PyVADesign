@@ -1,0 +1,8 @@
+##gff-version 3.2.1
+##sequence-region myseq 1 6878
+myseq	.	gene	54	1382	.	.	.	Name=eBlock-1;color=#ff7f0e
+myseq	.	gene	13	2575	.	.	.	Name=Gene;color=#d3d3d3
+myseq	.	gene	1195	1198	.	.	.	Name=E395T;color=black
+myseq	.	gene	54	1382	.	.	.	Name=eBlock-1;color=#ff7f0e
+myseq	.	gene	13	2575	.	.	.	Name=Gene;color=#d3d3d3
+myseq	.	gene	1195	1198	.	.	.	Name=E395T;color=black
