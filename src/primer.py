@@ -4,6 +4,8 @@ import math
 import difflib
 import pandas as pd
 
+import biotite.sequence as seq
+
 from Bio.SeqUtils import MeltingTemp as mt
 from Bio.SeqUtils import gc_fraction
 
@@ -80,7 +82,7 @@ class DesignPrimers:
         """
 
         fw_sequence = str(self.sequence_instance.vector.seq.lower())
-        rv_sequence = self.sequence_instance.reverse_complement(fw_sequence)
+        rv_sequence = seq.NucleotideSequence(fw_sequence).complement()
         
         ivaprimerdesign = IVAprimer()
         ivaprimers = []  # Store all IVA primers in a list
@@ -251,8 +253,7 @@ class Primer:
         for i in range(0, len(sequence) +1):
             for j in range(1, len(sequence) +1):
                 fragment = sequence[i:i+j]
-                complementary = Plasmid.reverse_complement(fragment)
-                complementary_inverted = complementary[::-1]
+                complementary_inverted = seq.NucleotideSequence(fragment).reverse().complement()
                 if len(fragment) >= self.hairpin_threshold:
                     # Search for complementary regions in sequence
                     if complementary_inverted in sequence:

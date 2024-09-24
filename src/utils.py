@@ -1,7 +1,15 @@
 import os
 import sys
 import random
+import tempfile
+import itertools
+import numpy as np
 import pandas as pd
+import biotite.sequence as seq
+import biotite.database.entrez as entrez
+import biotite.sequence.io.fasta as fasta
+import biotite.sequence.io.genbank as gb
+from biotite.sequence import AnnotatedSequence
 
 from Bio import SeqIO
 from Bio.Seq import Seq
@@ -13,70 +21,27 @@ from Bio.SeqFeature import SeqFeature, FeatureLocation, CompoundLocation
 # TODO Make insert + deletion clones
 
 
+# TODO REMOVE NATURAL AMINO ACIDS? CHECK CODONS FOR STOP BACTERIA VERSUS HUMAN
 class Utils:
 
     def __init__(self):
             pass
     
     @staticmethod
-    def natural_amino_acids():
-        """
-        This function returns a string of valid amino acids.
-        """
+    # TODO Remove function
+    def aas():
         return "acdefghiklmnpqrstvwy"
-    
-    @staticmethod
-    def DNA_codons():
-        DNA_Codons = {
-        "ATG": "start",
-        "TAA": "stop", "TAG": "stop", "TGA": "stop",
-        "GCT": "A", "GCC": "A", "GCA": "A", "GCG": "A",
-        "TGT": "C", "TGC": "C",
-        "GAT": "D", "GAC": "D",
-        "GAA": "E", "GAG": "E",
-        "TTT": "F", "TTC": "F",
-        "GGT": "G", "GGC": "G", "GGA": "G", "GGG": "G",
-        "CAT": "H", "CAC": "H",
-        "ATA": "I", "ATT": "I", "ATC": "I",
-        "AAA": "K", "AAG": "K",
-        "TTA": "L", "TTG": "L", "CTT": "L", "CTC": "L", "CTA": "L", "CTG": "L",
-        "ATG": "M",
-        "AAT": "N", "AAC": "N",
-        "CCT": "P", "CCC": "P", "CCA": "P", "CCG": "P",
-        "CAA": "Q", "CAG": "Q",
-        "CGT": "R", "CGC": "R", "CGA": "R", "CGG": "R", "AGA": "R", "AGG": "R",
-        "TCT": "S", "TCC": "S", "TCA": "S", "TCG": "S", "AGT": "S", "AGC": "S",
-        "ACT": "T", "ACC": "T", "ACA": "T", "ACG": "T",
-        "GTT": "V", "GTC": "V", "GTA": "V", "GTG": "V",
-        "TGG": "W",
-        "TAT": "Y", "TAC": "Y"}
-        return DNA_Codons
-    
-    @staticmethod
-    def read_codon_usage(fp):
-        codon_usage = {}
-        codon_usage_no_U = {}
-        df = pd.read_csv(fp, sep=';')
-        for _, row in df.iterrows():
-            codon_usage[row['Triplet']] = row['Number']
-        for key, value in codon_usage.items():
-            newkey = key.replace('U', 'T').lower()
-            codon_usage_no_U[newkey] = value
-        return codon_usage_no_U
-    
+        
     @staticmethod
     def check_directory(directory, verbose):
-        # Check if the directory exists
-        if not os.path.exists(directory):
+        if not os.path.exists(directory):  # Check if the directory exists
             raise FileNotFoundError(f"Directory {directory} does not exist.")
-        # Check if the directory is empty
-        if not os.listdir(directory):
+        if not os.listdir(directory):  # Check if the directory is empty
             if verbose:
                 print(f"Directory {directory} is empty.")
         else:
             if verbose:
                 print(f"Directory {directory} is not empty. Files might get overwritten or appended to.")
-
 
 
 
@@ -231,3 +196,131 @@ class OutputToFile:
     def __exit__(self, exc_type, exc_value, traceback):
         sys.stdout = self.stdout
         self.file.close()
+
+
+
+class CodonUsage:
+    """
+    Class for generating codon usage tables using biotite
+    """
+
+    #TODO Get genome ID from NIH (put somewhere in tutorial)
+    #TODO Default codon usage bacteria vs Human?
+    #TODO CHECK LICENSING OF THIS CODE THAT WAS ADOPTED FROM ... (https://www.biotite-python.org/latest/examples/gallery/sequence/misc/codon_usage.html)
+    
+    def __init__(self,
+                genome_id: str = None,
+                output_dir: str = None):
+
+        self.genome_id = genome_id
+        self.output_dir = output_dir
+
+    def run(self):
+        """
+        Obtain the most common codon for each amino acid in a genome
+        """
+        genome = self.get_genome_features()
+        codon_counter = CodonUsage.count_codons(genome)
+        codon_counter = CodonUsage.get_codon_usage(genome, codon_counter)
+        relative_frequencies = CodonUsage.get_relative_frequencies(genome, codon_counter)
+        self.relative_frequencies_to_csv(relative_frequencies)
+        max_codons = CodonUsage.most_common_codon_per_aa(relative_frequencies)
+        return max_codons
+
+    def get_genome_features(self):
+        """
+        Get the CDS features of a genome
+        """
+        try:
+            gb_file = gb.GenBankFile.read(
+                entrez.fetch(self.genome_id, tempfile.gettempdir(), "gb", "nuccore", "gb"))
+        except Exception as e:
+            print(f"Error fetching genome with ID '{self.genome_id}': {e}")
+            return None
+        genome = gb.get_annotated_sequence(gb_file, include_only=["CDS"])
+        if isinstance(genome, AnnotatedSequence):
+            return genome
+        else:
+            raise ValueError("No CDS features found in genome")
+    
+    def relative_frequencies_to_csv(self, frequencies_dict):
+        """
+        Save relative frequencies in a CSV file
+        """
+        outpath = os.path.join(self.output_dir, f"{self.genome_id}_codon_usage.csv")
+        with open(outpath, "w") as file:
+            file.write("Amino Acid,Codon,Relative Frequency\n")
+            for amino_acid, codons in frequencies_dict.items():
+                for codon, freq in codons:
+                    file.write(f"{amino_acid},{codon},{freq}\n")
+
+    @staticmethod
+    def count_codons(genome):
+        """
+        Count the occurrence of each codon in a genome
+        The symbols [0 1 2 3] represent ['A' 'C' 'G' 'T'] respectively
+        """
+        codon_counter = {
+            codon: 0
+            for codon in itertools.product(*([range(len(genome.sequence.alphabet))] * 3))}
+        return codon_counter
+    
+    @staticmethod
+    def get_codon_usage(genome, codon_counter):
+        """
+        Get the codon usage of a genome
+        """
+        for feature in genome.annotation:
+            cds = genome[feature]  # Get the coding sequence
+            if len(cds) % 3 != 0:  # malformed CDS
+                continue
+            for i in range(0, len(cds), 3):  # Count the codons
+                codon_code = tuple(cds.code[i:i+3])
+                codon_counter[codon_code] += 1
+        return codon_counter
+    
+    @staticmethod
+    def get_relative_frequencies(genome, codon_counter):
+        """
+        Convert the total frequencies into relative frequencies
+        """
+        table = seq.CodonTable.default_table()  # ID 11 is the bacterial codon table
+        relative_frequencies = {}
+        for amino_acid_code in range(20):
+            codon_codes_for_aa = table[amino_acid_code]
+            total = 0  # Get the total amount of codon occurrences for the amino acid
+            for codon_code in codon_codes_for_aa:
+                total += codon_counter[codon_code]
+            for codon_code in codon_codes_for_aa:
+                codon_counter[codon_code] /= total
+                amino_acid = seq.ProteinSequence.alphabet.decode(amino_acid_code)
+                codon = genome.sequence.alphabet.decode_multiple(codon_code)
+                codon = "".join(codon)
+                freq = codon_counter[codon_code]
+                if amino_acid not in relative_frequencies:  # Store relative frequencies in dictionary
+                    relative_frequencies[amino_acid] = []
+                relative_frequencies[amino_acid].append((codon, round(freq, 3)))
+        return relative_frequencies
+    
+    @staticmethod
+    def most_common_codon_per_aa(relative_frequencies):
+        """
+        Get the most common codon for each amino acid
+        """
+        max_freqs = {}
+        for amino_acid, codons in relative_frequencies.items():
+            codons.sort(key=lambda x: x[1], reverse=True)
+            max_freqs[amino_acid] = (codons[0][0], codons[0][1])
+        return max_freqs
+    
+
+
+
+
+
+
+
+
+
+
+

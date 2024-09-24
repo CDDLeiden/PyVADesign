@@ -6,11 +6,12 @@ import sys
 import copy
 import numpy as np
 from sklearn.cluster import KMeans
+import biotite.sequence as seq
 from sklearn.metrics.pairwise import euclidean_distances
 
 from .mutation import Mutation
 from .sequence import Plasmid
-from .utils import Utils, SnapGene
+from .utils import Utils, SnapGene, CodonUsage
 
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -77,7 +78,7 @@ class EblockDesign:
                  amount_optimization: bool = False,
                  clone_files: bool = True,
                  verbose: bool = True,
-                 codon_usage: str = os.path.join(data_dir, "codon_usage", "Escherichia_coli.csv"),
+                 codon_usage: str = "U00096",  # Escherichia coli str. K-12 substr. MG1655
 
                 # IDT values
                  bp_price: float = 0.05,
@@ -109,12 +110,22 @@ class EblockDesign:
         self.wt_eblocks: dict = {}  # Wild-type gene blocks
         self.eblocks: dict = {}  # Mutated gene blocks
 
+        # Store most abundant codons for the selected genome
+        self.most_abundant_codons: dict = {}
+
         self.validate_optimization_parameters()
 
     def run_design_eblocks(self):
         """
         This function runs the design process for eBlocks.
         """
+        
+        # Calculate the relative codon frequencies for the selected genome (Default is E. coli)
+        self.print_line(f"Calculating relative codon frequencies, based on the selected genome id {self.codon_usage} ...")
+        codonusage = CodonUsage(
+            genome_id=self.codon_usage,
+            output_dir=self.output_dir)
+        self.most_abundant_codons = codonusage.run()
 
         self.print_line("Starting eBlock design ...")
 
@@ -319,11 +330,13 @@ class EblockDesign:
     
     def check_wt_codon(self, eblock: Eblock, mut: str):
         """
-        This function checks if the WT codon at the mutation index is the same as in the mutation.
+        Check whether the WT codon at the mutation index is the same as in the proposed mutation
         """
-        all_codons = Utils.DNA_codons()
-        codon = eblock.sequence[eblock.mutation_start_index-3:eblock.mutation_start_index].lower()
-        result = next((value for key, value in all_codons.items() if key.lower() == codon), None)
+        codon = eblock.sequence[eblock.mutation_start_index-3:eblock.mutation_start_index].upper()
+        try:
+            result = seq.CodonTable.default_table()[str(codon)]
+        except:
+            result = None
         if result != mut[0]:
             print(f"WT codon does not match residue {mut}, but is {result}, the codon is {codon}")
             sys.exit()
@@ -331,13 +344,13 @@ class EblockDesign:
         #     print(f"WT codon does not match residue {mut}, but is {result}, the codon is {codon}")
         #     # print("This is probably due to the fact that paired mutations are not in the same eBlock")
         #     sys.exit()
-
+    
     def select_mut_codon(self, res: str):
-        all_codons = Utils.DNA_codons()
-        possible_codons = [key.lower() for key, value in all_codons.items() if value == res]
-        codon_dict = Utils.read_codon_usage(fp=self.codon_usage)
-        selected_codon = max(possible_codons, key=codon_dict.get, default='xxx')
-        return selected_codon
+        """
+        Select the most abundant codon for a given residue, 
+        based on the relative frequencies of the codons in the selected genome
+        """
+        return self.most_abundant_codons[res][0]
     
     def mutate_eblock(self, mutation, eblock: Eblock, end_idx=None):
         """
