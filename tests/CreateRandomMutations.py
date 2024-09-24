@@ -28,7 +28,7 @@ class RandomMutations:
         """
         Make random mutations in a protein sequence.
         """
-        protein_sequence = Plasmid.translate_sequence(nucleotide_sequence)
+        protein_sequence = RandomMutations.translate_sequence(nucleotide_sequence)
         residues = [i + str(j) for i, j in zip(protein_sequence, range(1, len(protein_sequence) + 1))]
 
         random_mutations = {}
@@ -173,6 +173,11 @@ class RandomMutations:
                 f.write('Insert ' + i.upper() + '\n')
             for i in mutations['deletions']:
                 f.write('Deletion ' + i.upper() + '\n')
+
+    @staticmethod
+    # TODO Change this function if possible
+    def translate_sequence(sequence: str) -> str:
+        return sequence.translate()
 
 
 if __name__ == "__main__":

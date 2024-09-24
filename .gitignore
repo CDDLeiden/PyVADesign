@@ -2,6 +2,7 @@
 
 doc/TODO.txt
 tutorial/output/*
+tutorial/0925-output/*
 !tutorial/output/.gitkeep 
 
 ### Python template
