@@ -127,7 +127,7 @@ class DesignPrimers:
             ivaprimers.append(iva_fw_primer)
             
             iva_rv_primer = IVAprimer(name=ivaprimerdesign.Rv_name(eblock.block_number),
-                                      sequence_5to3=self.sequence_instance.invert_sequence(''.join(rv_combined)),
+                                      sequence_5to3=seq.NucleotideSequence(''.join(rv_combined)).reverse(), # sequence_5to3=self.sequence_instance.invert_sequence(''.join(rv_combined)),
                                       is_reverse=True,
                                       template=''.join(final_rv_template),
                                       overhang=''.join(final_rv_oh))

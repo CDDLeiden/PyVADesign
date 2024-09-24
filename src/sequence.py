@@ -6,8 +6,12 @@ from datetime import datetime
 from Bio.SeqRecord import SeqRecord
 from Bio.SeqFeature import SeqFeature, FeatureLocation
 
+from biotite.sequence import NucleotideSequence
+
 
 # .dna file can also be opened in benchling
+
+#TODO Nucleotide sequence class vs protein sequence class
 
 
 class Plasmid:
@@ -68,8 +72,7 @@ class Plasmid:
         self.sequence = sequence
         self.seqid = seqid
         self.gene_start_idx, self.gene_end_idx = self.find_index_in_vector(vector=self.vector.seq, sequence=self.sequence)
-        result = self.check_sequence(sequence)
-        return result
+        self.check_dna_sequence(sequence)
         
     def mutate_vector(self, idx_start, idx_end, sequence, mutation_type):
         """
@@ -143,17 +146,27 @@ class Plasmid:
                 print("Please provide a single sequence in FASTA format.")
                 sys.exit()
         return sequence, seqid
-    
+            
     @staticmethod
-    def check_sequence(sequence: str) -> str:
+    def check_dna_sequence(sequence: str) -> bool:
         """
-        This function checks whether the sequence is DNA (only contains GCTA) and contains a start and stop codon.
+        This function checks whether the sequence is an actual nucleotide sequence and contains a start and stop codon.
         """
-        if Plasmid.is_dna(sequence) and Plasmid.contains_start_stop_codon(sequence):
-            return 1
+        if not (NucleotideSequence(sequence).is_valid() and Plasmid.contains_start_stop_codon(sequence)):
+            raise ValueError("Invalid nucleotide sequence: Please provide a valid sequence containing start and stop codons.")
+        return True
+
+    @staticmethod
+    def contains_start_stop_codon2(sequence: str) -> bool:
+        """
+        This function checks if the sequence contains start and stop codons.
+        """
+        stop_codons = ["TAA", "TAG", "TGA"]
+        sequence = sequence.upper()
+        if (sequence.startswith("ATG")) and (sequence[-3:] in stop_codons):
+            return True
         else:
-            print("Please provide a DNA sequence with start and stop codons.")
-            sys.exit()
+            return False
 
     @staticmethod
     def check_vector(vector: str) -> str:
@@ -162,32 +175,7 @@ class Plasmid:
         """
         # TODO Make this function
         pass
-
-    @staticmethod
-    def is_dna(sequence: str) -> bool:
-        """
-        This function checks if the sequence is DNA.
-        """
-        if set(sequence.upper()).issubset("ATGC"):
-            return True
-        else:
-            print("Please provide a DNA sequence")
-
-    @staticmethod
-    def contains_start_stop_codon(sequence: str) -> bool:
-        """
-        This function checks if the sequence contains start and stop codons.
-        """
-        # TODO hardcoded start and stop codons > REMOVE
-        if sequence.upper().startswith("ATG") and sequence.upper().endswith(("TAA", "TAG", "TGA")):
-            return True
-        else:
-            print("Please provide a sequence with start and stop codons")
-
-    @staticmethod
-    def translate_sequence(sequence: str) -> str:
-        return sequence.translate()
     
-    @staticmethod
-    def invert_sequence(sequence):
-        return sequence[::-1]
+    # @staticmethod
+    # def invert_sequence(sequence):
+    #     return sequence[::-1]

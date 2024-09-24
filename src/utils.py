@@ -21,19 +21,20 @@ from Bio.SeqFeature import SeqFeature, FeatureLocation, CompoundLocation
 # TODO Make insert + deletion clones
 
 
-# TODO REMOVE NATURAL AMINO ACIDS? CHECK CODONS FOR STOP BACTERIA VERSUS HUMAN
 class Utils:
 
     def __init__(self):
             pass
     
     @staticmethod
-    # TODO Remove function
     def aas():
         return "acdefghiklmnpqrstvwy"
         
     @staticmethod
     def check_directory(directory, verbose):
+        """
+        Check if a directory exists and is empty
+        """
         if not os.path.exists(directory):  # Check if the directory exists
             raise FileNotFoundError(f"Directory {directory} does not exist.")
         if not os.listdir(directory):  # Check if the directory is empty
@@ -133,7 +134,8 @@ class SnapGene:
         if primer.is_forward:
             site = {"start": int(primer.idx_start), "end": int(primer.idx_end), "sequence": str(primer.sequence_5to3)}
         elif primer.is_reverse:
-            site = {"start": int(primer.idx_start), "end": int(primer.idx_end), "sequence": self.sequence_instance.invert_sequence(primer.sequence_5to3)}
+            # site = {"start": int(primer.idx_start), "end": int(primer.idx_end), "sequence": self.sequence_instance.invert_sequence(primer.sequence_5to3)}
+            site = {"start": int(primer.idx_start), "end": int(primer.idx_end), "sequence": seq.NucleotideSequence(primer.sequence_5to3).reverse()}
         else:
             raise ValueError("Primer is neither forward nor reverse.")
         # Add primer binding sites as features to the SeqRecord
@@ -204,8 +206,7 @@ class CodonUsage:
     Class for generating codon usage tables using biotite
     """
 
-    #TODO Get genome ID from NIH (put somewhere in tutorial)
-    #TODO Default codon usage bacteria vs Human?
+    #TODO Get genome IDs from NIH (put somewhere in tutorial)
     #TODO CHECK LICENSING OF THIS CODE THAT WAS ADOPTED FROM ... (https://www.biotite-python.org/latest/examples/gallery/sequence/misc/codon_usage.html)
     
     def __init__(self,
@@ -282,9 +283,9 @@ class CodonUsage:
     @staticmethod
     def get_relative_frequencies(genome, codon_counter):
         """
-        Convert the total frequencies into relative frequencies
+        Convert the total counts into relative frequencies
         """
-        table = seq.CodonTable.default_table()  # ID 11 is the bacterial codon table
+        table = seq.CodonTable.default_table()
         relative_frequencies = {}
         for amino_acid_code in range(20):
             codon_codes_for_aa = table[amino_acid_code]
@@ -309,8 +310,8 @@ class CodonUsage:
         """
         max_freqs = {}
         for amino_acid, codons in relative_frequencies.items():
-            codons.sort(key=lambda x: x[1], reverse=True)
-            max_freqs[amino_acid] = (codons[0][0], codons[0][1])
+            max_codon = max(codons, key=lambda x: x[1])
+            max_freqs[amino_acid] = max_codon
         return max_freqs
     
 
