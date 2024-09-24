@@ -178,6 +178,7 @@ class Plasmid:
         """
         This function checks if the sequence contains start and stop codons.
         """
+        # TODO hardcoded start and stop codons > REMOVE
         if sequence.upper().startswith("ATG") and sequence.upper().endswith(("TAA", "TAG", "TGA")):
             return True
         else:
@@ -185,26 +186,8 @@ class Plasmid:
 
     @staticmethod
     def translate_sequence(sequence: str) -> str:
-        """
-        Translate DNA sequence to protein sequence
-        """
         return sequence.translate()
     
     @staticmethod
     def invert_sequence(sequence):
-        """
-        Invert sequence
-        """
         return sequence[::-1]
-    
-    @staticmethod
-    def reverse_complement(sequence):
-        """
-        Reverse complement sequence
-        """
-        pairs = {"a": "t", "c":"g", "t":"a", "g":"c"}
-        reverse = ""
-        for nucleotide in sequence:
-            rev_nucl = pairs[nucleotide]
-            reverse += rev_nucl
-        return reverse

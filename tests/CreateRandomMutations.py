@@ -34,7 +34,7 @@ class RandomMutations:
         random_mutations = {}
 
         # List containing all natural amino acids and options for our mutations
-        amino_acids = Utils.natural_amino_acids()
+        amino_acids = Utils.aas()
 
         # Randomly select single mutations
         selected_single_mutants = self.random_single_mutation(residues, amino_acids, n_single_mutations)
