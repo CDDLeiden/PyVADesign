@@ -7,16 +7,15 @@ import copy
 import numpy as np
 from sklearn.cluster import KMeans
 import biotite.sequence as seq
+from scipy.spatial.distance import pdist, squareform
 from sklearn.metrics.pairwise import euclidean_distances
+from scipy.spatial.distance import pdist, squareform
+from sklearn_extra.cluster import KMedoids
+
 
 from .mutation import Mutation
 from .sequence import Plasmid
 from .utils import Utils, SnapGene, CodonUsage
-
-
-# script_dir = os.path.dirname(os.path.abspath(__file__))
-# parent_dir = os.path.abspath(os.path.join(script_dir, os.pardir))  # Navigate one directory upwards to reach the parent directory
-# data_dir = os.path.join(parent_dir, "data")  # Navigate to the data directory
 
 
 class Eblock:
@@ -50,19 +49,6 @@ class Eblock:
         self.mutant_codon = mutant_codon
         self.insert = insert
 
-    def set_name(self, name: str):
-        self.name = name
-
-    def set_sequence(self, sequence: str):
-        self.sequence = sequence
-
-    def set_start_index(self, start_index: int):
-        self.start_index = start_index
-
-    def set_end_index(self, end_index: int):
-        self.end_index = end_index
-
-
 
 class EblockDesign:
     """
@@ -79,7 +65,6 @@ class EblockDesign:
                  verbose: bool = True,
                  codon_usage: str = "U00096",  # Escherichia coli str. K-12 substr. MG1655
 
-                # IDT values
                  bp_price: float = 0.05,
                  max_eblock_length: int = 1500,
                  min_eblock_length: int = 300,
@@ -118,8 +103,8 @@ class EblockDesign:
         """
         This function runs the design process for eBlocks.
         """
-        
         # Calculate the relative codon frequencies for the selected genome (Default is E. coli)
+        
         self.print_line(f"Calculating relative codon frequencies, based on the selected genome id {self.codon_usage} ...")
         codonusage = CodonUsage(
             genome_id=self.codon_usage,
@@ -130,23 +115,19 @@ class EblockDesign:
 
         # Divide the target gene into clusters based on the mutations
         valid_clusters = self.find_possible_clusters()
-        for key, value in valid_clusters.items():
-            print(key, value)
         optimal_clustering = self.choose_cluster(valid_clusters)
 
         # Define the beginning and end of each gene block, based on the clusters and include the minimum overlap
         bins = self.make_bins(optimal_clustering)
-        # print("bins", bins)
 
         # Make gene blocks (WT DNA sequences sliced to the correct size, according to the bins) and renumber them starting from 1
         self.wt_eblocks = self.make_wt_eblocks(bins)
 
-        # for i in self.wt_eblocks:
-        #     print("i.name", i.name, "i.start_index", i.start_index, "i.end_index", i.end_index, "i.bin_start", i.bin_start, "i.bin_end", i.bin_end)
-
         # Loop over all mutations and create the eBlocks, based on the WT eBlocks
         results = {}
         for mutation in self.mutation_instance.mutations:
+            print("-----")
+            print("TEST", mutation.mutation)
             results = self.make_mutant_eblock(mutation, results)  # Create mutated eBlock, based on mutation type
         sorted_dict = dict(sorted(results.items(), key=lambda x: (x[1].name, x[1].start_index)))  # Sort the eblocks based on the index of the first mutation in the eblock and the number of the eblock
         self.eblocks = sorted_dict
@@ -210,12 +191,11 @@ class EblockDesign:
                 valid_clusters = False
         
         if len(possibilities) == 0:  # No valid clusters found
-            print("No valid clusterings found for current mutations. Please check your input mutations and make sure \
-                   that the multi-mutants are not too far apart.")
-            sys.exit()
+            raise Exception("No valid clusterings found for current mutations. Please check your input mutations and make sure that the multi-mutants are not too far apart.")
         return possibilities
     
     def kmeans_clustering(self, num_clusters: int):
+        print("num_clusters", num_clusters)
         X = []
         constraints = []
         for i in self.mutation_instance.mutations:
@@ -236,11 +216,47 @@ class EblockDesign:
                     idxs.append(j)
                     X.append(j)
                 constraints.append(tuple(idxs))
+
+        # Old Kmeanseditedversion
+        # X = np.asarray(X).reshape(-1, 1).flatten()
+        # kmeans = CustomKMeans(constraints, n_clusters=num_clusters)  # Initialize KMeans with the number of clusters
+        # kmeans.fit(X.reshape(-1, 1))
+        # labels = kmeans.labels_
+        # print(constraints)
+
+        # New Kmediods
         X = np.asarray(X).reshape(-1, 1).flatten()
-        kmeans = CustomKMeans(constraints, n_clusters=num_clusters)  # Initialize KMeans with the number of clusters
-        kmeans.fit(X.reshape(-1, 1))
-        labels = kmeans.labels_
+        # print(X)
+        # print(X.shape)
+        # print('---')
+        # Convert constraints to indices
+        constraints_indices = []
+        for con in constraints:
+            index_a = np.where(X == con[0])[0]
+            index_b = np.where(X == con[1])[0]
+            constraints_indices.append((index_a, index_b))
+
+        # Step 2: Precompute the distance matrix (Euclidean by default for 1D points)
+        distance_matrix = squareform(pdist(X[:, np.newaxis], metric='euclidean'))
+        # print(distance_matrix)
+        # print(distance_matrix.shape)
+        # Step 3: Modify the distance matrix based on the constraints
+        for idx1, idx2 in constraints_indices:
+            distance_matrix[idx1, idx2] *= 0.5
+            distance_matrix[idx2, idx1] *= 0.5
+
+        # Step 4: Use KMedoids with the precomputed distance matrix
+        kmedoids = KMedoids(n_clusters=num_clusters, metric='precomputed', random_state=42)
+
+        # Step 5: Fit the model
+        kmedoids.fit(distance_matrix)
+
+        # Step 6: Get the cluster labels and return them along with the original X
+        labels = kmedoids.labels_
+
         return labels.tolist(), X.tolist()
+    
+    # TODO WRITE CHECK THAT PAIRED MUTATIONS ARE IN THE SAME CLUSTER
     
     def choose_cluster(self, clusters: dict) -> dict:
         if self.cost_optimization:
@@ -332,13 +348,14 @@ class EblockDesign:
         Check whether the WT codon at the mutation index is the same as in the proposed mutation
         """
         codon = eblock.sequence[eblock.mutation_start_index-3:eblock.mutation_start_index].upper()
+        print("check_wt_codon called")  # Added debug statement
         try:
             result = seq.CodonTable.default_table()[str(codon)]
+            print("codon:", codon, "result:", result)
         except:
             result = None
         if result != mut[0]:
-            print(f"WT codon does not match residue {mut}, but is {result}, the codon is {codon}")
-            sys.exit()
+            raise Exception(f"WT codon does not match residue {mut}, but is {result}, the codon is {codon}")
         # if result is not None and result != mut[0]:
         #     print(f"WT codon does not match residue {mut}, but is {result}, the codon is {codon}")
         #     # print("This is probably due to the fact that paired mutations are not in the same eBlock")
@@ -391,14 +408,8 @@ class EblockDesign:
         if mutation.is_singlemutation:
             eblock, _ = self.eblocks_within_range(mutation.idx_dna[0])
             eblock.mutation_start_index = self.eblock_index(eblock, mutation.idx_dna[0])
-            # print(mutation.mutation)
-            # print("mutation_start_index:", eblock.mutation_start_index)
-            # print("eblock.start_index", eblock.start_index)
-            # print("eblock.end_index", eblock.end_index)
-            # print("eblock.bin_start", eblock.bin_start)
-            # print("eblock.bin_end", eblock.bin_end)
-            # print("eblock.sequence", eblock.sequence)
-            # print("mutation.idx_dna[0]", mutation.idx_dna[0])
+            print(mutation.mutation)
+            print(mutation.mutation[0][0])
             self.check_wt_codon(eblock, mutation.mutation[0][0])  # Check if WT codon at index is same residue as mutation
             eblock.mutant_codon = self.select_mut_codon(mutation.mutation[0][-1])
             eblock.sequence = self.mutate_eblock(mutation, eblock)
@@ -423,16 +434,22 @@ class EblockDesign:
             selected_eblock = None
             for mut_i in mutation.idx_dna:
                 eblock, counts = self.eblocks_within_range(mut_i)
+                print(eblock, counts)
                 if counts == 1:  # If only one eBlock for mutation > should be correct eBlock
                     selected_eblock = eblock
 
             all_counts = [counts for _, counts in (self.eblocks_within_range(mut_i) for mut_i in mutation.idx_dna)]
+            print("all_counts", all_counts)
             lowest_count = min(all_counts)
+            print("lowest_count", lowest_count)
             
             for mut_i in mutation.idx_dna:
                 eblock, counts = self.eblocks_within_range(mut_i)
                 if counts == lowest_count:
                     selected_eblock = eblock
+                    print("selected eblock")
+                    print(selected_eblock.name)
+                    print("end selected eblock")
                     try:  # Try to find indexes of mutations, based on eblock. Check if they are too close to beginning or end of eblock
                         for mut_i in mutation.idx_dna:
                             eblock.mutation_start_index = self.eblock_index(selected_eblock, mut_i)  # Check too close to beginning or end
@@ -643,17 +660,19 @@ class EblockDesign:
     
 
 
-class CustomKMeans(KMeans):
-    def __init__(self, constraints_same, n_clusters, init='k-means++', n_init=10, max_iter=300, tol=1e-4, verbose=0, random_state=None, copy_x=True, algorithm='lloyd'):
-        super().__init__(n_clusters=n_clusters, init=init, n_init=n_init, max_iter=max_iter, tol=tol, verbose=verbose, random_state=random_state, copy_x=copy_x, algorithm=algorithm)
-        self.constraints_same = constraints_same
+# class CustomKMeans(KMeans):
+#     def __init__(self, constraints_same, n_clusters, init='k-means++', n_init=10, max_iter=300, tol=1e-4, verbose=0, random_state=None, copy_x=True, algorithm='lloyd'):
+#         super().__init__(n_clusters=n_clusters, init=init, n_init=n_init, max_iter=max_iter, tol=tol, verbose=verbose, random_state=random_state, copy_x=copy_x, algorithm=algorithm)
+#         self.constraints_same = constraints_same
 
-    def _euclidean_distances(self, X, Y):
-        distances = euclidean_distances(X, Y)
+#     def _euclidean_distances(self, X, Y):
+#         distances = euclidean_distances(X, Y)
         
-        for pair in self.constraints_same:
-            idx1, idx2 = pair
-            distances[idx1, idx2] *= 0.5
-            distances[idx2, idx1] *= 0.5
+#         print("modified _euclidean_distances called")
+        
+#         for pair in self.constraints_same:
+#             idx1, idx2 = pair
+#             distances[idx1, idx2] *= 0.5
+#             distances[idx2, idx1] *= 0.5
 
-        return distances
+#         return distances
