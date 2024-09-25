@@ -1,8 +1,0 @@
-##gff-version 3.2.1
-##sequence-region myseq 1 6878
-myseq	.	gene	223	232	.	.	.	Name=I71-GA;color=red
-myseq	.	gene	75	1133	.	.	.	Name=eBlock-1;color=#ff7f0e
-myseq	.	gene	13	2581	.	.	.	Name=Gene;color=#d3d3d3
-myseq	.	gene	223	232	.	.	.	Name=I71-GA;color=red
-myseq	.	gene	75	485	.	.	.	Name=eBlock-1;color=#ff7f0e
-myseq	.	gene	13	2581	.	.	.	Name=Gene;color=#d3d3d3
