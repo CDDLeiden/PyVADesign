@@ -1,12 +1,10 @@
 import os
 import sys
 import math
+import primer3
 import difflib
 import pandas as pd
-
 import biotite.sequence as seq
-
-from Bio.SeqUtils import MeltingTemp as mt
 from Bio.SeqUtils import gc_fraction
 
 from .mutation import Mutation
@@ -16,11 +14,7 @@ from .utils import OutputToFile, SnapGene
 
 
 # TODO add primer data to genbankl file feature is  "primer_bind" 
-
 # TODO Add examples of complementary and hairpin structures to the tests directory
-# TODO Check hairpin         # TODO Check using this website http://biotools.nubic.northwestern.edu/OligoCalc.html
-# TODO Self dimerization vs hairpin
-# TODO Primer3 checkout
 
 
 class DesignPrimers:
@@ -47,34 +41,41 @@ class DesignPrimers:
         """
         Run the design of the primers
         """
+
         primerinstance = Primer()
         snapgene_instance = SnapGene(sequence_instance=self.sequence_instance, output_dir=self.output_dir)
         primers = {}
-        with OutputToFile(os.path.join(self.output_dir, 'primer-warnings.txt')):  # Save warnings to file
-            ivaprimers = self.design_iva_primer()
-            for i in ivaprimers:
-                primers[i.name] = i.sequence_5to3
+        # with OutputToFile(os.path.join(self.output_dir, 'primer-warnings.txt')):  # Save warnings to file
+        ivaprimers = self.design_iva_primer()
+        for i in ivaprimers:
+            primers[i.name] = i.sequence_5to3
 
-            # Add primers to Genbank file
-            for mut, eblock in self.eblocks_design_instance.eblocks.items():
-                matching_fw_primer = [i for i in ivaprimers if i.name == f"IVA_Fw_eBlock_{eblock.block_number}"]
-                matching_rv_primer = [i for i in ivaprimers if i.name == f"IVA_Rv_eBlock_{eblock.block_number}"]
-                snapgene_instance.add_primers_to_genbank_file(genbank_file=os.path.join(self.output_dir, 'clones', f"{mut.name}", f"{mut.name}.gb"), primer=matching_fw_primer[0])
-                snapgene_instance.add_primers_to_genbank_file(genbank_file=os.path.join(self.output_dir, 'clones', f"{mut.name}", f"{mut.name}.gb"), primer=matching_rv_primer[0])
-        
- 
-            seqprimers = self.design_seq_primer()
-            for i in seqprimers:
-                primers[i.name] = i.sequence_5to3
-            self.snapgene_instance.primers_to_fasta(primers=primers, directory=self.output_dir, filename='primers.fasta')
+        # Add primers to Genbank file
+        for mut, eblock in self.eblocks_design_instance.eblocks.items():
+            matching_fw_primer = [i for i in ivaprimers if i.name == f"IVA_Fw_eBlock_{eblock.block_number}"]
+            matching_rv_primer = [i for i in ivaprimers if i.name == f"IVA_Rv_eBlock_{eblock.block_number}"]
+            snapgene_instance.add_primers_to_genbank_file(genbank_file=os.path.join(self.output_dir, 'clones', f"{mut.name}", f"{mut.name}.gb"), primer=matching_fw_primer[0])
+            snapgene_instance.add_primers_to_genbank_file(genbank_file=os.path.join(self.output_dir, 'clones', f"{mut.name}", f"{mut.name}.gb"), primer=matching_rv_primer[0])
 
-            # TODO Add primers to Genbank file
+        seqprimers, mapping = self.design_seq_primer()
+        for i in seqprimers:
+            primers[i.name] = str(i.sequence_5to3)
+        self.snapgene_instance.primers_to_fasta(primers=primers, directory=self.output_dir, filename='primers.fasta')
+        for k, v in mapping.items():
+            for i in v:
+                for s in seqprimers:
+                    if s.name == k:
+                        snapgene_instance.add_primers_to_genbank_file(genbank_file=os.path.join(self.output_dir, 'clones', f"{i}", f"{i}.gb"), primer=s.sequence_5to3)
 
-            for k, v in primers.items():  # Check primers for hairpin formation and multiple binding sites
-                max_hairpin, _, _ = primerinstance.check_hairpin(v)
-                n_binding_sites = primerinstance.check_multiple_binding_sites(vector=self.sequence_instance.vector.seq, sequence=v)
+        # for k, v in primers.items():  # Check primers for hairpin formation and multiple binding sites
+        #     hairpin = primerinstance.calc_hairpin(v)
+        #     n_binding_sites = primerinstance.check_multiple_binding_sites(vector=self.sequence_instance.vector.seq, sequence=v)
 
-            # add to ebl
+        # TODO Check fot 
+        # hairpin = primer3.calc_hairpin(seq2)
+        # het = primer3.calc_heterodimer(seq1, seq2)
+        # homo = primer3.calc_homodimer(seq1)
+        # add to ebl
                         
     def design_iva_primer(self):
         """
@@ -82,7 +83,7 @@ class DesignPrimers:
         """
 
         fw_sequence = str(self.sequence_instance.vector.seq.lower())
-        rv_sequence = seq.NucleotideSequence(fw_sequence).complement()
+        rv_sequence = str(seq.NucleotideSequence(fw_sequence).complement())
         
         ivaprimerdesign = IVAprimer()
         ivaprimers = []  # Store all IVA primers in a list
@@ -127,7 +128,7 @@ class DesignPrimers:
             ivaprimers.append(iva_fw_primer)
             
             iva_rv_primer = IVAprimer(name=ivaprimerdesign.Rv_name(eblock.block_number),
-                                      sequence_5to3=seq.NucleotideSequence(''.join(rv_combined)).reverse(), # sequence_5to3=self.sequence_instance.invert_sequence(''.join(rv_combined)),
+                                      sequence_5to3=str(seq.NucleotideSequence(''.join(rv_combined)).reverse()), # sequence_5to3=self.sequence_instance.invert_sequence(''.join(rv_combined)),
                                       is_reverse=True,
                                       template=''.join(final_rv_template),
                                       overhang=''.join(final_rv_oh))
@@ -187,14 +188,21 @@ class DesignPrimers:
                 else:
                     print("No primer found within the desired range")
 
-        seqprimerdesign.mapped_primers = self.map_seqprimers_to_mutations(seqprimers)
+        mapped_primers = self.map_seqprimers_to_mutations(seqprimers)
+        seqprimerdesign.mapped_primers = mapped_primers
         self.mapped_seqprimers_to_txt(seqprimerdesign.mapped_primers)  # Save mapped primers to mutations to file
 
         # Save primer information
+        print(seqprimers)
+        for i in seqprimers:
+            print(i.sequence_5to3, type(i.sequence_5to3))
+        #     print(i.name, i.idx_start, i.idx_end, i.5to3sequence)
+        
+        # Convert sequences to bytes
         df = seqprimerdesign.primers_to_dataframe(seqprimers)
         df.to_csv(os.path.join(self.output_dir, 'SEQprimers.csv'), index=False)
         
-        return seqprimers
+        return seqprimers, mapped_primers
         
     def map_seqprimers_to_mutations(self, primers: list):
         """Map the sequenced regions to the mutations that can be validated with the sequencing primers"""
@@ -243,24 +251,16 @@ class Primer:
         self.idx_end = idx_end
 
     def Tm(self, sequence):
-        return round(mt.Tm_NN(sequence), 2)
+        return round(primer3.calc_tm(str(sequence)), 2)
     
     def gc_content(self, primer):
         return round(100 * gc_fraction(primer, ambiguous="ignore"), 2)
     
-    def check_hairpin(self, sequence: str):
-        max_hairpin = 0
-        for i in range(0, len(sequence) +1):
-            for j in range(1, len(sequence) +1):
-                fragment = sequence[i:i+j]
-                complementary_inverted = seq.NucleotideSequence(fragment).reverse().complement()
-                if len(fragment) >= self.hairpin_threshold:
-                    # Search for complementary regions in sequence
-                    if complementary_inverted in sequence:
-                        if len(fragment) > max_hairpin:
-                            max_hairpin = len(fragment)
-                            # print(f"Hairpin formation in sequence {sequence} exceeds threshold of {self.hairpin_threshold} ({len(fragment)}) with {fragment} and {complementary_inverted}")
-        return max_hairpin, fragment, complementary_inverted
+    def calc_hairpin(self, sequence):
+        """
+        Calculate the hairpin formation in a given sequence
+        """
+        return primer3.calc_hairpin(str(sequence))
     
     @staticmethod
     def find_index_in_vector(vector, primer):
@@ -270,7 +270,7 @@ class Primer:
         end_indexes = []
 
         while True:
-            index = circular_string.find(primer, start_index)
+            index = str(circular_string).find(primer, start_index)
             if index == -1:
                 break
             if index >= len(vector):
@@ -293,6 +293,7 @@ class Primer:
     
     @staticmethod
     def check_multiple_binding_sites(vector: str, sequence: str):
+        # TODO Maybe use primerblast for this
         # TODO Write some checks for this function
         # TODO Check for exact cases where the sequence binds multiple times and almost exact cases where only few characters are different
         count = 0
@@ -539,8 +540,8 @@ class SEQprimer(Primer, DesignPrimers):
             new_row = pd.DataFrame({'eBlock': str(i.name),
                                     'sequence': str(i.sequence_5to3),
                                     'direction': 'Forward' if i.is_forward else 'Reverse',
-                                    'Tm': float(self.Tm(i.sequence_5to3)),
-                                    'GC content': float(self.gc_content(i.sequence_5to3)),
+                                    'Tm': float(self.Tm(str(i.sequence_5to3))),
+                                    'GC content': float(self.gc_content(str(i.sequence_5to3))),
                                     'begin position': int(i.idx_start_seq),
                                     'end position': int(i.idx_end_seq)}, index=[0])
             self.primers_df = pd.concat([self.primers_df, new_row], ignore_index=True)
