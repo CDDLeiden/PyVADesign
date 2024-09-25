@@ -66,7 +66,7 @@ class Plasmid:
  
     def parse_sequence(self, fp: str) -> str:
         """
-        This function parses the sequence from a text file and checks the input.
+        This function parses the sequence from a text file and checks the input.  # TODO FASTA?
         """
         sequence, seqid = self.read_single_fasta(fp)
         self.sequence = sequence
@@ -135,17 +135,12 @@ class Plasmid:
                 return record
         
     @staticmethod
-    def read_single_fasta(fp: str) -> str:
+    def read_single_fasta(fp: str):
         """
         This function reads a single fasta file and returns the sequence.
         """
-        for num, record in enumerate(SeqIO.parse(fp, "fasta")):
-            sequence = record.seq
-            seqid = record.id
-            if num > 0:
-                print("Please provide a single sequence in FASTA format.")
-                sys.exit()
-        return sequence, seqid
+        record = next(SeqIO.parse(fp, "fasta"))
+        return record.seq, record.id
             
     @staticmethod
     def check_dna_sequence(sequence: str) -> bool:
