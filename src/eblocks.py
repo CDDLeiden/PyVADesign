@@ -115,6 +115,7 @@ class EblockDesign:
 
         # Divide the target gene into clusters based on the mutations
         valid_clusters = self.find_possible_clusters()
+        print("valid_clusters", valid_clusters)
         optimal_clustering = self.choose_cluster(valid_clusters)
 
         # Define the beginning and end of each gene block, based on the clusters and include the minimum overlap
@@ -151,7 +152,7 @@ class EblockDesign:
         while (valid_clusters) and (n <= len(self.mutation_instance.mutations)):
             
             clusters = {}
-            cluster_labels, idxs_reordered = self.kmeans_clustering(num_clusters=n)
+            cluster_labels, idxs_reordered, valid_constraints = self.kmeans_clustering(num_clusters=n)
             clusters = self.cluster_size(clusters, cluster_labels, idxs_reordered)  # Add size of clusters
             cluster_sizes = [max(v) - min(v) for v in clusters.values()]
             cluster_sizes = self.check_clusters(clusters, cluster_sizes) # Check if the size of the clusters is within bounds (inserts + deletions)
@@ -182,7 +183,7 @@ class EblockDesign:
                 else:
                     cluster_correct += 1  
 
-            if (cluster_correct == len(clusters)) and (cluster_too_small < threshold_small_clusters):
+            if (cluster_correct == len(clusters)) and (cluster_too_small < threshold_small_clusters) and (valid_constraints):
                 possibilities[f'cluster N={n}'] = clusters_copy
                 n += 1
             elif cluster_too_big > 0:
@@ -195,7 +196,6 @@ class EblockDesign:
         return possibilities
     
     def kmeans_clustering(self, num_clusters: int):
-        print("num_clusters", num_clusters)
         X = []
         constraints = []
         for i in self.mutation_instance.mutations:
@@ -232,8 +232,8 @@ class EblockDesign:
         # Convert constraints to indices
         constraints_indices = []
         for con in constraints:
-            index_a = np.where(X == con[0])[0]
-            index_b = np.where(X == con[1])[0]
+            index_a = int(np.where(X == con[0])[0])
+            index_b = int(np.where(X == con[1])[0])
             constraints_indices.append((index_a, index_b))
 
         # Step 2: Precompute the distance matrix (Euclidean by default for 1D points)
@@ -253,10 +253,22 @@ class EblockDesign:
 
         # Step 6: Get the cluster labels and return them along with the original X
         labels = kmedoids.labels_
+        valid_constraints = self.check_constraints(constraints_indices, labels.tolist(), X.tolist()) #TODO If constraints are not valid > do not choose this clustering. Function returns bool
+        return labels.tolist(), X.tolist(), valid_constraints
 
-        return labels.tolist(), X.tolist()
     
-    # TODO WRITE CHECK THAT PAIRED MUTATIONS ARE IN THE SAME CLUSTER
+    def check_constraints(self, constraints_indices, labels, X) -> bool:
+        """
+        Check if the constraints are valid.
+        """
+        for con in constraints_indices:
+            con_labels = [labels[i] for i in con]
+            same = all(x == con_labels[0] for x in con_labels) # Check if all pairs are in the same cluster
+            if not same:
+                print("Constraints are not valid")
+                return False
+        return True
+
     
     def choose_cluster(self, clusters: dict) -> dict:
         if self.cost_optimization:
@@ -657,22 +669,3 @@ class EblockDesign:
                         '#aec7e8','#ffbb78','#98df8a','#ff9896','#c5b0d5','#c49c94','#f7b6d2','#c7c7c7','#dbdb8d','#9edae5',
                         '#393b79','#ff7f0e','#2ca02c','#8c564b','#e377c2','#7f7f7f','#bcbd22','#17becf']
         return {i: tab10_colors[i] for i in range(len(tab10_colors))}
-    
-
-
-# class CustomKMeans(KMeans):
-#     def __init__(self, constraints_same, n_clusters, init='k-means++', n_init=10, max_iter=300, tol=1e-4, verbose=0, random_state=None, copy_x=True, algorithm='lloyd'):
-#         super().__init__(n_clusters=n_clusters, init=init, n_init=n_init, max_iter=max_iter, tol=tol, verbose=verbose, random_state=random_state, copy_x=copy_x, algorithm=algorithm)
-#         self.constraints_same = constraints_same
-
-#     def _euclidean_distances(self, X, Y):
-#         distances = euclidean_distances(X, Y)
-        
-#         print("modified _euclidean_distances called")
-        
-#         for pair in self.constraints_same:
-#             idx1, idx2 = pair
-#             distances[idx1, idx2] *= 0.5
-#             distances[idx2, idx1] *= 0.5
-
-#         return distances
