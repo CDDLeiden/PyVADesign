@@ -1,8 +1,0 @@
-##gff-version 3.2.1
-##sequence-region myseq 1 6878
-myseq	.	gene	1641	2231	.	.	.	Name=eBlock-2;color=#2ca02c
-myseq	.	gene	13	2575	.	.	.	Name=Gene;color=#d3d3d3
-myseq	.	gene	1672	1675	.	.	.	Name=V554Y;color=black
-myseq	.	gene	1641	2231	.	.	.	Name=eBlock-3;color=#d62728
-myseq	.	gene	13	2575	.	.	.	Name=Gene;color=#d3d3d3
-myseq	.	gene	1672	1675	.	.	.	Name=V554Y;color=black

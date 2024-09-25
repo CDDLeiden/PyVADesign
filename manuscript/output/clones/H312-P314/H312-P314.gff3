@@ -1,8 +1,0 @@
-##gff-version 3.2.1
-##sequence-region myseq 1 6878
-myseq	.	gene	943	946	.	.	.	Name=H312-P314;color=blue
-myseq	.	gene	13	2569	.	.	.	Name=Gene;color=#d3d3d3
-myseq	.	gene	75	1121	.	.	.	Name=eBlock-1;color=#ff7f0e
-myseq	.	gene	943	946	.	.	.	Name=H312-P314;color=blue
-myseq	.	gene	13	2569	.	.	.	Name=Gene;color=#d3d3d3
-myseq	.	gene	606	1121	.	.	.	Name=eBlock-2;color=#2ca02c

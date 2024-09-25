@@ -1,8 +1,0 @@
-##gff-version 3.2.1
-##sequence-region myseq 1 6878
-myseq	.	gene	517	526	.	.	.	Name=E169-FC;color=red
-myseq	.	gene	201	1313	.	.	.	Name=eBlock-1;color=#ff7f0e
-myseq	.	gene	13	2581	.	.	.	Name=Gene;color=#d3d3d3
-myseq	.	gene	517	526	.	.	.	Name=E169-FC;color=red
-myseq	.	gene	201	830	.	.	.	Name=eBlock-1;color=#ff7f0e
-myseq	.	gene	13	2581	.	.	.	Name=Gene;color=#d3d3d3
