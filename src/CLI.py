@@ -17,8 +17,6 @@ from src.plot import Plot
 # python src/CLI.py -g tutorial/files/A0QX55.fasta -m tutorial/files/mutations.txt -o tutorial/output -v tutorial/files/vector.dna -s data/codon_usage/Mycobacterium_smegmatis.csv
 # python src/CLI.py -g tutorial/files/A0QX55.fasta -o tutorial/output -v tutorial/files/vector.dna -s data/codon_usage/Mycobacterium_smegmatis.csv -m tutorial/files/mutations_begin_end_of_gene.txt
 
-
-
 def eBlocksArgParser():
     parser = argparse.ArgumentParser()
     """

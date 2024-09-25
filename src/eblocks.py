@@ -14,10 +14,9 @@ from .sequence import Plasmid
 from .utils import Utils, SnapGene, CodonUsage
 
 
-script_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.abspath(os.path.join(script_dir, os.pardir))  # Navigate one directory upwards to reach the parent directory
-data_dir = os.path.join(parent_dir, "data")  # Navigate to the data directory
-
+# script_dir = os.path.dirname(os.path.abspath(__file__))
+# parent_dir = os.path.abspath(os.path.join(script_dir, os.pardir))  # Navigate one directory upwards to reach the parent directory
+# data_dir = os.path.join(parent_dir, "data")  # Navigate to the data directory
 
 
 class Eblock:

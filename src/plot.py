@@ -86,12 +86,10 @@ class Plot:
 
         # Check if mutations and sequence are available
         if self.mutation_instance.mutations is None:
-            print("No mutations found. Please run the mutation class first.")
-            sys.exit()
+            raise ValueError("No mutations found. Please run the mutation class first.")
         if self.sequence_instance.sequence is None:
-            print("No sequence found. Please run the sequence class first.")
-            sys.exit()
-
+            raise ValueError("No sequence found. Please run the sequence class first.")
+        
         features = []
         
         # Add GoI to plot
