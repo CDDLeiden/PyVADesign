@@ -157,7 +157,7 @@ class Plasmid:
         return True
 
     @staticmethod
-    def contains_start_stop_codon2(sequence: str) -> bool:
+    def contains_start_stop_codon(sequence: str) -> bool:
         """
         This function checks if the sequence contains start and stop codons.
         """
