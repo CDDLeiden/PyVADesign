@@ -17,9 +17,6 @@ from datetime import datetime
 from Bio.SeqRecord import SeqRecord
 from Bio.SeqFeature import SeqFeature, FeatureLocation, CompoundLocation
 
-# from .sequence import Plasmid
-# TODO Make insert + deletion clones
-
 
 class Utils:
 
@@ -37,14 +34,9 @@ class Utils:
         """
         if not os.path.exists(directory):  # Check if the directory exists
             raise FileNotFoundError(f"Directory {directory} does not exist.")
-        if not os.listdir(directory):  # Check if the directory is empty
-            if verbose:
-                print(f"Directory {directory} is empty.")
-        else:
+        if os.listdir(directory):  # Check if the directory is empty
             if verbose:
                 print(f"Directory {directory} is not empty. Files might get overwritten or appended to.")
-
-
 
 class SnapGene:
     """
@@ -97,24 +89,22 @@ class SnapGene:
                 f.write('\t'.join(line) + '\n')
 
 
-    def eblocks_to_genbank(self, wtvector, mutvector, eblocks: dict, output_dir, type='gene', filename='eblocks.gb', header=True):
+    def eblocks_to_genbank(self, wtvector, mutvector, eblocks: dict, output_dir, type='gene', filename='eblocks.gb', header=True, max_filename_length=16):
         """
         This function saves a vector to a GenBank (gb) file
         """
         sequence = Seq(mutvector)
-        record = SeqRecord(sequence, id=self.sequence_instance.seqid, description="")
+        record = SeqRecord(sequence, id=self.sequence_instance.seqid, name=self.sequence_instance.seqid, description="")
         record.annotations["molecule_type"] = "DNA"
         record.annotations["organism"] = self.sequence_instance.organism
         record.annotations["date"] = datetime.today().strftime('%d-%b-%Y').upper()
+        record.name = record.name + "_" + filename
+        # Limit filename length characters
+        if len(record.name) > max_filename_length:
+            record.name = record.name[:max_filename_length]
         features = []  # Add eBlock and mutations as features
         for k, v in eblocks.items():
-            print(k, v)
             if v[0] > v[1]: # Start index is larger than end index
-                # location1 = FeatureLocation(v[0], len(vector))
-                # location2 = FeatureLocation(0, v[1])
-                # feature1 = SeqFeature(location1, type=type, qualifiers={"gene": k, "color": v[2]})
-                # feature2 = SeqFeature(location2, type=type, qualifiers={"gene": k, "color": v[2]})
-                print(len(mutvector))
                 joint_location = CompoundLocation([FeatureLocation(v[0], len(mutvector)), FeatureLocation(0, v[1])])
                 joint_feature = SeqFeature(joint_location, type="gene", qualifiers={"gene": k, "color": v[2]})
                 features.append(joint_feature)
@@ -157,8 +147,6 @@ class SnapGene:
 
     @staticmethod
     def gff3_line(begin_pos, end_pos, name, hex_color, type):
-        # TODO Change feature, gene, CDS etc to the correct type
-        # TODO Change Myseq to the correct sequence name?
         line = ['myseq', '.', f"{type}", str(begin_pos), str(end_pos), '.', '.', '.', f"Name={name};color={hex_color}"]
         return line
     
@@ -224,7 +212,7 @@ class CodonUsage:
         codon_counter = CodonUsage.count_codons(genome)
         codon_counter = CodonUsage.get_codon_usage(genome, codon_counter)
         relative_frequencies = CodonUsage.get_relative_frequencies(genome, codon_counter)
-        self.relative_frequencies_to_csv(relative_frequencies)
+        # self.relative_frequencies_to_csv(relative_frequencies)
         max_codons = CodonUsage.most_common_codon_per_aa(relative_frequencies)
         return max_codons
 
