@@ -22,11 +22,7 @@ class Utils:
 
     def __init__(self):
             pass
-    
-    @staticmethod
-    def aas():
-        return "acdefghiklmnpqrstvwy"
-        
+            
     @staticmethod
     def check_directory(directory, verbose):
         """
@@ -40,15 +36,17 @@ class Utils:
 
 class SnapGene:
     """
-    Class for generating SnapGene files
+    Class for handling SnapGene files and generating SnapGene features
     """
 
     def __init__(self,
-                 sequence_instance,
+                 vector_instance,
+                 gene_instance,
                  output_dir: str = None):
         
             self.output_dir = output_dir
-            self.sequence_instance = sequence_instance
+            self.vector_instance = vector_instance
+            self.gene_instance = gene_instance
 
     def make_dir(self, directory='clones'):
         newpath = os.path.join(self.output_dir, directory)
@@ -73,7 +71,7 @@ class SnapGene:
         except FileNotFoundError:
             with open(os.path.join(directory, filename), 'w') as f:
                 if header:
-                    f.write("\n".join(SnapGene.gff3_header(self.sequence_instance.vector.seq)))
+                    f.write("\n".join(SnapGene.gff3_header(self.vector_instance.vector.seq)))
                     f.write("\n")
                 else:
                     pass
@@ -94,9 +92,9 @@ class SnapGene:
         This function saves a vector to a GenBank (gb) file
         """
         sequence = Seq(mutvector)
-        record = SeqRecord(sequence, id=self.sequence_instance.seqid, name=self.sequence_instance.seqid, description="")
+        record = SeqRecord(sequence, id=self.gene_instance.seqid, name=self.gene_instance.seqid, description="")
         record.annotations["molecule_type"] = "DNA"
-        record.annotations["organism"] = self.sequence_instance.organism
+        record.annotations["organism"] = self.vector_instance.organism
         record.annotations["date"] = datetime.today().strftime('%d-%b-%Y').upper()
         record.name = record.name + "_" + filename
         # Limit filename length characters

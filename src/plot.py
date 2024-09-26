@@ -8,7 +8,7 @@ from biotite.sequence import Feature, Location, Annotation
 from dna_features_viewer import GraphicFeature, GraphicRecord
 
 from .mutation import Mutation
-from .sequence import Plasmid
+from .sequence import Vector, Gene
 from .eblocks import EblockDesign
 
 
@@ -16,7 +16,8 @@ class Plot:
     def __init__(self, 
                  eblocks_design_instance: EblockDesign,
                  mutation_instance: Mutation,
-                 sequence_instance: Plasmid,
+                 vector_instance: Vector,
+                 gene_instance: Gene,
                  output_dir: str = None,
 
                  show: bool = False,
@@ -24,7 +25,8 @@ class Plot:
         
         self.eblocks_design_instance = eblocks_design_instance
         self.mutation_instance = mutation_instance
-        self.sequence_instance = sequence_instance
+        self.vector_instance = vector_instance
+        self.gene_instance = gene_instance
         self.output_dir = output_dir
         self.show = show
         self.save = save
@@ -87,17 +89,17 @@ class Plot:
         # Check if mutations and sequence are available
         if self.mutation_instance.mutations is None:
             raise ValueError("No mutations found. Please run the mutation class first.")
-        if self.sequence_instance.sequence is None:
+        if self.gene_instance.sequence is None:
             raise ValueError("No sequence found. Please run the sequence class first.")
         
         features = []
         
         # Add GoI to plot
         features.append(GraphicFeature(start=0, 
-                                       end=len(self.sequence_instance.sequence) +3, 
+                                       end=len(self.gene_instance.sequence) +3, 
                                        strand=+1, 
-                                       color=Plasmid().color, 
-                                       label=f"{self.sequence_instance.seqid}"))
+                                       color=Vector().color, 
+                                       label=f"{self.gene_instance.seqid}"))
 
         # Add mutations to plot
         if plot_mutations:
@@ -128,7 +130,7 @@ class Plot:
                                                label=f"{i.name}"))
 
             
-        record = GraphicRecord(sequence_length=len(self.sequence_instance.sequence), features=features)
+        record = GraphicRecord(sequence_length=len(self.gene_instance.sequence), features=features)
         fig_size = (figure_length, figure_width)
         fig, ax = plt.subplots(figsize=fig_size) 
         record.plot(ax=ax, figure_width=figure_width)
@@ -139,22 +141,21 @@ class Plot:
 
         if plot_eblocks and plot_mutations and self.save:
             if self.eblocks_design_instance.cost_optimization:
-                self.save_plot(fig, f'eblocks_{self.sequence_instance.seqid}_N{self.mutation_instance.n_mutants}_cost.png')
+                self.save_plot(fig, f'eblocks_{self.gene_instance.seqid}_N{self.mutation_instance.n_mutants}_cost.png')
             elif self.eblocks_design_instance.amount_optimization:
-                self.save_plot(fig, f'eblocks_{self.sequence_instance.seqid}_N{self.mutation_instance.n_mutants}_amount.png')
+                self.save_plot(fig, f'eblocks_{self.gene_instance.seqid}_N{self.mutation_instance.n_mutants}_amount.png')
         if not plot_eblocks:
-            self.save_plot(fig, f'mutations_{self.sequence_instance.seqid}_N{self.mutation_instance.n_mutants}_{self.eblocks_design_instance.optimization_method}.png')
+            self.save_plot(fig, f'mutations_{self.gene_instance.seqid}_N{self.mutation_instance.n_mutants}_{self.eblocks_design_instance.optimization_method}.png')
 
     def extract_snapgene_features(self):
         """
         Extract features from a snapgene vector file and return them as a list of biotite sequence features.
         """
-        if self.sequence_instance.vector is None:
-            print("No vector found. Please run the sequence class first.")
-            sys.exit()
+        if self.vector_instance.vector is None:
+            raise ValueError("No vector found. Please run the sequence class first.")
 
         vector_features = []
-        for i in self.sequence_instance.vector.features:
+        for i in self.vector_instance.vector.features:
             feature_type = i.type
             quals = i.qualifiers
             label_qualifier = i.qualifiers.get('label', '')
@@ -181,8 +182,8 @@ class Plot:
 
             vector_features.append(Feature(feature_type, locations, qual))
         # Add organism source
-        if self.sequence_instance.organism:
-                vector_features.append(Feature("source", [Location(0, len(self.sequence_instance.vector.seq))], {"organism": f"{self.sequence_instance.organism}"}))
+        if self.vector_instance.organism:
+                vector_features.append(Feature("source", [Location(0, len(self.vector_instance.vector.seq))], {"organism": f"{self.vector_instance.organism}"}))
         return vector_features
 
     def plot_vector(self, figsize=(8,8), fontsize=10):
@@ -196,8 +197,8 @@ class Plot:
         graphics.plot_plasmid_map(
             ax, 
             annotation, 
-            plasmid_size=len(self.sequence_instance.vector.seq), 
-            label=f"{self.sequence_instance.vector.name}",
+            plasmid_size=len(self.vector_instance.vector.seq), 
+            label=f"{self.vector_instance.vector.name}",
             label_properties={"fontsize": fontsize})
         ticks = ax.get_xticks()
         # Only show a few ticks

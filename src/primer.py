@@ -8,7 +8,7 @@ import biotite.sequence as seq
 from Bio.SeqUtils import gc_fraction
 
 from .mutation import Mutation
-from .sequence import Plasmid
+from .sequence import Vector, Gene
 from .eblocks import EblockDesign
 from .utils import OutputToFile, SnapGene
 
@@ -25,14 +25,16 @@ class DesignPrimers:
     def __init__(self,
                  eblocks_design_instance: EblockDesign,
                  mutation_instance: Mutation,
-                 sequence_instance: Plasmid,
+                 vector_instance: Vector,
+                 gene_instance: Gene,
                  snapgene_instance = None,
                  output_dir: str = None,
                  verbose: bool = True):
 
         self.eblocks_design_instance = eblocks_design_instance
         self.mutation_instance = mutation_instance
-        self.sequence_instance = sequence_instance
+        self.vector_instance = vector_instance
+        self.gene_instance = gene_instance
         self.output_dir = output_dir
         self.snapgene_instance = snapgene_instance
         self.verbose = verbose
