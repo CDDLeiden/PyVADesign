@@ -333,7 +333,7 @@ class EblockDesign:
                     end = self.vector_instance.gene_start_idx + mut.idx_dna[0] + mut.length_insert
                     snapgene_dict[mut.name] = [start, end, self.mutation_instance.colors[mut.type]]
                     snapgene_dict[eblock.name] = [eblock.start_index, eblock.end_index + mut.length_insert, self.eblock_colors[eblock.block_number]]
-                    snapgene_dict[self.gene_instance.seqid] = [self.gene_instance.gene_start_idx, self.vector_instance.gene_end_idx + mut.length_insert, self.vector_instance.color]
+                    snapgene_dict[self.gene_instance.seqid] = [self.vector_instance.gene_start_idx, self.vector_instance.gene_end_idx + mut.length_insert, self.vector_instance.color]
            
                 elif mut.is_deletion:
                     start = self.vector_instance.gene_start_idx -6 + mut.idx_dna_deletion_begin
