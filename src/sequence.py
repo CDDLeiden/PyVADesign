@@ -7,11 +7,47 @@ from Bio.SeqRecord import SeqRecord
 from Bio.SeqFeature import SeqFeature, FeatureLocation
 from biotite.sequence import NucleotideSequence
 
+class Gene:
+    def __init__(self,
+                 sequence = None,
+                 seqid = None):
+        
+        self.sequence = sequence
+        self.seqid = seqid
+
+    def parse_sequence(self, fp: str) -> str:
+        """
+        This function parses the sequence from a .fasta file and checks the input.
+        """
+        self.sequence, self.seqid = self.read_single_fasta(fp)
+        if not (NucleotideSequence(self.sequence).is_valid() and self.contains_start_stop_codon(self.sequence)):
+            raise ValueError("Invalid nucleotide sequence: Please provide a valid sequence containing start and stop codons.")
+        
+    @staticmethod
+    def read_single_fasta(fp: str):
+        """
+        This function reads a single fasta file and returns the sequence.
+        """
+        record = next(SeqIO.parse(fp, "fasta"))
+        return record.seq, record.id
+            
+    @staticmethod
+    def contains_start_stop_codon(sequence: str) -> bool:
+        """
+        This function checks if the sequence contains start and stop codons.
+        """
+        stop_codons = ["TAA", "TAG", "TGA"]
+        sequence = sequence.upper()
+        if (sequence.startswith("ATG")) and (sequence[-3:] in stop_codons):
+            return True
+        else:
+            return False
+
 
 class Vector:
     def __init__(self,
+                 gene: Gene,
                  vector = None,
-                 gene = None,
                  vector_id = None,
                  organism = None,
                  gene_start_idx = -1,
@@ -41,7 +77,7 @@ class Vector:
         self.gene_start_idx, self.gene_end_idx = self.find_index_in_vector(self.gene.sequence)
 
     def find_index_in_vector(self, sequence: str):
-        idx_begin = str(self.vector).lower().find(str(sequence).lower())
+        idx_begin = str(self.vector.seq).lower().find(str(sequence).lower())
         idx_end = idx_begin + len(sequence)
         idx_begin = self.circular_index(idx_begin, len(self.vector))
         idx_end = self.circular_index(idx_end, len(self.vector))
@@ -117,42 +153,3 @@ class Vector:
     @staticmethod
     def check_vector():
         pass
-
-
-class Gene:
-    def __init__(self,
-                 sequence = None,
-                 seqid = None):
-        
-        self.sequence = sequence
-        self.seqid = seqid
-
-    def parse_sequence(self, fp: str) -> str:
-        """
-        This function parses the sequence from a .fasta file and checks the input.
-        """
-        sequence, seqid = self.read_single_fasta(fp)
-        self.sequence = sequence
-        self.seqid = seqid
-        if not (NucleotideSequence(sequence).is_valid() and self.contains_start_stop_codon(sequence)):
-            raise ValueError("Invalid nucleotide sequence: Please provide a valid sequence containing start and stop codons.")
-        
-    @staticmethod
-    def read_single_fasta(fp: str):
-        """
-        This function reads a single fasta file and returns the sequence.
-        """
-        record = next(SeqIO.parse(fp, "fasta"))
-        return record.seq, record.id
-            
-    @staticmethod
-    def contains_start_stop_codon(sequence: str) -> bool:
-        """
-        This function checks if the sequence contains start and stop codons.
-        """
-        stop_codons = ["TAA", "TAG", "TGA"]
-        sequence = sequence.upper()
-        if (sequence.startswith("ATG")) and (sequence[-3:] in stop_codons):
-            return True
-        else:
-            return False

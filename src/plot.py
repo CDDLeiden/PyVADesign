@@ -98,7 +98,7 @@ class Plot:
         features.append(GraphicFeature(start=0, 
                                        end=len(self.gene_instance.sequence) +3, 
                                        strand=+1, 
-                                       color=Vector().color, 
+                                       color=Vector(Gene).color, 
                                        label=f"{self.gene_instance.seqid}"))
 
         # Add mutations to plot
