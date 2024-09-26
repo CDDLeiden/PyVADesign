@@ -5,9 +5,8 @@ from .utils import Utils
 
 class Mutation:
     """
-    This class represents the information for the selected mutations.
+    This class represents a mutation.
     """
-
     def __init__(self, 
                  type: str = None,
                  input: str = None,
@@ -15,57 +14,42 @@ class Mutation:
                  mutation: list = None,
                  n_mutants: int = None,
                  insert: str = None,
-                 deletion: str = None,
                  idx_dna: list = None,
-                #  idx_start: int = None,
-                #  idx_end: int = None,
                  idx_dna_deletion_begin: int = None,
                  idx_dna_deletion_end: int = None,
                  length_deletion: int = None,
                  length_insert: int = None,
-                 position: int = None, 
-                 wt_residue: str = None, 
-                 mut_residue: str = None,
-                 
-                is_singlemutation = False,
-                is_insert = False,
-                is_deletion = False,
-                is_multiplemutation = False):
+                 is_singlemutation = False,
+                 is_insert = False,
+                 is_deletion = False,
+                 is_multiplemutation = False):
         
         self.type = type
         self.input = input
         self.name = name
         self.mutation = mutation
-        self.position = position
-        self.idx_dna = idx_dna
-        self.paired = []
+        self.n_mutants = n_mutants
         self.insert = insert
-        self.deletion = deletion
-        self.length_insert = length_insert
+        self.idx_dna = idx_dna
         self.idx_dna_deletion_begin = idx_dna_deletion_begin
         self.idx_dna_deletion_end = idx_dna_deletion_end
-        # self.idx_start = idx_start
-        # self.idx_end = idx_end
         self.length_deletion = length_deletion
-        self.wt_residue = wt_residue
-        self.wt_residue = wt_residue
-        self.mut_residue = mut_residue
-        self.n_mutantsn = n_mutants
-        self.mutations = []
-        self.colors = {'Mutation': 'black', 'Insert': 'red', 'Deletion': 'blue', 'Combined': 'green'}
-
+        self.length_insert = length_insert
         self.is_singlemutation = is_singlemutation
         self.is_insert = is_insert
         self.is_deletion = is_deletion
         self.is_multiplemutation = is_multiplemutation
+        
+        self.mutations = []
+        self.colors = {'Mutation': 'black', 'Insert': 'red', 'Deletion': 'blue', 'Combined': 'green'}
 
     def parse_mutations(self, fp: str):
         """
-        This function parses the mutations from a text file and checks the input.
+        This function parses the mutations from a text file and checks the input
         """
         mutations = self.read_mutations(fp)
-        result = self.perform_checks(mutations)
-        return result
+        Mutation.check_nonnatural_aas(mutations)
+        Mutation.check_format(mutations)
                 
     def read_mutations(self, fp: str):
         """
@@ -126,7 +110,6 @@ class Mutation:
                             length_deletion=mut_length * 3,
                             is_deletion=True,
                             type = "Deletion")
-                        
                         mutations.append(mutation)
                         
                     # Insertion
@@ -142,15 +125,12 @@ class Mutation:
                             length_insert=len(str_spl_line[1].split("-")[1]) * 3,
                             is_insert=True,
                             type = "Insert")
-                        
                         mutations.append(mutation)
 
                     else:
-                        print(f"Please check format of mutation {line}")
-                        sys.exit()
+                        raise ValueError(f"Please check format of mutation {line}")
                 except:
-                    print(f"Please check format of mutation {line}")
-                    sys.exit()
+                    raise ValueError(f"Please check format of mutation {line}")
 
         # sort mutation by index
         mutations = self.sort_mutations(mutations)
@@ -165,12 +145,11 @@ class Mutation:
         sorted_mutations = sorted(mutations, key=lambda x: x.idx_dna[0])
         return sorted_mutations
     
-    def print_mutations(self):
+    def print_mutations(self, padding: int = 10):
         """
         This function prints the mutations.
         """
-        padding = max([len(mut.input) for mut in self.mutations])
-        padding = 10
+        # padding = max([len(mut.input) for mut in self.mutations])
         print("The selected mutations are:")
         for mut in self.mutations:
             if type(mut.mutation) == list:  
@@ -181,58 +160,33 @@ class Mutation:
                mutation = mut.mutation.replace("'", "")
                print(f"\t{mut.type.ljust(padding)}\t{mutation.ljust(padding)}")
 
-    def mean_idxs_dna(self) -> list:
-        """
-        This function returns the first index of each mutation.
-        """
-        mean_idxs = []
-        for mutation in self.mutations:
-            if len(mutation.idx_dna) > 1:
-                mean_idxs.append(float(np.mean(mutation.idx_dna)))
-            elif len(mutation.idx_dna) == 1:
-                mean_idxs.append(mutation.idx_dna[0])
-        return mean_idxs
-
-    @classmethod
-    def perform_checks(cls, mutations: list):
-        """
-        This function processes the mutations from a file and returns a list of Mutation objects.
-        """
-        Mutation.check_nonnatural_aas(mutations)
-        Mutation.check_format(mutations)
-        return 1
-
     @classmethod
     def check_nonnatural_aas(cls, mutations: list):
         """
-        This function checks whether there are any non-natural amino acids.
+        This function checks whether there are any non-natural amino acids in the mutations.
         """
         for mutation in mutations:
             if mutation.is_singlemutation:
                 wt_residue = mutation.mutation[0][0].lower()
                 mut_residue = mutation.mutation[0][-1].lower()
                 if (wt_residue or mut_residue) not in Utils.aas():
-                    print(f"Please check for non-natural amino acids in mutation {mutation.input}")
-                    sys.exit()
+                    raise ValueError(f"Please check for non-natural amino acids in mutation {mutation.input}")
             elif mutation.is_multiplemutation:
                 for m in mutation.mutation:
                     wt_residue = m[0].lower()
                     mut_residue = m[-1].lower()
                     if (wt_residue or mut_residue) not in Utils.aas():
-                        print(f"Please check for non-natural amino acids in mutation {mutation.input}")
-                        sys.exit()
+                        raise ValueError(f"Please check for non-natural amino acids in mutation {mutation.input}")
             elif mutation.is_deletion:
                 start_res = mutation.mutation.split("-")[0][0].lower()
                 end_res = mutation.mutation.split("-")[1][0].lower()
                 if (start_res or end_res) not in Utils.aas():
-                    print(f"Please check for non-natural amino acids in mutation {mutation.input}")
-                    sys.exit()
+                    raise ValueError(f"Please check for non-natural amino acids in mutation {mutation.input}")
             elif mutation.is_insert:
                 start_res = mutation.mutation.split("-")[0][0].lower()
                 insert = mutation.mutation.split("-")[1]
                 if (start_res or insert) not in Utils.aas():
-                    print(f"Please check for non-natural amino acids in mutation {mutation.input}")
-                    sys.exit()
+                    raise ValueError(f"Please check for non-natural amino acids in mutation {mutation.input}")
 
     @classmethod
     def check_format(cls, mutations: list):
@@ -246,8 +200,7 @@ class Mutation:
                     and (isinstance(int(mutation.mutation[0][1:-1]), int)):
                         continue
                     else:
-                        print(f"Please check format of mutation: {mutation.input}")
-                        sys.exit()
+                        raise ValueError(f"Please check format of mutation: {mutation.input}")
             elif mutation.is_deletion:
                     if (mutation.mutation.split("-")[0][0].lower() in Utils.aas()) \
                     and (mutation.mutation.split("-")[1][0].lower() in Utils.aas()) \
@@ -255,16 +208,14 @@ class Mutation:
                     and (isinstance(int(mutation.mutation.split("-")[1][1:]), int)):
                         continue
                     else:
-                        print(f"Please check format of mutation: {mutation.input}")
-                        sys.exit()
+                        raise ValueError(f"Please check format of mutation: {mutation.input}")
             elif mutation.is_insert:
                     if (mutation.mutation.split("-")[0][0].lower() in Utils.aas()) \
                     and (set(''.join(mutation.mutation.split("-")[1]).lower())).issubset(Utils.aas()) \
                     and (isinstance(int(mutation.mutation.split("-")[0][1:]), int)):
                         continue
                     else:
-                        print(f"Please check format of mutation: {mutation.input}")
-                        sys.exit()
+                        raise ValueError(f"Please check format of mutation: {mutation.input}")
             elif mutation.is_multiplemutation:
                 for m in mutation.mutation:
                     if (m[0].lower() in Utils.aas()) \
@@ -272,7 +223,6 @@ class Mutation:
                     and (isinstance(int(m[1:-1]), int)):
                         continue
                     else:
-                        print(f"Please check format of mutation: {mutation.input}")
-                        sys.exit()
+                        raise ValueError(f"Please check format of mutation: {mutation.input}")
             else:
                 pass
