@@ -149,7 +149,6 @@ class Mutation:
         """
         This function prints the mutations.
         """
-        # padding = max([len(mut.input) for mut in self.mutations])
         print("The selected mutations are:")
         for mut in self.mutations:
             if type(mut.mutation) == list:  
@@ -169,23 +168,23 @@ class Mutation:
             if mutation.is_singlemutation:
                 wt_residue = mutation.mutation[0][0].lower()
                 mut_residue = mutation.mutation[0][-1].lower()
-                if (wt_residue or mut_residue) not in Utils.aas():
+                if (wt_residue or mut_residue) not in Mutation.aas():
                     raise ValueError(f"Please check for non-natural amino acids in mutation {mutation.input}")
             elif mutation.is_multiplemutation:
                 for m in mutation.mutation:
                     wt_residue = m[0].lower()
                     mut_residue = m[-1].lower()
-                    if (wt_residue or mut_residue) not in Utils.aas():
+                    if (wt_residue or mut_residue) not in Mutation.aas():
                         raise ValueError(f"Please check for non-natural amino acids in mutation {mutation.input}")
             elif mutation.is_deletion:
                 start_res = mutation.mutation.split("-")[0][0].lower()
                 end_res = mutation.mutation.split("-")[1][0].lower()
-                if (start_res or end_res) not in Utils.aas():
+                if (start_res or end_res) not in Mutation.aas():
                     raise ValueError(f"Please check for non-natural amino acids in mutation {mutation.input}")
             elif mutation.is_insert:
                 start_res = mutation.mutation.split("-")[0][0].lower()
                 insert = mutation.mutation.split("-")[1]
-                if (start_res or insert) not in Utils.aas():
+                if (start_res or insert) not in Mutation.aas():
                     raise ValueError(f"Please check for non-natural amino acids in mutation {mutation.input}")
 
     @classmethod
@@ -195,34 +194,38 @@ class Mutation:
         """
         for mutation in mutations:
             if mutation.is_singlemutation:
-                    if (mutation.mutation[0][0].lower() in Utils.aas()) \
-                    and (mutation.mutation[0][-1].lower() in Utils.aas()) \
+                    if (mutation.mutation[0][0].lower() in Mutation.aas()) \
+                    and (mutation.mutation[0][-1].lower() in Mutation.aas()) \
                     and (isinstance(int(mutation.mutation[0][1:-1]), int)):
                         continue
                     else:
                         raise ValueError(f"Please check format of mutation: {mutation.input}")
             elif mutation.is_deletion:
-                    if (mutation.mutation.split("-")[0][0].lower() in Utils.aas()) \
-                    and (mutation.mutation.split("-")[1][0].lower() in Utils.aas()) \
+                    if (mutation.mutation.split("-")[0][0].lower() in Mutation.aas()) \
+                    and (mutation.mutation.split("-")[1][0].lower() in Mutation.aas()) \
                     and (isinstance(int(mutation.mutation.split("-")[0][1:]), int)) \
                     and (isinstance(int(mutation.mutation.split("-")[1][1:]), int)):
                         continue
                     else:
                         raise ValueError(f"Please check format of mutation: {mutation.input}")
             elif mutation.is_insert:
-                    if (mutation.mutation.split("-")[0][0].lower() in Utils.aas()) \
-                    and (set(''.join(mutation.mutation.split("-")[1]).lower())).issubset(Utils.aas()) \
+                    if (mutation.mutation.split("-")[0][0].lower() in Mutation.aas()) \
+                    and (set(''.join(mutation.mutation.split("-")[1]).lower())).issubset(Mutation.aas()) \
                     and (isinstance(int(mutation.mutation.split("-")[0][1:]), int)):
                         continue
                     else:
                         raise ValueError(f"Please check format of mutation: {mutation.input}")
             elif mutation.is_multiplemutation:
                 for m in mutation.mutation:
-                    if (m[0].lower() in Utils.aas()) \
-                    and (m[-1].lower() in Utils.aas()) \
+                    if (m[0].lower() in Mutation.aas()) \
+                    and (m[-1].lower() in Mutation.aas()) \
                     and (isinstance(int(m[1:-1]), int)):
                         continue
                     else:
                         raise ValueError(f"Please check format of mutation: {mutation.input}")
             else:
                 pass
+    
+    @staticmethod
+    def aas():
+        return "acdefghiklmnpqrstvwy"
