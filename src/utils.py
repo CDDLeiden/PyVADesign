@@ -17,15 +17,17 @@ from datetime import datetime
 from Bio.SeqRecord import SeqRecord
 from Bio.SeqFeature import SeqFeature, FeatureLocation, CompoundLocation
 
+from .sequence import Vector, Gene
 
 
+# TODO Rethink name of this class
 class SnapGene:
     """
     Class for handling SnapGene files and generating SnapGene features
     """
     def __init__(self,
-                 vector_instance,
-                 gene_instance,
+                 vector_instance: Vector,
+                 gene_instance: Gene,
                  output_dir: str = None):
         
             self.output_dir = output_dir
@@ -105,11 +107,9 @@ class SnapGene:
         This function saves primer data to an existing GenBank file
         """
         seq_record = SeqIO.read(genbank_file, "genbank")
-        print(seq_record.id)
         if primer.is_forward:
             site = {"start": int(primer.idx_start), "end": int(primer.idx_end), "sequence": str(primer.sequence_5to3)}
         elif primer.is_reverse:
-            # site = {"start": int(primer.idx_start), "end": int(primer.idx_end), "sequence": self.sequence_instance.invert_sequence(primer.sequence_5to3)}
             site = {"start": int(primer.idx_start), "end": int(primer.idx_end), "sequence": seq.NucleotideSequence(primer.sequence_5to3).reverse()}
         else:
             raise ValueError("Primer is neither forward nor reverse.")
@@ -119,10 +119,8 @@ class SnapGene:
         feature.qualifiers["note"] = primer.name
         feature.qualifiers["primer_sequence"] = site["sequence"]
         seq_record.features.append(feature)
-        # Print the features to identify any issues
-        for feature in seq_record.features:
-            print(feature)
-
+        # for feature in seq_record.features:
+        #     print(feature)
         SeqIO.write(seq_record, genbank_file, "genbank")
 
     @staticmethod
