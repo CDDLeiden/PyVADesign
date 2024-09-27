@@ -7,6 +7,8 @@ from Bio.SeqRecord import SeqRecord
 from Bio.SeqFeature import SeqFeature, FeatureLocation
 from biotite.sequence import NucleotideSequence
 
+
+
 class Gene:
     def __init__(self,
                  sequence = None,
@@ -42,6 +44,7 @@ class Gene:
             return True
         else:
             return False
+
 
 
 class Vector:

@@ -10,7 +10,7 @@ from sklearn_extra.cluster import KMedoids
 
 from .mutation import Mutation
 from .sequence import Vector, Gene
-from .utils import Utils, SnapGene, CodonUsage
+from .utils import SnapGene, CodonUsage
 
 
 class Eblock:
@@ -128,7 +128,6 @@ class EblockDesign:
         # Loop over all mutations and create the eBlocks, based on the WT eBlocks
         results = {}
         for mutation in self.mutation_instance.mutations:
-            print(f"Processing mutation: {mutation.name}")
             results = self.make_mutant_eblock(mutation, results)  # Create mutated eBlock, based on mutation type
         sorted_dict = dict(sorted(results.items(), key=lambda x: (x[1].name, x[1].start_index)))  # Sort the eblocks based on the index of the first mutation in the eblock and the number of the eblock
         self.eblocks = sorted_dict
@@ -355,7 +354,7 @@ class EblockDesign:
                         snapgene_dict[mut.mutation[i]] = [start, end, self.mutation_instance.colors[mut.type]]
                         
                 self.make_dir(dirname=filename)
-                Utils.check_directory(os.path.join(snapgene_instance.output_dir, filename), self.verbose)
+                self.check_directory(os.path.join(snapgene_instance.output_dir, filename))
                 mutated_vector = self.vector_instance.mutate_vector(eblock.start_index, eblock.end_index, eblock.sequence, mutation=mut)
                 self.vector_instance.save_vector(vector=mutated_vector, output_dir=os.path.join(snapgene_instance.output_dir, filename), filename=f"{filename}.dna")
                 snapgene_instance.eblocks_to_gff3(eblocks=snapgene_dict, output_dir=os.path.join(snapgene_instance.output_dir, filename), filename=f"{filename}.gff3")
@@ -396,6 +395,16 @@ class EblockDesign:
         if self.verbose:
             print(txt)
 
+    def check_directory(self, directory):
+        """
+        Check if a directory exists and is empty
+        """
+        if not os.path.exists(directory):  # Check if the directory exists
+            raise FileNotFoundError(f"Directory {directory} does not exist.")
+        if os.listdir(directory):  # Check if the directory is empty
+            if self.verbose:
+                print(f"Directory {directory} is not empty. Files might get overwritten or appended to.")
+
     def eblocks_to_csv(self, filename="eblocks.csv"):
         """
         Save eBlocks to a CSV file.
@@ -421,7 +430,8 @@ class EblockDesign:
         tab10_colors = ['#1f77b4','#ff7f0e','#2ca02c', '#d62728','#9467bd','#8c564b','#e377c2','#7f7f7f','#bcbd22','#17becf',
                         '#aec7e8','#ffbb78','#98df8a','#ff9896','#c5b0d5','#c49c94','#f7b6d2','#c7c7c7','#dbdb8d','#9edae5',
                         '#393b79','#ff7f0e','#2ca02c','#8c564b','#e377c2','#7f7f7f','#bcbd22','#17becf']
-        return {i: tab10_colors[i] for i in range(len(tab10_colors))}
+        return {i: tab10_colors[i] for i in range(len(tab10_colors))}    
+
     
 
 class Clustering:

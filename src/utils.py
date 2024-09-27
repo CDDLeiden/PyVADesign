@@ -18,27 +18,11 @@ from Bio.SeqRecord import SeqRecord
 from Bio.SeqFeature import SeqFeature, FeatureLocation, CompoundLocation
 
 
-class Utils:
-
-    def __init__(self):
-            pass
-            
-    @staticmethod
-    def check_directory(directory, verbose):
-        """
-        Check if a directory exists and is empty
-        """
-        if not os.path.exists(directory):  # Check if the directory exists
-            raise FileNotFoundError(f"Directory {directory} does not exist.")
-        if os.listdir(directory):  # Check if the directory is empty
-            if verbose:
-                print(f"Directory {directory} is not empty. Files might get overwritten or appended to.")
 
 class SnapGene:
     """
     Class for handling SnapGene files and generating SnapGene features
     """
-
     def __init__(self,
                  vector_instance,
                  gene_instance,
@@ -54,6 +38,7 @@ class SnapGene:
             os.makedirs(newpath)
         self.output_dir = newpath
             
+    # TODO Move this file to the primers file and primers class
     def primers_to_fasta(self, primers: dict, directory: str, filename='primers.fasta'):
         """
         This function converts the primers to features that can be read by SnapGene.
@@ -113,6 +98,8 @@ class SnapGene:
         outpath = os.path.join(output_dir, filename)
         SeqIO.write(record, outpath, "genbank")
 
+
+    # TODO Move this function to the primers file and primers class
     def add_primers_to_genbank_file(self, genbank_file, primer):
         """
         This function saves primer data to an existing GenBank file
@@ -159,16 +146,8 @@ class SnapGene:
             'SEQprimer': '#06FF92'}
         return colors
     
-    @staticmethod
-    def count_substring_occurance(sequence: str, substring: str):
-        return str(sequence).count(str(substring))
+
     
-    @staticmethod
-    def parse_codon_usage():
-        pass
-
-
-
 class OutputToFile:
     """
     Context manager for redirecting stdout to a file
@@ -186,15 +165,12 @@ class OutputToFile:
         self.file.close()
 
 
-
+# TODO Describe in the tutorial how to obtain the genome IDs from NIH
+# TODO Check licensing of this code that was adopted from ... (https://www.biotite-python.org/latest/examples/gallery/sequence/misc/codon_usage.html)
 class CodonUsage:
     """
     Class for generating codon usage tables using biotite
-    """
-
-    #TODO Get genome IDs from NIH (put somewhere in tutorial)
-    #TODO CHECK LICENSING OF THIS CODE THAT WAS ADOPTED FROM ... (https://www.biotite-python.org/latest/examples/gallery/sequence/misc/codon_usage.html)
-    
+    """    
     def __init__(self,
                 genome_id: str = None,
                 output_dir: str = None):
