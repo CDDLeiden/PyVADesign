@@ -98,6 +98,7 @@ class DesignPrimers:
 
         fw_sequence = str(self.vector_instance.vector.seq.lower())
         rv_sequence = str(seq.NucleotideSequence(fw_sequence).complement()).lower()
+        print("fw sequence:", fw_sequence)
        
         ivaprimerdesign = IVAprimer()
         ivaprimers = []  # Store all IVA primers in a list
@@ -105,22 +106,27 @@ class DesignPrimers:
 
         for eblock in self.eblocks_design_instance.wt_eblocks:  # Loop over gene blocks and design IVA primers (starting with initial sequences that are optimized later on)
             eblock.start_index = self.vector_instance.circular_index(eblock.start_index, ivaprimerdesign.vector_length)
+            print(eblock.name)
 
             init_fw_oh = ivaprimerdesign.Fw_overhang(eblock.end_index, fw_sequence, size=ivaprimerdesign.init_size)
             size = ivaprimerdesign.optimize_size(ivaprimerdesign.max_overhang_temp_IVA, init_fw_oh, eblock.end_index, ivaprimerdesign.init_size, fw_sequence, ivaprimerdesign.Fw_overhang)
             final_fw_oh = ivaprimerdesign.Fw_overhang(eblock.end_index, fw_sequence, size=size)
+            print("final_fw_oh:", final_fw_oh)
 
             init_fw_template = ivaprimerdesign.Fw_template(eblock.end_index, fw_sequence, size=ivaprimerdesign.init_size)
             size = ivaprimerdesign.optimize_size(ivaprimerdesign.max_template_temp_IVA, init_fw_template, eblock.end_index, ivaprimerdesign.init_size, fw_sequence, ivaprimerdesign.Fw_template)
             final_fw_template = ivaprimerdesign.Fw_template(eblock.end_index, fw_sequence, size)
+            print("final_fw_template:", final_fw_template)
 
             init_rv_oh = ivaprimerdesign.Rv_overhang(eblock.start_index, rv_sequence, size=ivaprimerdesign.init_size)
             size = ivaprimerdesign.optimize_size(ivaprimerdesign.max_overhang_temp_IVA, init_rv_oh, eblock.start_index, ivaprimerdesign.init_size, rv_sequence, ivaprimerdesign.Rv_overhang)
             final_rv_oh = ivaprimerdesign.Rv_overhang(eblock.start_index, rv_sequence, size)
+            print("final_rv_oh:", final_rv_oh)
 
             init_rv_template = ivaprimerdesign.Rv_template(eblock.start_index, rv_sequence, size=ivaprimerdesign.init_size)
             size = ivaprimerdesign.optimize_size(ivaprimerdesign.max_template_temp_IVA, init_rv_template, eblock.start_index, ivaprimerdesign.init_size, rv_sequence, ivaprimerdesign.Rv_template)
             final_rv_template = ivaprimerdesign.Rv_template(eblock.start_index, rv_sequence, size)
+            print("final_rv_template:", final_rv_template)
 
             # Combine template and overhang sequences
             fw_combined = ivaprimerdesign.combine_Fw_primer(final_fw_oh, final_fw_template)

@@ -88,8 +88,8 @@ class EblockDesign:
         self.min_order = min_order
 
         # Store WT and mutated gene blocks
-        self.wt_eblocks: dict = {}
-        self.eblocks: dict = {}
+        self.wt_eblocks: list = []
+        self.eblocks: list = []
 
         self.most_abundant_codons: dict = {}  # Store most abundant codons for the selected genome
         self.validate_optimization_parameters()
