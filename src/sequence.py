@@ -55,6 +55,7 @@ class Vector:
                  organism = None,
                  gene_start_idx = -1,
                  gene_end_idx = -1,
+                 length = None,
                  color: str = "#d3d3d3"):
 
         self.vector = vector
@@ -64,6 +65,7 @@ class Vector:
         self.gene_start_idx = gene_start_idx
         self.gene_end_idx = gene_end_idx
         self.color = color
+        self.length = length
 
     def parse_vector(self, fp: str):
         """
@@ -78,6 +80,7 @@ class Vector:
         self.vector = vector
         self.vector_id = vector.id
         self.gene_start_idx, self.gene_end_idx = self.find_index_in_vector(self.gene.sequence)
+        self.length = len(self.vector.seq)
 
     def find_index_in_vector(self, sequence: str):
         idx_begin = str(self.vector.seq).lower().find(str(sequence).lower())

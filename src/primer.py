@@ -6,6 +6,7 @@ import difflib
 import pandas as pd
 import biotite.sequence as seq
 from Bio.SeqUtils import gc_fraction
+from Bio.SeqUtils import MeltingTemp as mt
 
 from .mutation import Mutation
 from .sequence import Vector, Gene
@@ -45,10 +46,12 @@ class DesignPrimers:
         """
 
         primerinstance = Primer()
-        snapgene_instance = SnapGene(sequence_instance=self.sequence_instance, output_dir=self.output_dir)
+        snapgene_instance = SnapGene(vector_instance=self.vector_instance, gene_instance=self.gene_instance, output_dir=self.output_dir)
         primers = {}
         # with OutputToFile(os.path.join(self.output_dir, 'primer-warnings.txt')):  # Save warnings to file
+        print("Designing IVA primers ...")
         ivaprimers = self.design_iva_primer()
+
         for i in ivaprimers:
             primers[i.name] = i.sequence_5to3
 
@@ -59,7 +62,9 @@ class DesignPrimers:
             snapgene_instance.add_primers_to_genbank_file(genbank_file=os.path.join(self.output_dir, 'clones', f"{mut.name}", f"{mut.name}.gb"), primer=matching_fw_primer[0])
             snapgene_instance.add_primers_to_genbank_file(genbank_file=os.path.join(self.output_dir, 'clones', f"{mut.name}", f"{mut.name}.gb"), primer=matching_rv_primer[0])
 
+        print("Designing sequencing primers ...")
         seqprimers, mapping = self.design_seq_primer()
+
         for i in seqprimers:
             primers[i.name] = str(i.sequence_5to3)
         self.snapgene_instance.primers_to_fasta(primers=primers, directory=self.output_dir, filename='primers.fasta')
@@ -67,34 +72,39 @@ class DesignPrimers:
             for i in v:
                 for s in seqprimers:
                     if s.name == k:
-                        snapgene_instance.add_primers_to_genbank_file(genbank_file=os.path.join(self.output_dir, 'clones', f"{i}", f"{i}.gb"), primer=s.sequence_5to3)
+                        snapgene_instance.add_primers_to_genbank_file(genbank_file=os.path.join(self.output_dir, 'clones', f"{i}", f"{i}.gb"), primer=s)
 
-        # for k, v in primers.items():  # Check primers for hairpin formation and multiple binding sites
-        #     hairpin = primerinstance.calc_hairpin(v)
-        #     n_binding_sites = primerinstance.check_multiple_binding_sites(vector=self.sequence_instance.vector.seq, sequence=v)
+        for k, v in primers.items():  # Check primers for hairpin formation and multiple binding sites
+            hairpin = primerinstance.calc_hairpin(v)
+            print(v, hairpin)
+            n_binding_sites = primerinstance.check_multiple_binding_sites(vector=self.vector_instance.vector.seq, sequence=v)
+            print(f"Primer {k} has {n_binding_sites} binding sites in the vector sequence")
+            homo = primerinstance.calc_homodimer(v)
+            print("homo:", homo)
 
-        # TODO Check fot 
-        # hairpin = primer3.calc_hairpin(seq2)
-        # het = primer3.calc_heterodimer(seq1, seq2)
-        # homo = primer3.calc_homodimer(seq1)
-        # add to ebl
+        # Check for heterodimer
+        for mut, eblock in self.eblocks_design_instance.eblocks.items():
+            matching_fw_primer = [i for i in ivaprimers if i.name == f"IVA_Fw_eBlock_{eblock.block_number}"]
+            matching_rv_primer = [i for i in ivaprimers if i.name == f"IVA_Rv_eBlock_{eblock.block_number}"]
+            hetero = primerinstance.calc_heterodimer(matching_fw_primer[0].sequence_5to3, matching_rv_primer[0].sequence_5to3)
+            print("hetero:", hetero)
+
+        print("Finished designing primers.")
                         
     def design_iva_primer(self):
         """
         Design IVA primers to open-up the expression plasmid
         """
 
-        fw_sequence = str(self.sequence_instance.vector.seq.lower())
-        rv_sequence = str(seq.NucleotideSequence(fw_sequence).complement())
-        
+        fw_sequence = str(self.vector_instance.vector.seq.lower())
+        rv_sequence = str(seq.NucleotideSequence(fw_sequence).complement()).lower()
+       
         ivaprimerdesign = IVAprimer()
         ivaprimers = []  # Store all IVA primers in a list
-        ivaprimerdesign.vector_length = len(self.sequence_instance.vector.seq)
+        ivaprimerdesign.vector_length = len(self.vector_instance.vector.seq)
 
         for eblock in self.eblocks_design_instance.wt_eblocks:  # Loop over gene blocks and design IVA primers (starting with initial sequences that are optimized later on)
-
-            eblock.start_index = self.sequence_instance.circular_index(eblock.start_index, len(self.sequence_instance.vector.seq))
-            vector_length = len(self.sequence_instance.vector.seq)
+            eblock.start_index = self.vector_instance.circular_index(eblock.start_index, ivaprimerdesign.vector_length)
 
             init_fw_oh = ivaprimerdesign.Fw_overhang(eblock.end_index, fw_sequence, size=ivaprimerdesign.init_size)
             size = ivaprimerdesign.optimize_size(ivaprimerdesign.max_overhang_temp_IVA, init_fw_oh, eblock.end_index, ivaprimerdesign.init_size, fw_sequence, ivaprimerdesign.Fw_overhang)
@@ -123,7 +133,6 @@ class DesignPrimers:
                                       overhang=''.join(final_fw_oh))
             
             idx_start, idx_end = IVAprimer.find_index_in_vector(fw_sequence, ''.join(fw_combined))
-            print(f"Index start {idx_start} and index end {idx_end}")
             iva_fw_primer.idx_start = idx_start[0]
             iva_fw_primer.idx_end = idx_end[0]
 
@@ -136,7 +145,6 @@ class DesignPrimers:
                                       overhang=''.join(final_rv_oh))
             
             idx_start, idx_end = IVAprimer.find_index_in_vector(rv_sequence, ''.join(rv_combined))
-            print(f"Index start {idx_start} and index end {idx_end}")
             iva_rv_primer.idx_start = idx_start[0]
             iva_rv_primer.idx_end = idx_end[0]
 
@@ -159,7 +167,7 @@ class DesignPrimers:
         seqprimerdesign = SEQprimer()
         seqprimers = []  # Store all sequencing primers in a list
 
-        possible_primers = seqprimerdesign.all_fw_primers(gene_sequence=self.sequence_instance.sequence)  # Find all possible primers that fit the desired parameters
+        possible_primers = seqprimerdesign.all_fw_primers(gene_sequence=self.gene_instance.sequence)  # Find all possible primers that fit the desired parameters
         
         count = 1  # Counter for the primer names
         for i in self.eblocks_design_instance.wt_eblocks:  
@@ -181,7 +189,7 @@ class DesignPrimers:
                                      primer_idx_strt=closest_range[0],
                                      primer_idx_end=closest_range[1])
                     
-                    start_idx, end_idx = SEQprimer.find_index_in_vector(str(self.sequence_instance.vector.seq).lower(), str(closest_primer).lower())
+                    start_idx, end_idx = SEQprimer.find_index_in_vector(str(self.vector_instance.vector.seq).lower(), str(closest_primer).lower())
                     prim.idx_start = start_idx[0]
                     prim.idx_end = end_idx[0]
 
@@ -195,9 +203,9 @@ class DesignPrimers:
         self.mapped_seqprimers_to_txt(seqprimerdesign.mapped_primers)  # Save mapped primers to mutations to file
 
         # Save primer information
-        print(seqprimers)
-        for i in seqprimers:
-            print(i.sequence_5to3, type(i.sequence_5to3))
+        # print(seqprimers)
+        # for i in seqprimers:
+        #     print(i.sequence_5to3, type(i.sequence_5to3))
         #     print(i.name, i.idx_start, i.idx_end, i.5to3sequence)
         
         # Convert sequences to bytes
@@ -213,7 +221,7 @@ class DesignPrimers:
             mapped_primers[i.name] = []
             for mutation in self.mutation_instance.mutations:
                 if i.idx_start_seq <= mutation.idx_dna[0] <= i.idx_end_seq:
-                    mapped_primers[i.name].append(mutation.mutation)
+                    mapped_primers[i.name].append(mutation.name)
         return mapped_primers
     
     def mapped_seqprimers_to_txt(self, primers: dict, filename='SEQprimers-mapped-mutations.txt'):
@@ -253,8 +261,9 @@ class Primer:
         self.idx_end = idx_end
 
     def Tm(self, sequence):
-        return round(primer3.calc_tm(str(sequence)), 2)
-    
+        # return round(primer3.calc_tm(str(sequence)), 2)
+        return round(mt.Tm_GC(sequence.lower()), 2)
+ 
     def gc_content(self, primer):
         return round(100 * gc_fraction(primer, ambiguous="ignore"), 2)
     
@@ -263,6 +272,18 @@ class Primer:
         Calculate the hairpin formation in a given sequence
         """
         return primer3.calc_hairpin(str(sequence))
+    
+    def calc_homodimer(self, sequence):
+        """
+        Calculate the homodimer formation in a given sequence
+        """
+        return primer3.calc_homodimer(str(sequence))
+    
+    def calc_heterodimer(self, sequence1, sequence2):
+        """
+        Calculate the heterodimer formation between two sequences
+        """
+        return primer3.calc_heterodimer(str(sequence1), str(sequence2))
     
     @staticmethod
     def find_index_in_vector(vector, primer):
@@ -368,16 +389,16 @@ class IVAprimer(Primer, DesignPrimers):
         return f"IVA_Rv_eBlock_{n}"
     
     def Fw_overhang(self, block_end, fw_sequence, size=15):
-        fw_oh = fw_sequence[Plasmid.circular_index(block_end-size, self.vector_length):Plasmid.circular_index(block_end, self.vector_length)]
+        fw_oh = fw_sequence[Vector.circular_index(block_end-size, self.vector_length):Vector.circular_index(block_end, self.vector_length)]
         return fw_oh
         
     def Fw_template(self, block_end, fw_sequence, size=20):
-        fw_template = fw_sequence[Plasmid.circular_index(block_end, self.vector_length):Plasmid.circular_index(block_end+size, self.vector_length)]
+        fw_template = fw_sequence[Vector.circular_index(block_end, self.vector_length):Vector.circular_index(block_end+size, self.vector_length)]
         return fw_template
     
     def Rv_overhang(self, block_begin, rv_sequence, size=15):
-        begin = Plasmid.circular_index(block_begin, self.vector_length)
-        end = Plasmid.circular_index(block_begin+size, self.vector_length)
+        begin = Vector.circular_index(block_begin, self.vector_length)
+        end = Vector.circular_index(block_begin+size, self.vector_length)
         if begin < end:
             rv_oh = rv_sequence[begin:end]
         else:
@@ -385,7 +406,12 @@ class IVAprimer(Primer, DesignPrimers):
         return rv_oh
 
     def Rv_template(self, block_begin, rv_sequence, size=20):
-        rv_template = rv_sequence[Plasmid.circular_index(block_begin-size, self.vector_length):Plasmid.circular_index(block_begin, self.vector_length)]
+        begin = Vector.circular_index(block_begin-size, self.vector_length)
+        end = Vector.circular_index(block_begin, self.vector_length)
+        if begin < end:
+            rv_template = rv_sequence[Vector.circular_index(block_begin-size, self.vector_length):Vector.circular_index(block_begin, self.vector_length)]
+        else:
+            rv_template = rv_sequence[Vector.circular_index(block_begin-size, self.vector_length):] + rv_sequence[:Vector.circular_index(block_begin, self.vector_length)]
         return rv_template
     
     def combine_Fw_primer(self, overhang, template):
