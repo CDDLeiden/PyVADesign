@@ -102,17 +102,17 @@ class SnapGene:
 
 
     # TODO Move this function to the primers file and primers class
-    def add_primers_to_genbank_file(self, genbank_file, primer):
+    def add_primers_to_genbank_file(self, genbank_file, primer, direction):
         """
         This function saves primer data to an existing GenBank file
         """
         seq_record = SeqIO.read(genbank_file, "genbank")
-        if primer.is_forward:
+        if direction == "fw":
             site = {"start": int(primer.idx_start), "end": int(primer.idx_end), "sequence": str(primer.sequence_5to3)}
-        elif primer.is_reverse:
+        elif direction == "rv":
             site = {"start": int(primer.idx_start), "end": int(primer.idx_end), "sequence": seq.NucleotideSequence(primer.sequence_5to3).reverse()}
         else:
-            raise ValueError("Primer is neither forward nor reverse.")
+            raise ValueError("Primer is neither forward (fw) nor reverse (rv).")
         # Add primer binding sites as features to the SeqRecord
         feature_location = FeatureLocation(start=site["start"], end=site["end"])
         feature = SeqFeature(location=feature_location, type="primer_bind")

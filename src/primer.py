@@ -20,7 +20,7 @@ from .utils import OutputToFile, SnapGene
 
 class DesignPrimers:
     """
-    This class designs IVA primers to open-up the expression plasmid and Sanger sequencing primers for validation. 
+    This class designs primers to open-up the expression plasmid and Sequencing primers for validation. 
     """
 
     def __init__(self,
@@ -44,23 +44,48 @@ class DesignPrimers:
         """
         Run the design of the primers
         """
-
-        primerinstance = Primer()
+        # primerinstance = Primer()
         snapgene_instance = SnapGene(vector_instance=self.vector_instance, gene_instance=self.gene_instance, output_dir=self.output_dir)
-        primers = {}
+        
         # with OutputToFile(os.path.join(self.output_dir, 'primer-warnings.txt')):  # Save warnings to file
-        print("Designing IVA primers ...")
-        ivaprimers = self.design_iva_primer()
+        # ivaprimers = self.design_iva_primer()
+        min_oh = self.eblocks_design_instance.min_overlap - 15  # Minimum overhang length # TODO Remove this hardcoding
+        primers = {}  # eblock.name : [fw, rv]
+        print("Designing primer pairs ...")
+        for eblock in self.eblocks_design_instance.wt_eblocks:
+            mid_index = (eblock.start_index + eblock.end_index) // 2
+            length_product = len(self.vector_instance.vector.seq) - len(eblock.sequence) # TODO This is approximation
+            len_start = length_product - 50 # TODO Approximation
+            len_end = length_product + 50
 
-        for i in ivaprimers:
-            primers[i.name] = i.sequence_5to3
+            sequence_template = self.vector_instance.vector.seq[mid_index:] + self.vector_instance.vector.seq[:mid_index]  # Linearize plasmid to allow for primer design
+            half_eblock = len(eblock.sequence) // 2
+
+            fw_end_range = self.vector_instance.circular_index(half_eblock, len(self.vector_instance.vector.seq))
+            fw_start_range = self.vector_instance.circular_index(half_eblock - min_oh, len(self.vector_instance.vector.seq))
+        
+            rv_start_range = self.vector_instance.circular_index(len(self.vector_instance.vector.seq) - half_eblock, len(self.vector_instance.vector.seq))
+            rv_end_range = self.vector_instance.circular_index(len(self.vector_instance.vector.seq) - half_eblock + min_oh, len(self.vector_instance.vector.seq))
+
+            fw, rv = self.find_primerpair(sequence_template, eblock.name, fw_start_range, fw_end_range, rv_start_range, rv_end_range, len_start, len_end)
+            primers[eblock.name] = [fw, rv]  # TODO is this 5>3 sequence?
+
+        # for i in ivaprimers:
+        #     primers[i.name] = i.sequence_5to3
 
         # Add primers to Genbank file
         for mut, eblock in self.eblocks_design_instance.eblocks.items():
-            matching_fw_primer = [i for i in ivaprimers if i.name == f"IVA_Fw_eBlock_{eblock.block_number}"]
-            matching_rv_primer = [i for i in ivaprimers if i.name == f"IVA_Rv_eBlock_{eblock.block_number}"]
-            snapgene_instance.add_primers_to_genbank_file(genbank_file=os.path.join(self.output_dir, 'clones', f"{mut.name}", f"{mut.name}.gb"), primer=matching_fw_primer[0])
-            snapgene_instance.add_primers_to_genbank_file(genbank_file=os.path.join(self.output_dir, 'clones', f"{mut.name}", f"{mut.name}.gb"), primer=matching_rv_primer[0])
+            for k, v in primers.items():
+                if k == eblock.name:
+                    matching_fw_primer = v[0]
+                    matching_rv_primer = v[1]
+            # matching_fw_primer = [i for i in pri if i.name == f"IVA_Fw_eBlock_{eblock.block_number}"]
+            # matching_fw_primer = [i for i in ivaprimers if i.name == f"IVA_Fw_eBlock_{eblock.block_number}"]
+            # matching_rv_primer = [i for i in ivaprimers if i.name == f"IVA_Rv_eBlock_{eblock.block_number}"]
+            snapgene_instance.add_primers_to_genbank_file(genbank_file=os.path.join(self.output_dir, 'clones', f"{mut.name}", f"{mut.name}.gb"), primer=matching_fw_primer, direction='fw')
+            snapgene_instance.add_primers_to_genbank_file(genbank_file=os.path.join(self.output_dir, 'clones', f"{mut.name}", f"{mut.name}.gb"), primer=matching_rv_primer, direction='rv')
+
+        sys.exit()
 
         print("Designing sequencing primers ...")
         seqprimers, mapping = self.design_seq_primer()
@@ -90,6 +115,65 @@ class DesignPrimers:
             print("hetero:", hetero)
 
         print("Finished designing primers.")
+
+
+    def find_primerpair(self, sequence: str, seqID: str, fw_range_start: int, fw_range_end: int, rv_range_start: int, rv_range_end: int, i_start: int, i_end: int):
+        
+        left = fw_range_start
+        right = rv_range_start 
+
+        # TODO Move these values somewhere else
+        while True:
+            try:
+                result = primer3.bindings.design_primers(
+                    seq_args={
+                        'SEQUENCE_ID': seqID,
+                        'SEQUENCE_TEMPLATE': sequence,
+                        'SEQUENCE_INCLUDED_REGION': [0, len(sequence)],
+                        'SEQUENCE_FORCE_LEFT_START': left,
+                        'SEQUENCE_FORCE_RIGHT_START': right,
+                    },
+                    global_args={
+                        'PRIMER_OPT_SIZE': 20,
+                        'PRIMER_PICK_INTERNAL_OLIGO': 1,
+                        'PRIMER_INTERNAL_MAX_SELF_END': 8,
+                        'PRIMER_MIN_SIZE': 8,
+                        'PRIMER_MAX_SIZE': 25,
+                        'PRIMER_OPT_TM': 60.0,
+                        'PRIMER_MIN_TM': 57.0,
+                        'PRIMER_MAX_TM': 63.0,
+                        'PRIMER_MIN_GC': 20.0,
+                        'PRIMER_MAX_GC': 80.0,
+                        'PRIMER_MAX_POLY_X': 100,
+                        'PRIMER_INTERNAL_MAX_POLY_X': 100,
+                        'PRIMER_SALT_MONOVALENT': 50.0,
+                        'PRIMER_DNA_CONC': 50.0,
+                        'PRIMER_MAX_NS_ACCEPTED': 0,
+                        'PRIMER_MAX_SELF_ANY': 12,
+                        'PRIMER_MAX_SELF_END': 8,
+                        'PRIMER_PAIR_MAX_COMPL_ANY': 12,
+                        'PRIMER_PAIR_MAX_COMPL_END': 8,
+                        'PRIMER_PAIR_MAX_DIFF_TM': 5.0,
+                        'PRIMER_PRODUCT_SIZE_RANGE': [[i_start, i_end]],})
+            
+                fw = result['PRIMER_LEFT_0_SEQUENCE']
+                rv = result['PRIMER_RIGHT_0_SEQUENCE']
+                return fw, rv
+
+            except KeyError: # Exhaust all possibilities in the desired range
+                if left < fw_range_end:
+                    left += 1
+                elif right < rv_range_end:
+                    left = fw_range_start  # Reset left to the start range
+                    right += 1
+                else:
+                    fw = None
+                    rv = None
+                    return fw, rv
+
+
+
+
                         
     def design_iva_primer(self):
         """
