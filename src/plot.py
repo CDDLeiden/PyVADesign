@@ -1,7 +1,6 @@
 
 import os
 import sys
-import random
 import matplotlib.pyplot as plt
 import biotite.sequence.graphics as graphics
 from biotite.sequence import Feature, Location, Annotation
@@ -10,6 +9,9 @@ from dna_features_viewer import GraphicFeature, GraphicRecord
 from .mutation import Mutation
 from .sequence import Vector, Gene
 from .eblocks import EblockDesign
+
+# TODO Better parse vecotr information to plot and add a few tests
+
 
 
 class Plot:
@@ -91,9 +93,7 @@ class Plot:
             raise ValueError("No mutations found. Please run the mutation class first.")
         if self.gene_instance.sequence is None:
             raise ValueError("No sequence found. Please run the sequence class first.")
-        
         features = []
-        
         # Add GoI to plot
         features.append(GraphicFeature(start=0, 
                                        end=len(self.gene_instance.sequence) +3, 
