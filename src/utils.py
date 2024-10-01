@@ -20,7 +20,7 @@ from Bio.SeqFeature import SeqFeature, FeatureLocation, CompoundLocation
 from .sequence import Vector, Gene
 
 
-# TODO Rethink name of this class
+
 class SnapGene:
     """
     Class for handling SnapGene files and generating SnapGene features
@@ -33,51 +33,6 @@ class SnapGene:
             self.output_dir = output_dir
             self.vector_instance = vector_instance
             self.gene_instance = gene_instance
-
-    def make_dir(self, directory='clones'):
-        newpath = os.path.join(self.output_dir, directory)
-        if not os.path.exists(newpath):
-            os.makedirs(newpath)
-        self.output_dir = newpath
-                
-
-
-    def eblocks_to_gff3(self, eblocks: dict, output_dir, type='gene', filename='eblocks.gff3', header=True):
-        """
-        This function converts the eBlocks to features that can be read by SnapGene.
-        """
-        self.make_file(output_dir, filename, header=header)
-        with open(os.path.join(output_dir, filename), 'a') as f:
-            for k, v in eblocks.items():
-                line = self.gff3_line(v[0], v[1], k, v[2], type)
-                f.write('\t'.join(line) + '\n')
-
-
-    def eblocks_to_genbank(self, wtvector, mutvector, eblocks: dict, output_dir, type='gene', filename='eblocks.gb', header=True, max_filename_length=16):
-        """
-        This function saves a vector to a GenBank (gb) file
-        """
-        sequence = Seq(mutvector)
-        record = SeqRecord(sequence, id=self.gene_instance.seqid, name=self.gene_instance.seqid, description="")
-        record.annotations["molecule_type"] = "DNA"
-        record.annotations["organism"] = self.vector_instance.organism
-        record.annotations["date"] = datetime.today().strftime('%d-%b-%Y').upper()
-        record.name = record.name + "_" + filename
-        # Limit filename length characters
-        if len(record.name) > max_filename_length:
-            record.name = record.name[:max_filename_length]
-        features = []  # Add eBlock and mutations as features
-        for k, v in eblocks.items():
-            if v[0] > v[1]: # Start index is larger than end index
-                joint_location = CompoundLocation([FeatureLocation(v[0], len(mutvector)), FeatureLocation(0, v[1])])
-                joint_feature = SeqFeature(joint_location, type="gene", qualifiers={"gene": k, "color": v[2]})
-                features.append(joint_feature)
-            else:
-                feature = SeqFeature(FeatureLocation(v[0], v[1]), type=type, qualifiers={"gene": k, "color": v[2]})
-                features.append(feature)
-        record.features.extend(features)     
-        outpath = os.path.join(output_dir, filename)
-        SeqIO.write(record, outpath, "genbank")
 
     @staticmethod
     def gff3_header(length_sequence, version="3.2.1", sequence_name="myseq"):
@@ -101,24 +56,6 @@ class SnapGene:
         return colors
     
 
-    
-class OutputToFile:
-    """
-    Context manager for redirecting stdout to a file
-    """
-    def __init__(self, filepath):
-        self.filename = filepath
-        self.stdout = sys.stdout
-        self.file = open(filepath, 'w')
-
-    def __enter__(self):
-        sys.stdout = self.file
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        sys.stdout = self.stdout
-        self.file.close()
-
-
 # TODO Describe in the tutorial how to obtain the genome IDs from NIH
 # TODO Check licensing of this code that was adopted from ... (https://www.biotite-python.org/latest/examples/gallery/sequence/misc/codon_usage.html)
 class CodonUsage:
@@ -140,7 +77,6 @@ class CodonUsage:
         codon_counter = CodonUsage.count_codons(genome)
         codon_counter = CodonUsage.get_codon_usage(genome, codon_counter)
         relative_frequencies = CodonUsage.get_relative_frequencies(genome, codon_counter)
-        # self.relative_frequencies_to_csv(relative_frequencies)
         max_codons = CodonUsage.most_common_codon_per_aa(relative_frequencies)
         return max_codons
 
@@ -229,15 +165,3 @@ class CodonUsage:
             max_codon = max(codons, key=lambda x: x[1])
             max_freqs[amino_acid] = max_codon
         return max_freqs
-    
-
-
-
-
-
-
-
-
-
-
-
