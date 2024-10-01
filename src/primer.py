@@ -11,7 +11,6 @@ from Bio.SeqUtils import MeltingTemp as mt
 from .mutation import Mutation
 from .sequence import Vector, Gene
 from .eblocks import EblockDesign
-from .utils import SnapGene
 
 from Bio import SeqIO
 from Bio.Seq import Seq
@@ -301,7 +300,7 @@ class DesignPrimers:
             # Forward (left) primer
             start_idx, end_idx = self.vector_instance.find_index_in_vector(str(primer3output[f"PRIMER_LEFT_{index}_SEQUENCE"]))
             fw_primer = Primer()
-            fw_primer.name = eblock.name + "_fw"
+            fw_primer.name = "fw_" + eblock.name
             fw_primer.sequence_5to3 = primer3output[f"PRIMER_LEFT_{index}_SEQUENCE"]
             fw_primer.is_forward = True
             fw_primer.idx_start = start_idx
@@ -312,7 +311,7 @@ class DesignPrimers:
             tmpseq = seq.NucleotideSequence(str(primer3output[f'PRIMER_RIGHT_{index}_SEQUENCE'])).complement().reverse()
             start_idx, end_idx = self.vector_instance.find_index_in_vector(str(tmpseq))
             rv_primer = Primer()
-            rv_primer.name = eblock.name + "_rv"
+            rv_primer.name = "rv_" + eblock.name
             rv_primer.sequence_5to3 = primer3output[f'PRIMER_RIGHT_{index}_SEQUENCE']
             rv_primer.is_reverse = True
             rv_primer.idx_start = start_idx
@@ -325,7 +324,7 @@ class DesignPrimers:
             if direction == 'forward':
                 start_idx, end_idx = self.vector_instance.find_index_in_vector(str(primer3output[f'PRIMER_LEFT_{index}_SEQUENCE']))
                 seq_primer = Primer()
-                seq_primer.name = eblock.name + f"_{direction}_seq"
+                seq_primer.name = "seq_fw_" + eblock.name
                 seq_primer.sequence_5to3 = primer3output[f'PRIMER_LEFT_{index}_SEQUENCE']
                 seq_primer.is_forward = True
                 seq_primer.idx_start = start_idx
@@ -336,7 +335,7 @@ class DesignPrimers:
             elif direction == 'reverse':
                 start_idx, end_idx = self.vector_instance.find_index_in_vector(str(primer3output[f'PRIMER_RIGHT_{index}_SEQUENCE']))
                 seq_primer = Primer()
-                seq_primer.name = eblock.name + f"_{direction}_seq"
+                seq_primer.name = "seq_rv_" + eblock.name
                 seq_primer.sequence_5to3 = primer3output[f'PRIMER_RIGHT_{index}_SEQUENCE']
                 seq_primer.is_reverse = True
                 seq_primer.idx_start = start_idx
@@ -410,17 +409,11 @@ class DesignPrimers:
             raise ValueError("Primer is neither forward (fw) nor reverse (rv).")
         # Add primer binding sites as features to the SeqRecord
         feature = SeqFeature(location=feature_location, type="primer_bind")
-            # feature_location1 = FeatureLocation(start=site1["start"], end=site1["end"])
-            # feature_location2 = FeatureLocation(start=site2["start"], end=site2["end"])
-            # feature = SeqFeature(location=feature_location1, type="primer_bind")
-            # feature = SeqFeature(location=feature_location2, type="primer_bind")
         feature.qualifiers["note"] = "Primer binding site"
         feature.qualifiers["label"] = primer.name + "_" + direction
         feature.qualifiers["primer_sequence"] = site["sequence"]
         feature.qualifiers["direction"] = direction
         seq_record.features.append(feature)
-        # for feature in seq_record.features:
-        #     print(feature)
         SeqIO.write(seq_record, genbank_file, "genbank")
         
     def check_overlap(self):

@@ -21,43 +21,8 @@ from .sequence import Vector, Gene
 
 
 
-class SnapGene:
-    """
-    Class for handling SnapGene files and generating SnapGene features
-    """
-    def __init__(self,
-                 vector_instance: Vector,
-                 gene_instance: Gene,
-                 output_dir: str = None):
-        
-            self.output_dir = output_dir
-            self.vector_instance = vector_instance
-            self.gene_instance = gene_instance
-
-    @staticmethod
-    def gff3_header(length_sequence, version="3.2.1", sequence_name="myseq"):
-        result = [f"##gff-version {version}", f"##sequence-region {sequence_name} 1 {len(length_sequence)}"]
-        return result
-
-    @staticmethod
-    def gff3_line(begin_pos, end_pos, name, hex_color, type):
-        line = ['myseq', '.', f"{type}", str(begin_pos), str(end_pos), '.', '.', '.', f"Name={name};color={hex_color}"]
-        return line
-    
-    @staticmethod
-    def gff3_colors():
-        colors = {
-            'mutation': '#FF0000',
-            'combination': '#D8FF00',
-            'insert': '#0017FF',
-            'deletion': '#FF5900',
-            'IVAprimer': '#FF00D4',
-            'SEQprimer': '#06FF92'}
-        return colors
-    
-
 # TODO Describe in the tutorial how to obtain the genome IDs from NIH
-# TODO Check licensing of this code that was adopted from ... (https://www.biotite-python.org/latest/examples/gallery/sequence/misc/codon_usage.html)
+# TODO Check licensing of this code that was adopted from ... (https://www.biotite-python.org/latest/examples/gallery/sequence/misc/codon_usage.html) CHECK HOW TO USE IT!
 class CodonUsage:
     """
     Class for generating codon usage tables using biotite
