@@ -5,12 +5,7 @@ from datetime import datetime
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '../src'))
 
-from sequence import Plasmid
-from utils import Utils
-
-
-# python src/CLI.py -g tutorial/files/A0QX55.fasta -v tutorial/files/vector.dna -s data/codon_usage/Mycobacterium_smegmatis.csv -m tests/randominput/1_mutations_random_N=120_2024-04-22.txt -o tests/randomoutput/1
-
+from sequence import Vector, Gene
 
 
 class RandomMutations:
@@ -24,42 +19,43 @@ class RandomMutations:
                                 n_multiple_mutations: int, 
                                 n_deletions: int, 
                                 n_insertions: int,
-                                output_dir: str):
+                                output_dir: str,
+                                filename):
         """
         Make random mutations in a protein sequence.
         """
         protein_sequence = RandomMutations.translate_sequence(nucleotide_sequence)
-        residues = [i + str(j) for i, j in zip(protein_sequence, range(1, len(protein_sequence) + 1))]
+        residues = [i + str(j) for i, j in zip(protein_sequence, range(1, len(protein_sequence) + 1))][:-1]
 
         random_mutations = {}
 
         # List containing all natural amino acids and options for our mutations
-        amino_acids = Utils.aas()
+        amino_acids = ['A', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'K', 'L', 'M', 'N', 'P', 'Q', 'R', 'S', 'T', 'V', 'W', 'Y']
 
         # Randomly select single mutations
         selected_single_mutants = self.random_single_mutation(residues, amino_acids, n_single_mutations)
         random_mutations['single_mutations'] = selected_single_mutants
-        print(f"Generated {n_single_mutations} single mutations: ", selected_single_mutants)
+        # print(f"Generated {n_single_mutations} single mutations: ", selected_single_mutants)
 
         # Randomly select double mutations
         selected_double_mutants = self.random_multiple_mutation(residues, amino_acids, n_multiple_mutations)
         random_mutations['double_mutations'] = selected_double_mutants
-        print(f"Generated {n_multiple_mutations} paired mutations: ", selected_double_mutants)
+        # print(f"Generated {n_multiple_mutations} paired mutations: ", selected_double_mutants)
 
         # Randomly select insertions
         selected_insertions = self.random_insert(residues, amino_acids, n_insertions)
         random_mutations['insertions'] = selected_insertions
-        print(f"Generated {n_insertions} insertions: ", selected_insertions)
+        # print(f"Generated {n_insertions} insertions: ", selected_insertions)
 
         # Randomly select deletions
         selected_deletions = self.random_deletion(residues, n_deletions)
         random_mutations['deletions'] = selected_deletions
-        print(f"Generated {n_deletions} deletions: ", selected_deletions)
+        # print(f"Generated {n_deletions} deletions: ", selected_deletions)
 
         n_mutations = n_single_mutations + n_multiple_mutations + n_insertions + n_deletions
-        print(f"Total number of mutations: {n_mutations}")
+        # print(f"Total number of mutations: {n_mutations}")
 
-        self.random_mutations_to_file(output_dir, n_mutations, random_mutations)
+        self.random_mutations_to_file(output_dir, n_mutations, random_mutations, filename)
 
 
     def random_single_mutation(self, residues, aas, n):
@@ -127,11 +123,30 @@ class RandomMutations:
         """
         deletions = []
         for i in range(n):
-            len_deletion = random.sample(range(1, max_length_deletion), 1)[0]
-            res_b = random.sample(residues, 1)[0]
-            res_e = residues[residues.index(res_b) + len_deletion]
-            deletion = res_b + '-' + res_e
-            deletions.append(deletion)
+            # len_deletion = random.sample(range(1, max_length_deletion), 1)[0]
+            # res_b = random.sample(residues, 1)[0]
+            # res_e = residues[residues.index(res_b) + len_deletion]
+            # deletion = res_b + '-' + res_e
+            # deletions.append(deletion)
+                    # Ensure len_deletion is at least 1 and at most max_length_deletion
+            len_deletion = random.randint(1, min(max_length_deletion, len(residues)))
+
+            # Select a residue from the list
+            res_b = random.choice(residues)
+
+            # Get the starting index of the selected residue
+            start_index = residues.index(res_b)
+
+            # Check if we can safely calculate the end index
+            if start_index + len_deletion < len(residues):
+                res_e = residues[start_index + len_deletion]
+                deletion = res_b + '-' + res_e
+                deletions.append(deletion)
+            else:
+                # If out of range, handle it, e.g., skip or create a deletion with available residues
+                # Here, we'll just create a deletion that ends at the last residue
+                deletion = res_b + '-' + residues[-1]
+                deletions.append(deletion)
         return deletions
 
     def random_insert(self, residues, aas, n, max_length_insertion=10):
@@ -159,10 +174,13 @@ class RandomMutations:
             inserts.append(insert)
         return inserts
 
-    def random_mutations_to_file(self, output_dir, n, mutations):
-        now = datetime.now()
-        dt_string = now.strftime("%Y-%m-%d")
-        mutationsfile = os.path.join(output_dir, f'mutations_random_N={n}_{dt_string}.txt')
+    def random_mutations_to_file(self, output_dir, n, mutations, filename=None):
+        if not filename:
+            now = datetime.now()
+            dt_string = now.strftime("%Y-%m-%d")
+            mutationsfile = os.path.join(output_dir, f'mutations_random_N={n}_{dt_string}.txt')
+        else:
+            mutationsfile = os.path.join(output_dir, filename)
 
         with open(mutationsfile, 'w') as f:
             for i in mutations['single_mutations']:
@@ -175,33 +193,42 @@ class RandomMutations:
                 f.write('Deletion ' + i.upper() + '\n')
 
     @staticmethod
-    # TODO Change this function if possible
     def translate_sequence(sequence: str) -> str:
         return sequence.translate()
 
 
 if __name__ == "__main__":
 
-    # TODO Check for different gene lengths and different mutations what are feasible input numbers
+    current_dir = os.path.dirname(__file__)
+    base_dir = os.path.abspath(os.path.join(current_dir, '..'))
 
     # sequence
-    sequence_file = r"tutorial\files\A0QX55.fasta"
-    vector_file = r"tutorial/files/vector.dna"
-    sequence_instance = Plasmid()
-    sequence_instance.parse_vector(vector_file)
-    sequence_instance.parse_sequence(sequence_file)
+    gene = 'A0QX55'
+    sequence_file = os.path.join(base_dir, "example_data", "Msmegmatis_DnaE1", "A0QX55.fasta")
+    vector_file = os.path.join(base_dir, "example_data", "Msmegmatis_DnaE1", "vector.dna")
+        
+    # Output directory
+    output_dir = os.path.join(base_dir, "tests", "randominput")
+
+    gene_instance = Gene()
+    gene_instance.parse_sequence(sequence_file)
+
+    vector_instance = Vector(gene=gene_instance)
+    vector_instance.parse_vector(vector_file)
 
     # output directory
-    output_dir = r"tests/randominput"
-    n_single_mutations = 100
-    n_multiple_mutations = 50
-    n_deletions = 30
-    n_insertions = 30
+    for i in range(1, 200):
+        # randomly choose number of mutations
+        n_single_mutations = random.randint(1, 100)
+        n_multiple_mutations = random.randint(1, 50)
+        n_deletions = random.randint(1, 50)
+        n_insertions = random.randint(1, 50)
 
-    random_mutations = RandomMutations()
-    random_mutations.make_random_mutations(nucleotide_sequence=sequence_instance.sequence,
-                                          n_single_mutations=n_single_mutations, 
-                                          n_multiple_mutations=n_multiple_mutations,
-                                          n_deletions=n_deletions,
-                                          n_insertions=n_insertions, 
-                                          output_dir=output_dir)
+        random_mutations = RandomMutations()
+        random_mutations.make_random_mutations(nucleotide_sequence=gene_instance.sequence,
+                                            n_single_mutations=n_single_mutations, 
+                                            n_multiple_mutations=n_multiple_mutations,
+                                            n_deletions=n_deletions,
+                                            n_insertions=n_insertions, 
+                                            output_dir=output_dir,
+                                            filename=f"{i}_{gene}_mutations.txt")
