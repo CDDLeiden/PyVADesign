@@ -1,6 +1,8 @@
 ### Specific for this directory
 
 tutorial_output/*
+tests/randominput/*
+tests/randomoutput/*
 
 ### Python template
 # Byte-compiled / optimized / DLL files
