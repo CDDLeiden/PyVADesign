@@ -239,7 +239,7 @@ class DesignPrimers:
             return result
                 
         except KeyError:  # If no suitable primer is found
-            raise ValueError("No sequencing primer found.")
+            raise ValueError("No sequencing primer found, try changing the settings.")
         
     def find_closest_higher_index(self, numbers, target):
         """Find closest number in list that is higher than target"""
@@ -347,7 +347,7 @@ class DesignPrimers:
                     left = fw_range_start  # Reset left to the start range
                     right += 1
                 else:
-                    raise ValueError("Primer pair not found.")
+                    raise ValueError("Primer pair not found. Try using less strict settings.")
 
     def add_primers_to_genbank_file(self, genbank_file, primer):
         """
