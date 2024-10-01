@@ -1,10 +1,6 @@
 import os
 import sys
 from Bio import SeqIO
-from Bio.Seq import Seq
-from datetime import datetime
-from Bio.SeqRecord import SeqRecord
-from Bio.SeqFeature import SeqFeature, FeatureLocation
 from biotite.sequence import NucleotideSequence
 
 

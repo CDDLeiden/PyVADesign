@@ -1,28 +1,13 @@
 import os
-import sys
-import random
 import tempfile
 import itertools
-import numpy as np
-import pandas as pd
 import biotite.sequence as seq
 import biotite.database.entrez as entrez
-import biotite.sequence.io.fasta as fasta
 import biotite.sequence.io.genbank as gb
 from biotite.sequence import AnnotatedSequence
 
-from Bio import SeqIO
-from Bio.Seq import Seq
-from datetime import datetime
-from Bio.SeqRecord import SeqRecord
-from Bio.SeqFeature import SeqFeature, FeatureLocation, CompoundLocation
-
-from .sequence import Vector, Gene
 
 
-
-# TODO Describe in the tutorial how to obtain the genome IDs from NIH
-# TODO Check licensing of this code that was adopted from ... (https://www.biotite-python.org/latest/examples/gallery/sequence/misc/codon_usage.html) CHECK HOW TO USE IT!
 class CodonUsage:
     """
     Class for generating codon usage tables using biotite

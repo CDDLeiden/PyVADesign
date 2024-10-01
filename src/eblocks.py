@@ -2,21 +2,18 @@ import os
 import sys
 import copy
 import numpy as np
+from Bio import SeqIO
+from Bio.Seq import Seq
+from datetime import datetime
 import biotite.sequence as seq
-from scipy.spatial.distance import pdist, squareform
-from scipy.spatial.distance import pdist, squareform
+from Bio.SeqRecord import SeqRecord
 from sklearn_extra.cluster import KMedoids
+from scipy.spatial.distance import pdist, squareform
+from Bio.SeqFeature import SeqFeature, FeatureLocation, CompoundLocation
 
+from .utils import CodonUsage
 from .mutation import Mutation
 from .sequence import Vector, Gene
-from .utils import CodonUsage
-
-from Bio import SeqIO
-from datetime import datetime
-from Bio.Seq import Seq
-
-from Bio.SeqRecord import SeqRecord
-from Bio.SeqFeature import SeqFeature, FeatureLocation, CompoundLocation
 
 
 
