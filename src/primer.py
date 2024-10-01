@@ -1,22 +1,13 @@
 import os
-import sys
-import math
 import primer3
-import difflib
-import pandas as pd
+from Bio import SeqIO
 import biotite.sequence as seq
-from Bio.SeqUtils import gc_fraction
-from Bio.SeqUtils import MeltingTemp as mt
+from Bio.SeqFeature import SeqFeature, FeatureLocation, CompoundLocation
 
+from .sequence import Vector
 from .mutation import Mutation
-from .sequence import Vector, Gene
 from .eblocks import EblockDesign
 
-from Bio import SeqIO
-from Bio.Seq import Seq
-from datetime import datetime
-from Bio.SeqRecord import SeqRecord
-from Bio.SeqFeature import SeqFeature, FeatureLocation, CompoundLocation
 
 
 # TODO Add examples of complementary and hairpin structures to the tests directory
