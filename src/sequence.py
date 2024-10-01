@@ -84,9 +84,16 @@ class Vector:
 
     def find_index_in_vector(self, sequence: str):
         idx_begin = str(self.vector.seq).lower().find(str(sequence).lower())
+        if idx_begin == -1:  # sequence overlapping with begin/end of vector
+            new_vector = self.vector.seq + self.vector.seq
+            idx = str(new_vector).lower().find(str(sequence).lower())
+            idx_begin = idx - len(self.vector.seq)
+            idx_begin = self.circular_index(idx_begin, len(self.vector))
         idx_end = idx_begin + len(sequence)
-        idx_begin = self.circular_index(idx_begin, len(self.vector))
         idx_end = self.circular_index(idx_end, len(self.vector))
+        if idx_end > len(self.vector):
+            idx_end = idx_end - len(self.vector)
+            idx_end = self.circular_index(idx_end, len(self.vector))
         if idx_begin == -1 or idx_end == -1:
             raise ValueError("Gene block not found in vector sequence.")
         return idx_begin, idx_end

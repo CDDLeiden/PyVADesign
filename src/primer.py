@@ -13,9 +13,126 @@ from .sequence import Vector, Gene
 from .eblocks import EblockDesign
 from .utils import OutputToFile, SnapGene
 
+from Bio import SeqIO
+from Bio.Seq import Seq
+from datetime import datetime
+from Bio.SeqRecord import SeqRecord
+from Bio.SeqFeature import SeqFeature, FeatureLocation, CompoundLocation
 
-# TODO add primer data to genbankl file feature is  "primer_bind" 
+
 # TODO Add examples of complementary and hairpin structures to the tests directory
+
+class Primer:
+    def __init__(self,
+                 name: str = None,
+                 sequence_5to3: str = None,
+                 is_forward: bool = False,
+                 is_reverse: bool = False,
+                 idx_start: int = None,
+                 idx_end: int = None,
+                 tm: float = None,
+                 gc_content: float = None,):
+
+        self.name = name
+        self.sequence_5to3 = sequence_5to3
+        self.is_forward = is_forward
+        self.is_reverse = is_reverse
+        self.idx_start = idx_start
+        self.idx_end = idx_end
+        self.tm = tm
+        self.gc_content = gc_content
+
+    # @staticmethod
+    # def check_multiple_binding_sites(vector: str, sequence: str):
+    #     # TODO Maybe use primerblast for this
+    #     # TODO Write some checks for this function
+    #     # TODO Check for exact cases where the sequence binds multiple times and almost exact cases where only few characters are different
+    #     count = 0
+    #     for i in range(len(vector) - len(sequence) + 1):
+    #         sub = vector[i:i + len(sequence)]
+    #         unique_chars = set(sub)
+    #         if len(unique_chars) <= 2 or (len(unique_chars) == 3 and sub.count(sub[0]) == 2):
+    #             count += 1
+    #     if count > 1:
+    #         print(f"Multiple binding sites for sequence {sequence} in the vector sequence")
+    #     return count
+
+
+class Primer3Config:
+    """
+    This class contains the configuration for the primer3 design
+    """
+    # TODO Add some other parameters as well from https://primer3.org/manual.html
+    @staticmethod
+    def global_args_primer_pair():
+        return {
+            # TODO Add task
+            'PRIMER_OPT_SIZE': 20,
+            'PRIMER_PICK_INTERNAL_OLIGO': 1,
+            'PRIMER_INTERNAL_MAX_SELF_END': 8,
+            'PRIMER_MIN_SIZE': 12,
+            'PRIMER_MAX_SIZE': 25,
+            'PRIMER_OPT_TM': 60.0,
+            'PRIMER_MIN_TM': 57.0,
+            'PRIMER_MAX_TM': 63.0,
+            'PRIMER_MIN_GC': 20.0,
+            'PRIMER_MAX_GC': 80.0,
+            'PRIMER_MAX_POLY_X': 100,
+            'PRIMER_INTERNAL_MAX_POLY_X': 100,
+            'PRIMER_SALT_MONOVALENT': 50.0,
+            'PRIMER_DNA_CONC': 50.0,
+            'PRIMER_MAX_NS_ACCEPTED': 0,
+            'PRIMER_MAX_SELF_ANY': 12,
+            'PRIMER_MAX_SELF_END': 8,
+            'PRIMER_PAIR_MAX_COMPL_ANY': 12,
+            'PRIMER_PAIR_MAX_COMPL_END': 8,
+            'PRIMER_PAIR_MAX_DIFF_TM': 5.0,
+        }
+
+    @staticmethod
+    def global_args_sequencing_primer():
+        # TODO Add GC clamp
+        return {
+            'PRIMER_TASK': 'pick_sequencing_primers',
+            'PRIMER_OPT_SIZE': 16,
+            'PRIMER_MIN_SIZE': 16,
+            'PRIMER_MAX_SIZE': 25,
+            'PRIMER_OPT_TM': 58.0,
+            'PRIMER_MIN_TM': 55.0,
+            'PRIMER_MAX_TM': 60.0,
+            'PRIMER_MIN_GC': 40.0,
+            'PRIMER_MAX_GC': 60.0,
+            'PRIMER_MAX_POLY_X': 5,
+            'PRIMER_MAX_NS_ACCEPTED': 0,
+            'PRIMER_MAX_SELF_ANY': 8,
+            'PRIMER_MAX_SELF_END': 3,
+            'PRIMER_SALT_MONOVALENT': 50.0,
+            'PRIMER_DNA_CONC': 50.0
+        }
+
+    @staticmethod
+    def seq_args_primer_pair(sequence, product_start=None, product_end=None, force_left=None, force_right=None):
+        args = {
+            'SEQUENCE_ID': 'SEQ0001',
+            'SEQUENCE_TEMPLATE': sequence,
+            'SEQUENCE_INCLUDED_REGION': [0, len(sequence)],
+        }
+        if product_start is not None and product_end is not None:
+            args['PRIMER_PRODUCT_SIZE_RANGE'] = [[product_start, product_end]]
+        if force_left is not None:
+            args['SEQUENCE_FORCE_LEFT_START'] = force_left
+        if force_right is not None:
+            args['SEQUENCE_FORCE_RIGHT_START'] = force_right
+        return args
+    
+    @staticmethod
+    def seq_args_sequencing_primer(sequence, start, end):
+        return {
+            'SEQUENCE_ID': 'SEQ0001',
+            'SEQUENCE_TEMPLATE': sequence,
+            'SEQUENCE_TARGET': [start, end],
+        }
+
 
 
 class DesignPrimers:
@@ -27,36 +144,102 @@ class DesignPrimers:
                  eblocks_design_instance: EblockDesign,
                  mutation_instance: Mutation,
                  vector_instance: Vector,
-                 gene_instance: Gene,
-                 snapgene_instance = None,
                  output_dir: str = None,
+                 minimum_overlap: int = 15,
+                 void_length: int = 100,
                  verbose: bool = True):
 
         self.eblocks_design_instance = eblocks_design_instance
         self.mutation_instance = mutation_instance
         self.vector_instance = vector_instance
-        self.gene_instance = gene_instance
         self.output_dir = output_dir
-        self.snapgene_instance = snapgene_instance
+        self.minimum_overlap = minimum_overlap
+        self.void_length = void_length
         self.verbose = verbose
 
     def run_design(self):
         """
         Run the design of the primers
         """
-        # primerinstance = Primer()
-        snapgene_instance = SnapGene(vector_instance=self.vector_instance, gene_instance=self.gene_instance, output_dir=self.output_dir)
+        min_oh = self.check_overlap()  # Check if the overlap is large enough
         
-        # with OutputToFile(os.path.join(self.output_dir, 'primer-warnings.txt')):  # Save warnings to file
-        # ivaprimers = self.design_iva_primer()
-        min_oh = self.eblocks_design_instance.min_overlap - 15  # Minimum overhang length # TODO Remove this hardcoding
-        primers = {}  # eblock.name : [fw, rv]
         print("Designing primer pairs ...")
+        primerpairs = self.run_design_primerpair(min_oh)  # store primers: eblock.name : [fw_primer, rv_primer]
+
+        # Add primers to Genbank file of clones
+        for mut, eblock in self.eblocks_design_instance.eblocks.items():
+            for k, v in primerpairs.items():
+                if k == eblock.name:
+                    self.add_primers_to_genbank_file(genbank_file=os.path.join(self.output_dir, 'clones', f"{mut.name}", f"{mut.name}.gb"), primer=v[0])
+                    self.add_primers_to_genbank_file(genbank_file=os.path.join(self.output_dir, 'clones', f"{mut.name}", f"{mut.name}.gb"), primer=v[1])
+
+        for k, v in primerpairs.items():  # Save primers to fasta file
+            self.primers_to_fasta(name=v[0].name, seq=v[0].sequence_5to3, directory=self.output_dir, filename='primers.fasta')
+            self.primers_to_fasta(name=v[1].name, seq=v[1].sequence_5to3, directory=self.output_dir, filename='primers.fasta')
+
+        print("Designing sequencing primers ...")
+        seqprimers = self.run_design_seqprimer()
+
+        # Save primers to fasta file (both pairs and sequenging primers)
+        for k, v in seqprimers.items():
+            self.primers_to_fasta(name=v[0].name, seq=v[0].sequence_5to3, directory=self.output_dir, filename='primers.fasta')
+            self.primers_to_fasta(name=v[1].name, seq=v[1].sequence_5to3, directory=self.output_dir, filename='primers.fasta')
+
+        for mut, eblock in self.eblocks_design_instance.eblocks.items():
+            for k, v in seqprimers.items():
+                if k == eblock.name:
+                    self.add_primers_to_genbank_file(genbank_file=os.path.join(self.output_dir, 'clones', f"{mut.name}", f"{mut.name}.gb"), primer=v[0])
+                    self.add_primers_to_genbank_file(genbank_file=os.path.join(self.output_dir, 'clones', f"{mut.name}", f"{mut.name}.gb"), primer=v[1])
+        
+        print("Finished designing primers.")
+
+        
+    def run_design_seqprimer(self):
+        """
+        For each eBlock design a Forward and Reverse sequencing primer using primer3
+        """
+        primers = {}  # store primers: d[eblock.name] = [fw, rv]
         for eblock in self.eblocks_design_instance.wt_eblocks:
+            start = self.vector_instance.circular_index(eblock.start_index - self.void_length, self.vector_instance.length)
+            end = self.vector_instance.circular_index(start + 2*self.void_length, self.vector_instance.length)
+            if start > end:  # change the 0-point of the sequence
+                sequence = self.vector_instance.vector.seq[-1000:] + self.vector_instance.vector.seq[0:-1000]
+                idx_eblock = sequence.find(eblock.sequence)
+                start = self.vector_instance.circular_index(idx_eblock - self.void_length, self.vector_instance.length)
+                end = self.vector_instance.circular_index(start + 2*self.void_length, self.vector_instance.length)
+            else:
+                sequence = self.vector_instance.vector.seq
+
+            # Obtain FW primer
+            result  = self.design_sequencing_primer(sequence=sequence, start=start, end=end)
+            fw_result = self.parse_primer3_result(result, eblock, type='seq', direction='forward')
+            primers[eblock.name] = [fw_result]
+            # Obtain RV primer
+            start = self.vector_instance.circular_index(eblock.end_index - self.void_length , self.vector_instance.length)
+            end = self.vector_instance.circular_index(start + 2*self.void_length, self.vector_instance.length)
+            result  = self.design_sequencing_primer(sequence=self.vector_instance.vector.seq, start=start, end=end)
+
+            # Find the closest start index that is higher than the end index
+            possible_starts = []
+            for i in range(len(result) - 1):
+                try:
+                    possible_starts.append(int(result['PRIMER_RIGHT'][i]['COORDS'][0]))
+                except:
+                    break
+                
+            index = self.find_closest_higher_index(possible_starts, end)
+            rv_results = self.parse_primer3_result(result, eblock, type='seq', direction='reverse', index=index)
+            primers[eblock.name].append(rv_results)
+        return primers
+        
+    def run_design_primerpair(self, min_oh):
+        primers = {}
+        for eblock in self.eblocks_design_instance.wt_eblocks:
+
             mid_index = (eblock.start_index + eblock.end_index) // 2
-            length_product = len(self.vector_instance.vector.seq) - len(eblock.sequence) # TODO This is approximation
-            len_start = length_product - 50 # TODO Approximation
-            len_end = length_product + 50
+            length_product = len(self.vector_instance.vector.seq) - len(eblock.sequence)
+            len_start = length_product - 75 # TODO Approximation
+            len_end = length_product + 75
 
             sequence_template = self.vector_instance.vector.seq[mid_index:] + self.vector_instance.vector.seq[:mid_index]  # Linearize plasmid to allow for primer design
             half_eblock = len(eblock.sequence) // 2
@@ -67,98 +250,118 @@ class DesignPrimers:
             rv_start_range = self.vector_instance.circular_index(len(self.vector_instance.vector.seq) - half_eblock, len(self.vector_instance.vector.seq))
             rv_end_range = self.vector_instance.circular_index(len(self.vector_instance.vector.seq) - half_eblock + min_oh, len(self.vector_instance.vector.seq))
 
-            fw, rv = self.find_primerpair(sequence_template, eblock.name, fw_start_range, fw_end_range, rv_start_range, rv_end_range, len_start, len_end)
-            primers[eblock.name] = [fw, rv]  # TODO is this 5>3 sequence?
+            result = self.find_primerpair(sequence_template, fw_start_range, fw_end_range, rv_start_range, rv_end_range, len_start, len_end)
+            fw, rv = self.parse_primer3_result(result, eblock, type='pair')
+            primers[eblock.name] = [fw, rv]
+        return primers
 
-        # for i in ivaprimers:
-        #     primers[i.name] = i.sequence_5to3
+    def design_sequencing_primer(self, sequence, start, end):
+        try:
+            result = primer3.bindings.design_primers(seq_args=Primer3Config.seq_args_sequencing_primer(sequence, start, end),
+                                                     global_args=Primer3Config.global_args_sequencing_primer())
+            # Check if a sequencing primer was found
+            if 'PRIMER_LEFT_0_SEQUENCE' or 'PRIMER_RIGHT_0_SEQUENCE' in result:
+                    seqprimer = result['PRIMER_LEFT_0_SEQUENCE']
+            return result
+                
+        except KeyError:  # If no suitable primer is found
+            raise ValueError("No sequencing primer found.")
+        
+    def find_closest_higher_index(self, numbers, target):
+        """Find closest number in list that is higher than target"""
+        higher_numbers = [num for num in numbers if num > target]
+        if not higher_numbers:
+            return None
+        closest_higher = min(higher_numbers)
+        return numbers.index(closest_higher)
+    
+    def make_fasta_file(self, directory, filename, header=False):
+        try:
+            with open(os.path.join(directory, filename), 'r') as f:
+                pass
+        except FileNotFoundError:
+            with open(os.path.join(directory, filename), 'w') as f:
+                if header:
+                    f.write("\n".join(SnapGene.gff3_header(self.vector_instance.vector.seq)))
+                    f.write("\n")
+                else:
+                    pass
+    
+    def primers_to_fasta(self, name, seq, directory, filename='primers.fasta'):
+        """
+        This function converts the primers to features that can be read by SnapGene.
+        """
+        self.make_fasta_file(directory, filename, header=False)
+        with open(os.path.join(self.output_dir, filename), 'a') as f:
+            f.write(f">{name}\n")
+            f.write(f"{seq}\n")
 
-        # Add primers to Genbank file
-        for mut, eblock in self.eblocks_design_instance.eblocks.items():
-            for k, v in primers.items():
-                if k == eblock.name:
-                    matching_fw_primer = v[0]
-                    matching_rv_primer = v[1]
-            # matching_fw_primer = [i for i in pri if i.name == f"IVA_Fw_eBlock_{eblock.block_number}"]
-            # matching_fw_primer = [i for i in ivaprimers if i.name == f"IVA_Fw_eBlock_{eblock.block_number}"]
-            # matching_rv_primer = [i for i in ivaprimers if i.name == f"IVA_Rv_eBlock_{eblock.block_number}"]
-            snapgene_instance.add_primers_to_genbank_file(genbank_file=os.path.join(self.output_dir, 'clones', f"{mut.name}", f"{mut.name}.gb"), primer=matching_fw_primer, direction='fw')
-            snapgene_instance.add_primers_to_genbank_file(genbank_file=os.path.join(self.output_dir, 'clones', f"{mut.name}", f"{mut.name}.gb"), primer=matching_rv_primer, direction='rv')
-
-        sys.exit()
-
-        print("Designing sequencing primers ...")
-        seqprimers, mapping = self.design_seq_primer()
-
-        for i in seqprimers:
-            primers[i.name] = str(i.sequence_5to3)
-        self.snapgene_instance.primers_to_fasta(primers=primers, directory=self.output_dir, filename='primers.fasta')
-        for k, v in mapping.items():
-            for i in v:
-                for s in seqprimers:
-                    if s.name == k:
-                        snapgene_instance.add_primers_to_genbank_file(genbank_file=os.path.join(self.output_dir, 'clones', f"{i}", f"{i}.gb"), primer=s)
-
-        for k, v in primers.items():  # Check primers for hairpin formation and multiple binding sites
-            hairpin = primerinstance.calc_hairpin(v)
-            print(v, hairpin)
-            n_binding_sites = primerinstance.check_multiple_binding_sites(vector=self.vector_instance.vector.seq, sequence=v)
-            print(f"Primer {k} has {n_binding_sites} binding sites in the vector sequence")
-            homo = primerinstance.calc_homodimer(v)
-            print("homo:", homo)
-
-        # Check for heterodimer
-        for mut, eblock in self.eblocks_design_instance.eblocks.items():
-            matching_fw_primer = [i for i in ivaprimers if i.name == f"IVA_Fw_eBlock_{eblock.block_number}"]
-            matching_rv_primer = [i for i in ivaprimers if i.name == f"IVA_Rv_eBlock_{eblock.block_number}"]
-            hetero = primerinstance.calc_heterodimer(matching_fw_primer[0].sequence_5to3, matching_rv_primer[0].sequence_5to3)
-            print("hetero:", hetero)
-
-        print("Finished designing primers.")
-
-
-    def find_primerpair(self, sequence: str, seqID: str, fw_range_start: int, fw_range_end: int, rv_range_start: int, rv_range_end: int, i_start: int, i_end: int):
+    def parse_primer3_result(self, primer3output, eblock, type, index=0, direction=None,):
+        if type == "pair":
+            # Forward (left) primer
+            start_idx, end_idx = self.vector_instance.find_index_in_vector(str(primer3output[f"PRIMER_LEFT_{index}_SEQUENCE"]))
+            fw_primer = Primer()
+            fw_primer.name = eblock.name + "_fw"
+            fw_primer.sequence_5to3 = primer3output[f"PRIMER_LEFT_{index}_SEQUENCE"]
+            fw_primer.is_forward = True
+            fw_primer.idx_start = start_idx
+            fw_primer.idx_end = end_idx
+            fw_primer.tm = round(primer3output[f'PRIMER_LEFT_{index}_TM'], 2)
+            fw_primer.gc_content = round(primer3output[f'PRIMER_LEFT_{index}_GC_PERCENT'], 2)
+            # Reverse (right) primer
+            tmpseq = seq.NucleotideSequence(str(primer3output[f'PRIMER_RIGHT_{index}_SEQUENCE'])).complement().reverse()
+            start_idx, end_idx = self.vector_instance.find_index_in_vector(str(tmpseq))
+            rv_primer = Primer()
+            rv_primer.name = eblock.name + "_rv"
+            rv_primer.sequence_5to3 = primer3output[f'PRIMER_RIGHT_{index}_SEQUENCE']
+            rv_primer.is_reverse = True
+            rv_primer.idx_start = start_idx
+            rv_primer.idx_end = end_idx
+            rv_primer.tm = round(primer3output[f'PRIMER_RIGHT_{index}_TM'], 2)
+            rv_primer.gc_content = round(primer3output[f'PRIMER_RIGHT_{index}_GC_PERCENT'], 2)
+            return fw_primer, rv_primer
+        elif type == 'seq':
+            # TODO Does direction matter here?
+            if direction == 'forward':
+                start_idx, end_idx = self.vector_instance.find_index_in_vector(str(primer3output[f'PRIMER_LEFT_{index}_SEQUENCE']))
+                seq_primer = Primer()
+                seq_primer.name = eblock.name + f"_{direction}_seq"
+                seq_primer.sequence_5to3 = primer3output[f'PRIMER_LEFT_{index}_SEQUENCE']
+                seq_primer.is_forward = True
+                seq_primer.idx_start = start_idx
+                seq_primer.idx_end = end_idx
+                seq_primer.tm = round(primer3output[f'PRIMER_LEFT_0_TM'], 2)
+                seq_primer.gc_content = round(primer3output[f'PRIMER_LEFT_{index}_GC_PERCENT'], 2)
+                return seq_primer
+            elif direction == 'reverse':
+                start_idx, end_idx = self.vector_instance.find_index_in_vector(str(primer3output[f'PRIMER_RIGHT_{index}_SEQUENCE']))
+                seq_primer = Primer()
+                seq_primer.name = eblock.name + f"_{direction}_seq"
+                seq_primer.sequence_5to3 = primer3output[f'PRIMER_RIGHT_{index}_SEQUENCE']
+                seq_primer.is_reverse = True
+                seq_primer.idx_start = start_idx
+                seq_primer.idx_end = end_idx
+                seq_primer.tm = round(primer3output[f'PRIMER_RIGHT_{index}_TM'], 2)
+                seq_primer.gc_content = round(primer3output[f'PRIMER_RIGHT_{index}_GC_PERCENT'], 2)
+                return seq_primer
+        else:
+            raise ValueError("Invalid type. Please specify 'pair' or 'seq'.")
+    
+    def find_primerpair(self, sequence: str, fw_range_start: int, fw_range_end: int, rv_range_start: int, rv_range_end: int, i_start: int, i_end: int):
         
         left = fw_range_start
         right = rv_range_start 
 
-        # TODO Move these values somewhere else
         while True:
             try:
-                result = primer3.bindings.design_primers(
-                    seq_args={
-                        'SEQUENCE_ID': seqID,
-                        'SEQUENCE_TEMPLATE': sequence,
-                        'SEQUENCE_INCLUDED_REGION': [0, len(sequence)],
-                        'SEQUENCE_FORCE_LEFT_START': left,
-                        'SEQUENCE_FORCE_RIGHT_START': right,
-                    },
-                    global_args={
-                        'PRIMER_OPT_SIZE': 20,
-                        'PRIMER_PICK_INTERNAL_OLIGO': 1,
-                        'PRIMER_INTERNAL_MAX_SELF_END': 8,
-                        'PRIMER_MIN_SIZE': 8,
-                        'PRIMER_MAX_SIZE': 25,
-                        'PRIMER_OPT_TM': 60.0,
-                        'PRIMER_MIN_TM': 57.0,
-                        'PRIMER_MAX_TM': 63.0,
-                        'PRIMER_MIN_GC': 20.0,
-                        'PRIMER_MAX_GC': 80.0,
-                        'PRIMER_MAX_POLY_X': 100,
-                        'PRIMER_INTERNAL_MAX_POLY_X': 100,
-                        'PRIMER_SALT_MONOVALENT': 50.0,
-                        'PRIMER_DNA_CONC': 50.0,
-                        'PRIMER_MAX_NS_ACCEPTED': 0,
-                        'PRIMER_MAX_SELF_ANY': 12,
-                        'PRIMER_MAX_SELF_END': 8,
-                        'PRIMER_PAIR_MAX_COMPL_ANY': 12,
-                        'PRIMER_PAIR_MAX_COMPL_END': 8,
-                        'PRIMER_PAIR_MAX_DIFF_TM': 5.0,
-                        'PRIMER_PRODUCT_SIZE_RANGE': [[i_start, i_end]],})
-            
-                fw = result['PRIMER_LEFT_0_SEQUENCE']
-                rv = result['PRIMER_RIGHT_0_SEQUENCE']
-                return fw, rv
+                result = primer3.bindings.design_primers(seq_args=Primer3Config.seq_args_primer_pair(sequence,
+                                                                                                     product_start=i_start,
+                                                                                                     product_end=i_end,
+                                                                                                     force_left=left,
+                                                                                                     force_right=right),
+                                                        global_args=Primer3Config.global_args_primer_pair())
+                check = result['PRIMER_LEFT_0_SEQUENCE']
+                return result
 
             except KeyError: # Exhaust all possibilities in the desired range
                 if left < fw_range_end:
@@ -167,504 +370,62 @@ class DesignPrimers:
                     left = fw_range_start  # Reset left to the start range
                     right += 1
                 else:
-                    fw = None
-                    rv = None
-                    return fw, rv
+                    raise ValueError("Primer pair not found.")
 
-
-
-
-                        
-    def design_iva_primer(self):
+    def add_primers_to_genbank_file(self, genbank_file, primer):
         """
-        Design IVA primers to open-up the expression plasmid
+        This function saves primer data to an existing GenBank file
         """
+        # TODO : Check direction of the primer in benchling and see whether this is correct
+        seq_record = SeqIO.read(genbank_file, "genbank")
+        feature = None
+        site = {}
 
-        fw_sequence = str(self.vector_instance.vector.seq.lower())
-        rv_sequence = str(seq.NucleotideSequence(fw_sequence).complement()).lower()
-        print("fw sequence:", fw_sequence)
-       
-        ivaprimerdesign = IVAprimer()
-        ivaprimers = []  # Store all IVA primers in a list
-        ivaprimerdesign.vector_length = len(self.vector_instance.vector.seq)
-
-        for eblock in self.eblocks_design_instance.wt_eblocks:  # Loop over gene blocks and design IVA primers (starting with initial sequences that are optimized later on)
-            eblock.start_index = self.vector_instance.circular_index(eblock.start_index, ivaprimerdesign.vector_length)
-            print(eblock.name)
-
-            init_fw_oh = ivaprimerdesign.Fw_overhang(eblock.end_index, fw_sequence, size=ivaprimerdesign.init_size)
-            size = ivaprimerdesign.optimize_size(ivaprimerdesign.max_overhang_temp_IVA, init_fw_oh, eblock.end_index, ivaprimerdesign.init_size, fw_sequence, ivaprimerdesign.Fw_overhang)
-            final_fw_oh = ivaprimerdesign.Fw_overhang(eblock.end_index, fw_sequence, size=size)
-            print("final_fw_oh:", final_fw_oh)
-
-            init_fw_template = ivaprimerdesign.Fw_template(eblock.end_index, fw_sequence, size=ivaprimerdesign.init_size)
-            size = ivaprimerdesign.optimize_size(ivaprimerdesign.max_template_temp_IVA, init_fw_template, eblock.end_index, ivaprimerdesign.init_size, fw_sequence, ivaprimerdesign.Fw_template)
-            final_fw_template = ivaprimerdesign.Fw_template(eblock.end_index, fw_sequence, size)
-            print("final_fw_template:", final_fw_template)
-
-            init_rv_oh = ivaprimerdesign.Rv_overhang(eblock.start_index, rv_sequence, size=ivaprimerdesign.init_size)
-            size = ivaprimerdesign.optimize_size(ivaprimerdesign.max_overhang_temp_IVA, init_rv_oh, eblock.start_index, ivaprimerdesign.init_size, rv_sequence, ivaprimerdesign.Rv_overhang)
-            final_rv_oh = ivaprimerdesign.Rv_overhang(eblock.start_index, rv_sequence, size)
-            print("final_rv_oh:", final_rv_oh)
-
-            init_rv_template = ivaprimerdesign.Rv_template(eblock.start_index, rv_sequence, size=ivaprimerdesign.init_size)
-            size = ivaprimerdesign.optimize_size(ivaprimerdesign.max_template_temp_IVA, init_rv_template, eblock.start_index, ivaprimerdesign.init_size, rv_sequence, ivaprimerdesign.Rv_template)
-            final_rv_template = ivaprimerdesign.Rv_template(eblock.start_index, rv_sequence, size)
-            print("final_rv_template:", final_rv_template)
-
-            # Combine template and overhang sequences
-            fw_combined = ivaprimerdesign.combine_Fw_primer(final_fw_oh, final_fw_template)
-            rv_combined = ivaprimerdesign.combine_Rv_primer(final_rv_template, final_rv_oh)
-
-            iva_fw_primer = IVAprimer(name=ivaprimerdesign.Fw_name(eblock.block_number),
-                                      sequence_5to3=''.join(fw_combined),
-                                      is_forward=True,
-                                      template=''.join(final_fw_template),
-                                      overhang=''.join(final_fw_oh))
-            
-            idx_start, idx_end = IVAprimer.find_index_in_vector(fw_sequence, ''.join(fw_combined))
-            iva_fw_primer.idx_start = idx_start[0]
-            iva_fw_primer.idx_end = idx_end[0]
-
-            ivaprimers.append(iva_fw_primer)
-            
-            iva_rv_primer = IVAprimer(name=ivaprimerdesign.Rv_name(eblock.block_number),
-                                      sequence_5to3=str(seq.NucleotideSequence(''.join(rv_combined)).reverse()), # sequence_5to3=self.sequence_instance.invert_sequence(''.join(rv_combined)),
-                                      is_reverse=True,
-                                      template=''.join(final_rv_template),
-                                      overhang=''.join(final_rv_oh))
-            
-            idx_start, idx_end = IVAprimer.find_index_in_vector(rv_sequence, ''.join(rv_combined))
-            iva_rv_primer.idx_start = idx_start[0]
-            iva_rv_primer.idx_end = idx_end[0]
-
-            ivaprimers.append(iva_rv_primer)
-                
-            # Check primers and make sure they are within the desired parameters
-            ivaprimerdesign.Tm_difference(iva_fw_primer, iva_rv_primer)
-            overlap = ivaprimerdesign.check_complementarity(iva_fw_primer, iva_rv_primer)
-
-        # Save primer information
-        df = ivaprimerdesign.primers_to_dataframe(ivaprimers)
-        df.to_csv(os.path.join(self.output_dir, 'IVAprimers.csv'), index=False)
-
-        return ivaprimers
-
-    def design_seq_primer(self):
-        """
-        Design sequencing primers to validate the mutations
-        """
-        seqprimerdesign = SEQprimer()
-        seqprimers = []  # Store all sequencing primers in a list
-
-        possible_primers = seqprimerdesign.all_fw_primers(gene_sequence=self.gene_instance.sequence)  # Find all possible primers that fit the desired parameters
-        
-        count = 1  # Counter for the primer names
-        for i in self.eblocks_design_instance.wt_eblocks:  
-            length = i.end_index - i.start_index  # How many primers needed to sequence the whole gene block
-            num_primers = math.ceil(length / seqprimerdesign.max_sequenced_region)
-            
-            size = int(length / num_primers)
-            primer_start_indexes = [(i.start_index - seqprimerdesign.void_length) + (k * size) for k in range(num_primers)]  # Calculate the starting points of the sequencing primer
-            primer_end_indexes = [i.start_index + (k * size) for k in range(1, num_primers + 1)]
-            
-            for si, ei in zip(primer_start_indexes, primer_end_indexes):
-                closest_range, closest_primer, diff = seqprimerdesign.find_closest_primer(possible_primers, si)  # Find closest primer to starting position         
-                if diff < seqprimerdesign.max_difference:
-                    prim = SEQprimer(name=seqprimerdesign.get_name(count, i.block_number),
-                                     sequence_5to3=closest_primer,
-                                     is_forward=True,
-                                     idx_start_seq=si + seqprimerdesign.void_length - diff,
-                                     idx_end_seq=ei - diff,
-                                     primer_idx_strt=closest_range[0],
-                                     primer_idx_end=closest_range[1])
-                    
-                    start_idx, end_idx = SEQprimer.find_index_in_vector(str(self.vector_instance.vector.seq).lower(), str(closest_primer).lower())
-                    prim.idx_start = start_idx[0]
-                    prim.idx_end = end_idx[0]
-
-                    seqprimers.append(prim)
-                    count += 1
-                else:
-                    print("No primer found within the desired range")
-
-        mapped_primers = self.map_seqprimers_to_mutations(seqprimers)
-        seqprimerdesign.mapped_primers = mapped_primers
-        self.mapped_seqprimers_to_txt(seqprimerdesign.mapped_primers)  # Save mapped primers to mutations to file
-
-        # Save primer information
-        # print(seqprimers)
-        # for i in seqprimers:
-        #     print(i.sequence_5to3, type(i.sequence_5to3))
-        #     print(i.name, i.idx_start, i.idx_end, i.5to3sequence)
-        
-        # Convert sequences to bytes
-        df = seqprimerdesign.primers_to_dataframe(seqprimers)
-        df.to_csv(os.path.join(self.output_dir, 'SEQprimers.csv'), index=False)
-        
-        return seqprimers, mapped_primers
-        
-    def map_seqprimers_to_mutations(self, primers: list):
-        """Map the sequenced regions to the mutations that can be validated with the sequencing primers"""
-        mapped_primers = {}
-        for i in primers:
-            mapped_primers[i.name] = []
-            for mutation in self.mutation_instance.mutations:
-                if i.idx_start_seq <= mutation.idx_dna[0] <= i.idx_end_seq:
-                    mapped_primers[i.name].append(mutation.name)
-        return mapped_primers
-    
-    def mapped_seqprimers_to_txt(self, primers: dict, filename='SEQprimers-mapped-mutations.txt'):
-        with open(os.path.join(self.output_dir, filename), 'w') as f:
-            for k, v in primers.items():
-                f.write(f"{k}\n")
-                for i in v:
-                    if type(i) == list:
-                        tmp = str(i)[1:-1]
-                        tmp = tmp.replace("'", "")
-                        f.write(f"\t{tmp}\n")
-                    else:
-                        i.replace("'", "")
-                        f.write(f"\t{i}\n")
-
-
-    
-class Primer:
-    def __init__(self,
-                 name: str = None,
-                 sequence_5to3: str = None,
-                 complementarity_threshold: int = 4,
-                 hairpin_threshold: int = 4,
-                 is_forward: bool = False,
-                 is_reverse: bool = False,
-                 
-                 idx_start: int = None,
-                 idx_end: int = None):
-
-        self.name = name
-        self.sequence_5to3 = sequence_5to3
-        self.complementarity_threshold = complementarity_threshold
-        self.hairpin_threshold = hairpin_threshold
-        self.is_forward = is_forward
-        self.is_reverse = is_reverse
-        self.idx_start = idx_start
-        self.idx_end = idx_end
-
-    def Tm(self, sequence):
-        # return round(primer3.calc_tm(str(sequence)), 2)
-        return round(mt.Tm_GC(sequence.lower()), 2)
- 
-    def gc_content(self, primer):
-        return round(100 * gc_fraction(primer, ambiguous="ignore"), 2)
-    
-    def calc_hairpin(self, sequence):
-        """
-        Calculate the hairpin formation in a given sequence
-        """
-        return primer3.calc_hairpin(str(sequence))
-    
-    def calc_homodimer(self, sequence):
-        """
-        Calculate the homodimer formation in a given sequence
-        """
-        return primer3.calc_homodimer(str(sequence))
-    
-    def calc_heterodimer(self, sequence1, sequence2):
-        """
-        Calculate the heterodimer formation between two sequences
-        """
-        return primer3.calc_heterodimer(str(sequence1), str(sequence2))
-    
-    @staticmethod
-    def find_index_in_vector(vector, primer):
-        circular_string = vector + vector
-        start_index = 0
-        start_indexes = []
-        end_indexes = []
-
-        while True:
-            index = str(circular_string).find(primer, start_index)
-            if index == -1:
-                break
-            if index >= len(vector):
-                new_index = index - len(vector)
-                if new_index not in start_indexes:
-                    start_indexes.append(new_index)
-                    end_indexes.append(new_index + len(primer))
+        if primer.is_forward == True:
+            direction = "forward"
+            if primer.idx_start < primer.idx_end:
+                # Case where primer doesn't overlap with the end of the plasmid
+                site = {"start": int(primer.idx_start), "end": int(primer.idx_end), "sequence": str(primer.sequence_5to3)}
+                feature_location = FeatureLocation(start=site["start"], end=site["end"])
             else:
-                if index not in start_indexes:
-                    start_indexes.append(index)
-                    end_indexes.append(index + len(primer))
-            start_index = index + len(primer)
+                # Case where primer overlaps with the end of the plasmid
+                size = self.vector_instance.length - primer.idx_start
+                site1 = {"start": int(primer.idx_start), "end": int(self.vector_instance.length), "sequence": seq.NucleotideSequence(primer.sequence_5to3[:size])}
+                site2 = {"start": 0, "end": int(primer.idx_end), "sequence": seq.NucleotideSequence(primer.sequence_5to3[size:])}
+                feature_location = CompoundLocation([FeatureLocation(start=site1["start"], end=site1["end"]), FeatureLocation(start=site2["start"], end=site2["end"])])
+                site["sequence"] = site1["sequence"] + site2["sequence"]
 
-        if len(start_indexes) > 1:
-            # TODO What to do here? add them all?
-            print(f"Multiple binding sites for primer {primer} in the vector sequence")
-            sys.exit()
-
-        return start_indexes, end_indexes
-    
-    @staticmethod
-    def check_multiple_binding_sites(vector: str, sequence: str):
-        # TODO Maybe use primerblast for this
-        # TODO Write some checks for this function
-        # TODO Check for exact cases where the sequence binds multiple times and almost exact cases where only few characters are different
-        count = 0
-        for i in range(len(vector) - len(sequence) + 1):
-            sub = vector[i:i + len(sequence)]
-            unique_chars = set(sub)
-            if len(unique_chars) <= 2 or (len(unique_chars) == 3 and sub.count(sub[0]) == 2):
-                count += 1
-        if count > 1:
-            print(f"Multiple binding sites for sequence {sequence} in the vector sequence")
-        return count
-    
-
-
-class IVAprimer(Primer, DesignPrimers):
-    def __init__(self,
-                 
-                 # Primer properties
-                 name: str = None,
-                 sequence_5to3: str = None,
-                 complementarity_threshold: int = 4,
-                 hairpin_threshold: int = 4,
-                 is_forward: bool = False,
-                 is_reverse: bool = False,
-                 
-                 template: str = None,
-                 overhang: str = None,
-
-                 idx_start: int = None,
-                 idx_end: int = None,
-
-                 # IVA primer properties
-                 max_overhang_temp_IVA: int = 50,
-                 max_template_temp_IVA: int = 60,
-                 max_oh_length: int = 15,
-                 init_size: int = 10,  # Initial size of the primer
-                 vector_length: int = 0):  
-        
-        super().__init__(name=name, 
-                         sequence_5to3=sequence_5to3, 
-                         complementarity_threshold=complementarity_threshold, 
-                         hairpin_threshold=hairpin_threshold, 
-                         is_forward=is_forward,
-                         is_reverse=is_reverse,
-                         idx_start=idx_start,
-                         idx_end=idx_end)
-                         
-        self.max_overhang_temp_IVA = max_overhang_temp_IVA
-        self.max_template_temp_IVA = max_template_temp_IVA
-        self.max_oh_length = max_oh_length
-        self.init_size = init_size
-
-        self.template  = template
-        self.overhang = overhang
-
-        self.vector_length = vector_length
-
-        self.primers = []
-        self.primers_df: pd.DataFrame = pd.DataFrame(columns=['eBlock', 
-                                                              'Overhang', 
-                                                              'Template', 
-                                                              'direction'
-                                                              'Tm Template',
-                                                              'Tm Overhang']) 
-
-    def Fw_name(self, n: int):
-        return f"IVA_Fw_eBlock_{n}"
-    
-    def Rv_name(self, n: int):
-        return f"IVA_Rv_eBlock_{n}"
-    
-    def Fw_overhang(self, block_end, fw_sequence, size=15):
-        fw_oh = fw_sequence[Vector.circular_index(block_end-size, self.vector_length):Vector.circular_index(block_end, self.vector_length)]
-        return fw_oh
-        
-    def Fw_template(self, block_end, fw_sequence, size=20):
-        fw_template = fw_sequence[Vector.circular_index(block_end, self.vector_length):Vector.circular_index(block_end+size, self.vector_length)]
-        return fw_template
-    
-    def Rv_overhang(self, block_begin, rv_sequence, size=15):
-        begin = Vector.circular_index(block_begin, self.vector_length)
-        end = Vector.circular_index(block_begin+size, self.vector_length)
-        if begin < end:
-            rv_oh = rv_sequence[begin:end]
+        elif primer.is_reverse == True:
+            direction = "reverse"
+            if primer.idx_start < primer.idx_end:
+                site = {"start": int(primer.idx_start), "end": int(primer.idx_end), "sequence": seq.NucleotideSequence(primer.sequence_5to3).reverse()}
+                feature_location = FeatureLocation(start=site["start"], end=site["end"])
+            else:
+                size = self.vector_instance.length - primer.idx_start
+                site1 = {"start": int(primer.idx_start), "end": int(self.vector_instance.length), "sequence": seq.NucleotideSequence(primer.sequence_5to3[:size]).reverse()}
+                site2 = {"start": 0, "end": int(primer.idx_end), "sequence": seq.NucleotideSequence(primer.sequence_5to3[size:]).reverse()}
+                feature_location = CompoundLocation([FeatureLocation(start=site1["start"], end=site1["end"]), FeatureLocation(start=site2["start"], end=site2["end"])])
+                site["sequence"] = site1["sequence"] + site2["sequence"]
         else:
-            rv_oh = rv_sequence[begin:] + rv_sequence[:end]
-        return rv_oh
-
-    def Rv_template(self, block_begin, rv_sequence, size=20):
-        begin = Vector.circular_index(block_begin-size, self.vector_length)
-        end = Vector.circular_index(block_begin, self.vector_length)
-        if begin < end:
-            rv_template = rv_sequence[Vector.circular_index(block_begin-size, self.vector_length):Vector.circular_index(block_begin, self.vector_length)]
+            raise ValueError("Primer is neither forward (fw) nor reverse (rv).")
+        # Add primer binding sites as features to the SeqRecord
+        feature = SeqFeature(location=feature_location, type="primer_bind")
+            # feature_location1 = FeatureLocation(start=site1["start"], end=site1["end"])
+            # feature_location2 = FeatureLocation(start=site2["start"], end=site2["end"])
+            # feature = SeqFeature(location=feature_location1, type="primer_bind")
+            # feature = SeqFeature(location=feature_location2, type="primer_bind")
+        feature.qualifiers["note"] = "Primer binding site"
+        feature.qualifiers["label"] = primer.name + "_" + direction
+        feature.qualifiers["primer_sequence"] = site["sequence"]
+        feature.qualifiers["direction"] = direction
+        seq_record.features.append(feature)
+        # for feature in seq_record.features:
+        #     print(feature)
+        SeqIO.write(seq_record, genbank_file, "genbank")
+        
+    def check_overlap(self):
+        min_oh = self.eblocks_design_instance.min_overlap - self.minimum_overlap
+        if min_oh < 0:
+            raise ValueError("Overhang is too small.")
         else:
-            rv_template = rv_sequence[Vector.circular_index(block_begin-size, self.vector_length):] + rv_sequence[:Vector.circular_index(block_begin, self.vector_length)]
-        return rv_template
-    
-    def combine_Fw_primer(self, overhang, template):
-        return overhang + template
-    
-    def combine_Rv_primer(self, template, overhang):
-        return template + overhang
-    
-    def optimize_size(self, optimum, primer, pos, size, sequence, function):
-        tm = self.Tm(primer)
-        while (tm < (optimum)):
-            size += 1
-            primer = function(pos, sequence, size)
-            tm = self.Tm(primer)
-        while (tm > (optimum)):
-            size -= 1
-            primer = function(pos, sequence, size)
-            tm = self.Tm(primer)
-        return size
-    
-    def Tm_difference(self, primer1, primer2, threshold=3):
-        """
-        Check if the Tm of the primers are within the desired boundaries, otherwise optimize the primers
-        """
-        dTm_overhangs = abs(self.Tm(primer1.overhang) - self.Tm(primer2.overhang))
-        dTm_templates = abs(self.Tm(primer1.template) - self.Tm(primer2.template))
-        if dTm_overhangs > threshold:
-            print(f"The overhang temperatures for {primer1.name} {primer2.name} exceed max Tm difference of {threshold} degrees")
-        if dTm_templates > threshold:
-            print(f"The template temperatures for {primer1.name} {primer2.name} exceed max Tm difference {threshold} degrees")
-            
-    def check_complementarity(self, primer1, primer2):
-        overlap = self.get_overlap(primer1.sequence_5to3, primer2.sequence_5to3)
-        if len(overlap) > self.complementarity_threshold:
-            print(f"Complementarity between the primers {primer1.name} {primer2.name} exceeds threshold of {self.complementarity_threshold}")
-        return overlap
-    
-    def get_overlap(self, s1, s2):
-        s = difflib.SequenceMatcher(None, s1, s2)
-        pos_a, _, size = s.find_longest_match(0, len(s1), 0, len(s2)) 
-        return s1[pos_a:pos_a+size]
-    
-    def primers_to_dataframe(self, primers):
-        self.primers_df.dropna(axis=1, inplace=True, how='all')
-        for i in primers:
-            new_row = pd.DataFrame({'eBlock': str(i.name),
-                                    'Overhang': str(i.overhang),
-                                    'Template': str(i.template),
-                                    'direction': 'Forward' if i.is_forward else 'Reverse',
-                                    'Tm Template': float(self.Tm(i.template)),
-                                    'Tm Overhang': float(self.Tm(i.overhang))}, index=[0])
-            self.primers_df = pd.concat([self.primers_df, new_row], ignore_index=True)
-        return self.primers_df
-    
-
-
-class SEQprimer(Primer, DesignPrimers):
-    def __init__(self,
-                 
-                 # Primer properties 
-                 name: str = None,
-                 sequence_5to3: str = None,
-                 complementarity_threshold: int = 4,
-                 hairpin_threshold: int = 4,
-                 is_forward: bool = False,
-                 is_reverse: bool = False,
-
-                 idx_start: int = None,
-                 idx_end: int = None,
-
-                # SEQ primer properties
-                 min_primer_length_seq: int = 18,
-                 max_primer_length_seq: int = 24,
-                 min_gc_content_primer_seq: int = 45,
-                 max_gc_content_primer_seq: int = 55,
-                 gc_clamp: bool = True,
-                 void_length: int = 100,  # Approximate number of nucleotides that is skipped before sequencing starts
-                 max_difference: int = 100,  
-                 max_sequenced_region: int = 600,
-                 idx_start_seq: int = -1,
-                 idx_end_seq: int = -1,
-                 primer_idx_strt: int = -1,
-                 primer_idx_end: int = -1):  # Maximum number of nucleotides that can be sequenced using a single primer
-        
-        super().__init__(name=name,
-                         sequence_5to3=sequence_5to3,
-                         complementarity_threshold=complementarity_threshold,
-                         hairpin_threshold=hairpin_threshold,
-                         is_forward=is_forward,
-                         is_reverse=is_reverse,
-                         idx_start=idx_start,
-                         idx_end=idx_end)
-                         
-        self.min_primer_length_seq = min_primer_length_seq
-        self.max_primer_length_seq = max_primer_length_seq
-        self.min_gc_content_primer_seq = min_gc_content_primer_seq
-        self.max_gc_content_primer_seq = max_gc_content_primer_seq
-        self.gc_clamp = gc_clamp
-        self.void_length = void_length
-        self.max_difference = max_difference
-        self.max_sequenced_region = max_sequenced_region
-        self.idx_start_seq = idx_start_seq
-        self.idx_end_seq = idx_end_seq
-        self.primer_idx_strt = primer_idx_strt
-        self.primer_idx_end = primer_idx_end
-
-        self.primers = []
-        self.primers_df: pd.DataFrame = pd.DataFrame(columns=['eBlock', 
-                                                              'sequence', 
-                                                              'direction',
-                                                              'Tm',
-                                                              'GC content',
-                                                              'begin position',
-                                                              'end position'])
-    
-        self.mapped_primers = {}
-
-    def get_name(self, n: int, number: int):
-        return f"SEQ{n}_eBlock-{number}"
-
-    def find_closest_primer(self, all_primers: dict, position: int):
-        """
-        Find the closest primer to a given position
-        """
-        closest_range = None
-        closest_primer = None
-        min_difference = float('inf')
-        for prim_idx, prim in all_primers.items():
-            difference = position - prim_idx[0]
-            if abs(difference) < min_difference:
-                min_difference = difference
-                closest_range = prim_idx
-                closest_primer = prim
-                min_difference = difference
-        return closest_range, closest_primer, min_difference
-
-    def all_fw_primers(self, gene_sequence: str):
-        result = {}
-        for i in range(len(gene_sequence)):
-            for j in range(i, len(gene_sequence)):
-                option = gene_sequence[i:j]
-                if self.min_primer_length_seq <= len(option) <= self.max_primer_length_seq:
-                    if self.min_gc_content_primer_seq <= self.gc_content(option) <= self.max_gc_content_primer_seq:
-                        if self.gc_clamp:
-                            if option[-1].lower() == 'g' or option[-1].lower() == 'c':
-                                result[(i, j)] = option
-                        else:
-                            result[(i, j)] = option
-        return result
-    
-    def primers_to_dataframe(self, primers):
-        self.primers_df.dropna(axis=1, inplace=True, how='all')
-        for i in primers:
-            new_row = pd.DataFrame({'eBlock': str(i.name),
-                                    'sequence': str(i.sequence_5to3),
-                                    'direction': 'Forward' if i.is_forward else 'Reverse',
-                                    'Tm': float(self.Tm(str(i.sequence_5to3))),
-                                    'GC content': float(self.gc_content(str(i.sequence_5to3))),
-                                    'begin position': int(i.idx_start_seq),
-                                    'end position': int(i.idx_end_seq)}, index=[0])
-            self.primers_df = pd.concat([self.primers_df, new_row], ignore_index=True)
-        return self.primers_df
-        
-    def all_rv_primers(self):
-        # TODO in case FW does not work, implement this
-        pass
+            return min_oh

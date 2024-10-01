@@ -39,29 +39,8 @@ class SnapGene:
         if not os.path.exists(newpath):
             os.makedirs(newpath)
         self.output_dir = newpath
-            
-    # TODO Move this file to the primers file and primers class
-    def primers_to_fasta(self, primers: dict, directory: str, filename='primers.fasta'):
-        """
-        This function converts the primers to features that can be read by SnapGene.
-        """
-        self.make_file(directory, filename, header=False)
-        with open(os.path.join(self.output_dir, filename), 'a') as f:
-            for k, v in primers.items():
-                f.write(f">{k}\n")
-                f.write(f"{v}\n")
-    
-    def make_file(self, directory, filename, header=False):
-        try:
-            with open(os.path.join(directory, filename), 'r') as f:
-                pass
-        except FileNotFoundError:
-            with open(os.path.join(directory, filename), 'w') as f:
-                if header:
-                    f.write("\n".join(SnapGene.gff3_header(self.vector_instance.vector.seq)))
-                    f.write("\n")
-                else:
-                    pass
+                
+
 
     def eblocks_to_gff3(self, eblocks: dict, output_dir, type='gene', filename='eblocks.gff3', header=True):
         """
@@ -99,29 +78,6 @@ class SnapGene:
         record.features.extend(features)     
         outpath = os.path.join(output_dir, filename)
         SeqIO.write(record, outpath, "genbank")
-
-
-    # TODO Move this function to the primers file and primers class
-    def add_primers_to_genbank_file(self, genbank_file, primer, direction):
-        """
-        This function saves primer data to an existing GenBank file
-        """
-        seq_record = SeqIO.read(genbank_file, "genbank")
-        if direction == "fw":
-            site = {"start": int(primer.idx_start), "end": int(primer.idx_end), "sequence": str(primer.sequence_5to3)}
-        elif direction == "rv":
-            site = {"start": int(primer.idx_start), "end": int(primer.idx_end), "sequence": seq.NucleotideSequence(primer.sequence_5to3).reverse()}
-        else:
-            raise ValueError("Primer is neither forward (fw) nor reverse (rv).")
-        # Add primer binding sites as features to the SeqRecord
-        feature_location = FeatureLocation(start=site["start"], end=site["end"])
-        feature = SeqFeature(location=feature_location, type="primer_bind")
-        feature.qualifiers["note"] = primer.name
-        feature.qualifiers["primer_sequence"] = site["sequence"]
-        seq_record.features.append(feature)
-        # for feature in seq_record.features:
-        #     print(feature)
-        SeqIO.write(seq_record, genbank_file, "genbank")
 
     @staticmethod
     def gff3_header(length_sequence, version="3.2.1", sequence_name="myseq"):
