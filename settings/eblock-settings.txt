@@ -1,0 +1,11 @@
+output_dir=tutorial_output
+cost_optimization=True
+amount_optimization=False
+clone_files=True
+verbose=False
+codon_usage=U00096
+bp_price=0.05
+max_eblock_length=1500
+min_eblock_length=300
+min_overlap=25
+min_order=24

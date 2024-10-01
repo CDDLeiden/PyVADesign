@@ -61,53 +61,24 @@ class Primer3Config:
     """
     This class contains the configuration for the primer3 design
     """
-    # TODO Add some other parameters as well from https://primer3.org/manual.html
-    @staticmethod
-    def global_args_primer_pair():
-        return {
-            # TODO Add task
-            'PRIMER_OPT_SIZE': 20,
-            'PRIMER_PICK_INTERNAL_OLIGO': 1,
-            'PRIMER_INTERNAL_MAX_SELF_END': 8,
-            'PRIMER_MIN_SIZE': 12,
-            'PRIMER_MAX_SIZE': 25,
-            'PRIMER_OPT_TM': 60.0,
-            'PRIMER_MIN_TM': 57.0,
-            'PRIMER_MAX_TM': 63.0,
-            'PRIMER_MIN_GC': 20.0,
-            'PRIMER_MAX_GC': 80.0,
-            'PRIMER_MAX_POLY_X': 100,
-            'PRIMER_INTERNAL_MAX_POLY_X': 100,
-            'PRIMER_SALT_MONOVALENT': 50.0,
-            'PRIMER_DNA_CONC': 50.0,
-            'PRIMER_MAX_NS_ACCEPTED': 0,
-            'PRIMER_MAX_SELF_ANY': 12,
-            'PRIMER_MAX_SELF_END': 8,
-            'PRIMER_PAIR_MAX_COMPL_ANY': 12,
-            'PRIMER_PAIR_MAX_COMPL_END': 8,
-            'PRIMER_PAIR_MAX_DIFF_TM': 5.0,
-        }
 
+    # TODO Add some other parameters as well from https://primer3.org/manual.html
+    # TODO Add GC clamp parameter
+    
     @staticmethod
-    def global_args_sequencing_primer():
-        # TODO Add GC clamp
-        return {
-            'PRIMER_TASK': 'pick_sequencing_primers',
-            'PRIMER_OPT_SIZE': 16,
-            'PRIMER_MIN_SIZE': 16,
-            'PRIMER_MAX_SIZE': 25,
-            'PRIMER_OPT_TM': 58.0,
-            'PRIMER_MIN_TM': 55.0,
-            'PRIMER_MAX_TM': 60.0,
-            'PRIMER_MIN_GC': 40.0,
-            'PRIMER_MAX_GC': 60.0,
-            'PRIMER_MAX_POLY_X': 5,
-            'PRIMER_MAX_NS_ACCEPTED': 0,
-            'PRIMER_MAX_SELF_ANY': 8,
-            'PRIMER_MAX_SELF_END': 3,
-            'PRIMER_SALT_MONOVALENT': 50.0,
-            'PRIMER_DNA_CONC': 50.0
-        }
+    def read_global_settings(file):
+        """
+        Read the settings from a file
+        """
+        with open(file, 'r') as f:
+            settings = {}
+            for line in f:
+                if line.startswith('=') or line.startswith('Primer3 File') or line.startswith('P3_FILE'):
+                    continue
+                if '=' in line:
+                    key, value = line.strip().split('=')
+                    settings[key] = value
+        return settings
 
     @staticmethod
     def seq_args_primer_pair(sequence, product_start=None, product_end=None, force_left=None, force_right=None):
@@ -143,6 +114,8 @@ class DesignPrimers:
                  eblocks_design_instance: EblockDesign,
                  mutation_instance: Mutation,
                  vector_instance: Vector,
+                 primers_settingsfile: str = None,
+                 seqprimers_settingsfile: str = None,
                  output_dir: str = None,
                  minimum_overlap: int = 15,
                  void_length: int = 100,
@@ -151,6 +124,8 @@ class DesignPrimers:
         self.eblocks_design_instance = eblocks_design_instance
         self.mutation_instance = mutation_instance
         self.vector_instance = vector_instance
+        self.primers_settingsfile = primers_settingsfile
+        self.seqprimers_settingsfile = seqprimers_settingsfile
         self.output_dir = output_dir
         self.minimum_overlap = minimum_overlap
         self.void_length = void_length
@@ -257,14 +232,14 @@ class DesignPrimers:
     def design_sequencing_primer(self, sequence, start, end):
         try:
             result = primer3.bindings.design_primers(seq_args=Primer3Config.seq_args_sequencing_primer(sequence, start, end),
-                                                     global_args=Primer3Config.global_args_sequencing_primer())
+                                                     global_args=Primer3Config.read_global_settings(self.seqprimers_settingsfile))
             # Check if a sequencing primer was found
             if 'PRIMER_LEFT_0_SEQUENCE' or 'PRIMER_RIGHT_0_SEQUENCE' in result:
                     seqprimer = result['PRIMER_LEFT_0_SEQUENCE']
             return result
                 
         except KeyError:  # If no suitable primer is found
-            raise ValueError("No sequencing primer found.")
+            raise ValueError("No sequencing primer found, try changing the settings.")
         
     def find_closest_higher_index(self, numbers, target):
         """Find closest number in list that is higher than target"""
@@ -350,6 +325,9 @@ class DesignPrimers:
         
         left = fw_range_start
         right = rv_range_start 
+        
+        # TODO Import settings from file
+
 
         while True:
             try:
@@ -358,7 +336,7 @@ class DesignPrimers:
                                                                                                      product_end=i_end,
                                                                                                      force_left=left,
                                                                                                      force_right=right),
-                                                        global_args=Primer3Config.global_args_primer_pair())
+                                                        global_args=Primer3Config.read_global_settings(self.primers_settingsfile))
                 check = result['PRIMER_LEFT_0_SEQUENCE']
                 return result
 
@@ -369,7 +347,7 @@ class DesignPrimers:
                     left = fw_range_start  # Reset left to the start range
                     right += 1
                 else:
-                    raise ValueError("Primer pair not found.")
+                    raise ValueError("Primer pair not found. Try using less strict settings.")
 
     def add_primers_to_genbank_file(self, genbank_file, primer):
         """

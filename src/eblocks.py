@@ -62,6 +62,7 @@ class EblockDesign:
                  vector_instance: Vector,
                  gene_instance: Gene,
                  output_dir: str = None,
+                 settings_file: str = None,
 
                  cost_optimization: bool = True,
                  amount_optimization: bool = False,
@@ -80,6 +81,7 @@ class EblockDesign:
         self.vector_instance = vector_instance
         self.gene_instance = gene_instance
         self.output_dir = output_dir
+        self.settings_file = settings_file
 
         self.cost_optimization = cost_optimization
         self.amount_optimization = amount_optimization
@@ -105,6 +107,11 @@ class EblockDesign:
         """
         This function runs the design process for eBlocks.
         """
+        if self.settings_file:
+            settings = self.parse_settings(self.settings_file)
+            self.update_settings(settings)
+            if self.verbose:
+                self.display_settings()
 
         self.print_line(f"Calculating relative codon frequencies, based on the selected genome id {self.codon_usage} ...")
         codonusage = CodonUsage(
@@ -468,6 +475,47 @@ class EblockDesign:
         outpath = os.path.join(output_dir, filename)
         SeqIO.write(record, outpath, "genbank")
 
+    def parse_settings(self, file):
+        settings = {}
+        with open(file, 'r') as f:
+            for line in f:
+                if '=' in line:
+                    key, value = line.strip().split('=')
+                    settings[key] = value
+        return settings
+    
+    def display_settings(self):
+        # Print all class attributes using the __dict__ attribute
+        for key, value in self.__dict__.items():
+            print(f"{key}: {value}")
+    
+    def update_settings(self, settings):
+        for key, value in settings.items():
+            if key == 'cost_optimization':
+                self.cost_optimization = bool(value)
+            elif key == 'amount_optimization':
+                self.amount_optimization = bool(value)
+            elif key == 'bp_price':
+                self.bp_price = float(value)
+            elif key == 'max_eblock_length':
+                self.max_eblock_length = int(value)
+            elif key == 'min_eblock_length':
+                self.min_eblock_length = int(value)
+            elif key == 'min_overlap':
+                self.min_overlap = int(value)
+            elif key == 'min_order':
+                self.min_order = int(value)
+            elif key == 'codon_usage':
+                self.codon_usage = str(value)
+            elif key == 'output_dir':
+                self.output_dir = str(value)
+            elif key == 'verbose':
+                self.verbose = bool(value)
+            elif key == 'clone_files':
+                self.clone_files = bool(value)
+            else:
+                raise Exception(f"Key {key} not found in class.")
+            
     @staticmethod
     def renumber_eblock(eblocks: list):
         sorted_list = sorted(eblocks, key=lambda x: x.bin_start)
