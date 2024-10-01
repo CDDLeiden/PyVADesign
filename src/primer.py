@@ -11,7 +11,7 @@ from Bio.SeqUtils import MeltingTemp as mt
 from .mutation import Mutation
 from .sequence import Vector, Gene
 from .eblocks import EblockDesign
-from .utils import OutputToFile, SnapGene
+from .utils import SnapGene
 
 from Bio import SeqIO
 from Bio.Seq import Seq

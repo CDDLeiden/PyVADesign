@@ -11,6 +11,12 @@ from sklearn_extra.cluster import KMedoids
 from .mutation import Mutation
 from .sequence import Vector, Gene
 from .utils import SnapGene, CodonUsage
+from Bio import SeqIO
+from datetime import datetime
+from Bio.Seq import Seq
+
+from Bio.SeqRecord import SeqRecord
+from Bio.SeqFeature import SeqFeature, FeatureLocation, CompoundLocation
 
 
 class Eblock:
@@ -80,7 +86,6 @@ class EblockDesign:
         self.verbose = verbose
         self.codon_usage = codon_usage
 
-        # IDT parameters
         self.bp_price = bp_price
         self.max_eblock_length = max_eblock_length
         self.min_eblock_length = min_eblock_length
@@ -309,7 +314,7 @@ class EblockDesign:
     def make_clones(self):
             
             snapgene_instance = SnapGene(output_dir=self.output_dir, vector_instance=self.vector_instance, gene_instance=self.gene_instance)
-            snapgene_instance.make_dir()  # Make clones-dir
+            self.make_dir(dirname='clones')  # Make clones-dir
             original_dir = self.output_dir
             self.set_output_dir(snapgene_instance.output_dir)
 
@@ -357,8 +362,8 @@ class EblockDesign:
                 self.check_directory(os.path.join(snapgene_instance.output_dir, filename))
                 mutated_vector = self.vector_instance.mutate_vector(eblock.start_index, eblock.end_index, eblock.sequence, mutation=mut)
                 self.vector_instance.save_vector(vector=mutated_vector, output_dir=os.path.join(snapgene_instance.output_dir, filename), filename=f"{filename}.dna")
-                snapgene_instance.eblocks_to_gff3(eblocks=snapgene_dict, output_dir=os.path.join(snapgene_instance.output_dir, filename), filename=f"{filename}.gff3")
-                snapgene_instance.eblocks_to_genbank(wtvector=self.vector_instance.vector.seq, mutvector=mutated_vector, eblocks=snapgene_dict, output_dir=os.path.join(snapgene_instance.output_dir, filename), filename=f"{filename}.gb")
+                self.eblocks_to_gff3(eblocks=snapgene_dict, output_dir=os.path.join(snapgene_instance.output_dir, filename), filename=f"{filename}.gff3")
+                self.eblocks_to_genbank(mutvector=mutated_vector, eblocks=snapgene_dict, output_dir=os.path.join(snapgene_instance.output_dir, filename), filename=f"{filename}.gb")
                 
             self.output_dir = original_dir
         
@@ -414,6 +419,43 @@ class EblockDesign:
             for key, value in self.eblocks.items():
                 f.write(f"{value.name},{value.start_index},{value.end_index},{value.sequence}\n")
 
+
+    def eblocks_to_gff3(self, eblocks: dict, output_dir, type='gene', filename='eblocks.gff3', header=True):
+        """
+        This function converts the eBlocks to features that can be read by SnapGene.
+        """
+        self.make_file(output_dir, filename, header=header)
+        with open(os.path.join(output_dir, filename), 'a') as f:
+            for k, v in eblocks.items():
+                line = self.gff3_line(v[0], v[1], k, v[2], type)
+                f.write('\t'.join(line) + '\n')
+
+    def eblocks_to_genbank(self, mutvector, eblocks: dict, output_dir, type='gene', filename='eblocks.gb', header=True, max_filename_length=16):
+        """
+        This function saves a vector to a GenBank (gb) file
+        """
+        sequence = Seq(mutvector)
+        record = SeqRecord(sequence, id=self.gene_instance.seqid, name=self.gene_instance.seqid, description="")
+        record.annotations["molecule_type"] = "DNA"
+        record.annotations["organism"] = self.vector_instance.organism
+        record.annotations["date"] = datetime.today().strftime('%d-%b-%Y').upper()
+        record.name = record.name + "_" + filename
+        # Limit filename length characters
+        if len(record.name) > max_filename_length:
+            record.name = record.name[:max_filename_length]
+        features = []  # Add eBlock and mutations as features
+        for k, v in eblocks.items():
+            if v[0] > v[1]: # Start index is larger than end index
+                joint_location = CompoundLocation([FeatureLocation(v[0], len(mutvector)), FeatureLocation(0, v[1])])
+                joint_feature = SeqFeature(joint_location, type="gene", qualifiers={"gene": k, "color": v[2]})
+                features.append(joint_feature)
+            else:
+                feature = SeqFeature(FeatureLocation(v[0], v[1]), type=type, qualifiers={"gene": k, "color": v[2]})
+                features.append(feature)
+        record.features.extend(features)     
+        outpath = os.path.join(output_dir, filename)
+        SeqIO.write(record, outpath, "genbank")
+
     @staticmethod
     def renumber_eblock(eblocks: list):
         sorted_list = sorted(eblocks, key=lambda x: x.bin_start)
@@ -430,9 +472,10 @@ class EblockDesign:
         tab10_colors = ['#1f77b4','#ff7f0e','#2ca02c', '#d62728','#9467bd','#8c564b','#e377c2','#7f7f7f','#bcbd22','#17becf',
                         '#aec7e8','#ffbb78','#98df8a','#ff9896','#c5b0d5','#c49c94','#f7b6d2','#c7c7c7','#dbdb8d','#9edae5',
                         '#393b79','#ff7f0e','#2ca02c','#8c564b','#e377c2','#7f7f7f','#bcbd22','#17becf']
-        return {i: tab10_colors[i] for i in range(len(tab10_colors))}    
-
+        return {i: tab10_colors[i] for i in range(len(tab10_colors))}
     
+
+
 
 class Clustering:
     """
@@ -562,7 +605,6 @@ class Clustering:
         kmedoids.fit(distance_matrix)
 
         labels = kmedoids.labels_
-
         labels = labels.tolist()
         X = X.tolist()
 
