@@ -40,6 +40,7 @@ class Mutation:
         self.is_multiplemutation = is_multiplemutation
         
         self.mutations = []
+        self.unprocessed_mutations = []
         self.colors = {'Mutation': 'black', 'Insert': 'red', 'Deletion': 'blue', 'Combined': 'green'}
 
     def parse_mutations(self, fp: str):
@@ -143,6 +144,10 @@ class Mutation:
         """
         sorted_mutations = sorted(mutations, key=lambda x: x.idx_dna[0])
         return sorted_mutations
+    
+    def remove_index(self, idx: int):
+        self.unprocessed_mutations.append(self.mutations[idx])
+        del self.mutations[idx]
     
     def print_mutations(self, padding: int = 10):
         """
