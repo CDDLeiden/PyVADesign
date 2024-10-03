@@ -41,6 +41,7 @@ class Mutation:
         
         self.mutations = []
         self.unprocessed_mutations = []
+        self.unvalid_mutations = []
         self.colors = {'Mutation': 'black', 'Insert': 'red', 'Deletion': 'blue', 'Combined': 'green'}
 
     def parse_mutations(self, fp: str):
@@ -131,12 +132,27 @@ class Mutation:
                         raise ValueError(f"Please check format of mutation {line}")
                 except:
                     raise ValueError(f"Please check format of mutation {line}")
-
-        # sort mutation by index
-        mutations = self.sort_mutations(mutations)
+                
+        valid_mutations = self.validate_mutations(mutations)
+        if len(valid_mutations) != len(mutations):
+            invalids = self.find_unique_items(mutations, valid_mutations)
+            invalid_names = [i.name for i in invalids]
+            raise ValueError(f"Please check the format of the mutation {invalid_names}.")
+        mutations = self.sort_mutations(mutations)  # sort mutation by index
         self.mutations = mutations
         self.n_mutants = len(mutations)
         return mutations
+    
+    def find_unique_items(self, list1, list2):
+        set1 = set(list1)
+        set2 = set(list2)
+        # Find symmetric difference (elements in either set but not in both)
+        unique_items = set1.symmetric_difference(set2)
+        return list(unique_items)
+    
+    def validate_mutations(self, mutations):
+        valid = [m for m in mutations if isinstance(m.idx_dna, list) and m.idx_dna]
+        return valid 
     
     def sort_mutations(self, mutations: list):
         """
