@@ -17,6 +17,10 @@ from .utils import CodonUsage
 from .mutation import Mutation
 from .sequence import Vector, Gene
 
+import warnings
+
+warnings.filterwarnings("ignore", category=UserWarning, module="sklearn_extra.cluster._k_medoids")  # Ignore warnings specifically from sklearn_extra.cluster._k_medoids
+
 
 
 class Eblock:
@@ -110,7 +114,7 @@ class EblockDesign:
             settings = self.parse_settings(self.settings_file)
             self.update_settings(settings)
             if self.verbose:
-                self.display_settings()
+                self.display_settings()  # TODO Display settings in a more fancy way
 
         self.print_line(f"Calculating relative codon frequencies, based on the selected genome id {self.codon_usage} ...")
         codonusage = CodonUsage(
@@ -131,26 +135,27 @@ class EblockDesign:
             bp_price=self.bp_price,
             verbose=self.verbose)
         optimal_clustering = cluster_instance.run_clustering()
-        print("optimal_clustering", optimal_clustering)
+        # print("optimal_clustering", optimal_clustering)
 
         # Define the beginning and end of each gene block, based on the clusters and include the minimum overlap
         bins = self.make_bins(optimal_clustering)
 
         # Make gene blocks (WT DNA sequences sliced to the correct size, according to the bins) and renumber them starting from 1
         self.wt_eblocks = self.make_wt_eblocks(bins)
-        print("WT EBLOCKS!!!!!")
-        for i in self.wt_eblocks:
-            print(i.name, i.start_index, i.end_index, i.bin_start, i.bin_end, i.sequence)
+        # print("WT EBLOCKS!!!!!")
+        # for i in self.wt_eblocks:
+        #     print(i.name, i.start_index, i.end_index, i.bin_start, i.bin_end, i.sequence)
 
         # Loop over all mutations and create the eBlocks, based on the WT eBlocks
         results = {}
         for mutation in self.mutation_instance.mutations:
-            print("MUTATION", mutation.name, mutation.idx_dna)
+            # print("MUTATION", mutation.name, mutation.idx_dna)
             results = self.make_mutant_eblock(mutation, results)  # Create mutated eBlock, based on mutation type
         # Check if all mutations could be mapped and remove mutations that could not be processed from mutation instance
         self.check_eblocks(results)
-        for k, v in results.items():
-            print(k.name, v.name, v.start_index, v.end_index, v.sequence)
+
+        # for k, v in results.items():
+        #     print(k.name, v.name, v.start_index, v.end_index, v.sequence)
 
         # print("UNPROCESSED MUTATIONS")
         # print(self.mutation_instance.unprocessed_mutations)
@@ -253,14 +258,7 @@ class EblockDesign:
         elif mutation.is_deletion:
             mutated_eblock = eblock.sequence[:eblock.mutation_start_index -3] + eblock.sequence[end_idx -3:]
         return mutated_eblock
-    
-    def design_insert(self, aas):
-        codon_insert = ''  # Sequence to insert in gene block
-        for res in aas:
-            codon = self.select_mut_codon(res)
-            codon_insert += codon
-        return codon_insert
-    
+        
     def check_eblock_length(self, eblock_seq: str) -> bool:
         """
         Check if the length of the gene block is within bounds
@@ -276,10 +274,18 @@ class EblockDesign:
         """
         This function creates the mutated eBlock, based on the WT eBlocks and the mutation.
         """
-
+        # print("MUTATION", mutation.name, mutation.idx_dna)
         if mutation.is_singlemutation:
-            eblocks, _ = self.eblocks_within_range(mutation.idx_dna[0])
-            eblock = eblocks[0]
+            eblock_start, count_start = self.eblocks_within_range(mutation.idx_dna[0])
+            eblock_end, count_end = self.eblocks_within_range(mutation.idx_dna[0] + 3)
+            eblock = None
+            if (count_start > 1) or (count_end > 1):
+                for i in eblock_start:
+                    for j in eblock_end:
+                        if i.name == j.name:
+                            eblock = i
+            elif (count_start == 1) and (count_end == 1):
+                eblock = eblock_start[0]
             eblock.mutation_start_index = self.eblock_index(eblock, mutation.idx_dna[0])
             self.check_wt_codon(eblock, mutation.mutation[0][0])  # Check if WT codon at index is same residue as mutation
             eblock.mutant_codon = self.select_mut_codon(mutation.mutation[0][-1])
@@ -297,7 +303,7 @@ class EblockDesign:
                             eblock = i
             elif (count_start == 1) and (count_end == 1):
                 eblock = eblock_start[0]
-            print("selected eblock", eblock.name)        
+            # print("selected eblock", eblock.name)        
             eblock.mutation_start_index = self.eblock_index(eblock, mutation.idx_dna[0])
             self.check_wt_codon(eblock, mutation.mutation[0][0])
             eblock.insert = self.design_insert(mutation.insert)
@@ -305,10 +311,13 @@ class EblockDesign:
             self.check_eblock_length(eblock.sequence)  # Check if eBlock is too long including the insert
 
         elif mutation.is_deletion:
+            # print(mutation.name, mutation.idx_dna_deletion_begin, mutation.idx_dna_deletion_end, mutation.length_deletion)
             eblock_start, count_start = self.eblocks_within_range(mutation.idx_dna_deletion_begin)
-            print("EBLOCK START", eblock_start, count_start)
+            # print("EBLOCK START", eblock_start, count_start)
+            # print(i.name for i in eblock_start)
             eblock_end, count_end = self.eblocks_within_range(mutation.idx_dna_deletion_end)
-            print("EBLOCK END", eblock_end, count_end)
+            # print("EBLOCK END", eblock_end, count_end)
+            # print([i.name for i in eblock_end])
             eblock = None
             if (count_start > 1) or (count_end > 1):
                 for i in eblock_start:
@@ -317,7 +326,7 @@ class EblockDesign:
                             eblock = i
             else:
                 eblock = eblock_start[0]
-            print(mutation.name, mutation.idx_dna_deletion_begin, mutation.idx_dna_deletion_end)
+            # print(mutation.name, mutation.idx_dna_deletion_begin, mutation.idx_dna_deletion_end)
             eblock.mutation_start_index = self.eblock_index(eblock, mutation.idx_dna_deletion_begin)
             idx_end = self.eblock_index(eblock, mutation.idx_dna_deletion_end)
             self.check_wt_codon(eblock, mutation.mutation[0][0])  # Check if WT codon at index is same residue as mutation
@@ -340,10 +349,10 @@ class EblockDesign:
             for lst in all_eblocks:
                 counter.update(set(lst))
             common_eblock = [item for item, count in counter.items() if count == len(all_eblocks)]
-            print("common_eblock", common_eblock)
+            # print("common_eblock", common_eblock)
             if len(common_eblock) > 0:
                 selected_eblock = [e for e in eblocks if e.name == common_eblock[0]][0]
-                print("selected_eblock", selected_eblock)
+                # print("selected_eblock", selected_eblock)
             else:
                 print(f"Multiple eBlocks for multiple mutations, not all mutations in the same eBlock. Skip mutation {mutation.name} {mutation.idx_dna}.")
                 return results
@@ -369,6 +378,7 @@ class EblockDesign:
                 selected_eblock.sequence = self.mutate_eblock(mutation, selected_eblock)
 
             eblock = selected_eblock
+        print(mutation.name, eblock.name, eblock.start_index, eblock.end_index, eblock.sequence)
         results[mutation] = eblock
         return results
     
@@ -380,6 +390,7 @@ class EblockDesign:
 
             # Loop over all mutations and create mutated vector and features that can be read by snapgene
             for mut, eblock in self.eblocks.items():
+                # print("MUTATION", mut.name, eblock.name, eblock.start_index, eblock.end_index, eblock.sequence)
                 results = {}
                 if not (mut.is_deletion) and not (mut.is_insert):
                     results[eblock.name] = [eblock.start_index, eblock.end_index, self.eblock_colors[eblock.block_number]]
@@ -400,7 +411,7 @@ class EblockDesign:
                     results[self.gene_instance.seqid] = [self.vector_instance.gene_start_idx, self.vector_instance.gene_end_idx + mut.length_insert, self.vector_instance.color]
            
                 elif mut.is_deletion:
-                    print(mut.name, mut.idx_dna_deletion_begin, mut.idx_dna_deletion_end)
+                    # print(mut.name, mut.idx_dna_deletion_begin, mut.idx_dna_deletion_end)
                     start = self.vector_instance.gene_start_idx -6 + mut.idx_dna_deletion_begin
                     end = self.vector_instance.gene_start_idx -3 + mut.idx_dna_deletion_begin
                     results[mut.name] = [start, end, self.mutation_instance.colors[mut.type]]
@@ -547,6 +558,13 @@ class EblockDesign:
                     settings[key] = value
         return settings
     
+    def design_insert(self, aas):
+        codon_insert = ''  # Sequence to insert in gene block
+        for res in aas:
+            codon = self.select_mut_codon(res)
+            codon_insert += codon
+        return codon_insert
+    
     def display_settings(self):
         # Print all class attributes using the __dict__ attribute
         for key, value in self.__dict__.items():
@@ -589,6 +607,7 @@ class EblockDesign:
                 
     @staticmethod
     def generate_eblock_colors() -> dict:
+        # TODO IF THERE ARE MORE COLORS NEEDED, ADD MORE COLORS > MAKE A CHECK FOR THIS!
         """
         Create dictionary with colors for plotting eBlocks using the tab10 color scheme.
         """
@@ -664,10 +683,10 @@ class Clustering:
         valid_clusters = True
         while (valid_clusters) and (n <= len(self.mutation_instance.mutations)):
             
-            print("n", n)
+            # print("n", n)
             
             cluster_labels, invalid_constraints = self.kmedoids_clustering(num_clusters=n)
-            print("cluster_labels", cluster_labels)
+            # print("cluster_labels", cluster_labels)
             clusters = self.cluster_to_dict(cluster_labels, self.X)
             
             # clusters = self.add_insert_deletion_sizes(clusters) # TODO Think about insertions and deletions and what to do with them
@@ -680,9 +699,9 @@ class Clustering:
                 invalid_constraints = 0
                 # TODO Check constraints again
 
-            print("clusters", clusters)
-            print("cluster_sizes", cluster_sizes)
-            print("invalid_constraints", invalid_constraints)
+            # print("clusters", clusters)
+            # print("cluster_sizes", cluster_sizes)
+            # print("invalid_constraints", invalid_constraints)
 
             cluster_too_small = 0
             cluster_correct = 0
@@ -743,6 +762,7 @@ class Clustering:
             elif i.is_deletion:
                 X.append(i.idx_dna_deletion_begin)
                 X.append(i.idx_dna_deletion_end)
+                constraints.append((i.idx_dna_deletion_begin, i.idx_dna_deletion_end))
             elif i.is_multiplemutation:
                 idxs = []
                 for j in i.idx_dna:
@@ -755,7 +775,6 @@ class Clustering:
             for pair in itertools.combinations(con, 2):
                 idx_a = np.where(X == pair[0])[0]
                 index_a = int(idx_a[0])  # Take the first match
-
                 idx_b = np.where(X == pair[1])[0]
                 index_b = int(idx_b[0])
                 constraints_indices.append((index_a, index_b))
@@ -785,7 +804,7 @@ class Clustering:
                 costs[n] = self.calculate_cost(c)
             lowest_cost = min(costs.values())
             best_clustering_k = [k for k, v in costs.items() if v == lowest_cost][0]
-            print("best_clustering_k", best_clustering_k)
+            # print("best_clustering_k", best_clustering_k)
             self.print_line(f"Lowest estimated cost: €{lowest_cost} (given price per bp of €{self.bp_price})")
             return clusters[best_clustering_k]
         elif self.amount_optimization:
@@ -794,7 +813,7 @@ class Clustering:
             for n, c in clusters.items():
                 fewest_blocks[n] = len(c)
             best_clustering_k = [k for k, v in fewest_blocks.items() if v == min(fewest_blocks.values())][0]
-            print(f"Fewest number of eBlocks: {min(fewest_blocks.values())}")
+            # print(f"Fewest number of eBlocks: {min(fewest_blocks.values())}")
             self.print_line(f"Lowest number of eBlocks: {best_clustering_k}")
             return clusters[best_clustering_k]
 
@@ -851,7 +870,7 @@ class Clustering:
         for con in self.idxs_constraints:
             con_labels = [labels[i] for i in con]
             if not all(x == con_labels[0] for x in con_labels):
-                print("X", self.X[con[0]], self.X[con[1]], "con", con, "con_labels", con_labels)
+                # print("X", self.X[con[0]], self.X[con[1]], "con", con, "con_labels", con_labels)
                 distance = self.X[con[0]] - self.X[con[1]]
                 if distance > 0:
                     invalid_constraints[con_labels[0]].append(distance)
@@ -899,10 +918,10 @@ class Clustering:
         # Add value to the eblock
         for k, v in clean_dict.items():
             max_value = max(clusters[k[0]])
-            print(k, "max_value", max_value, "v", v)
-            print("size:", max(clusters[k[0]]) - min(clusters[k[0]]))
+            # print(k, "max_value", max_value, "v", v)
+            # print("size:", max(clusters[k[0]]) - min(clusters[k[0]]))
             if (max(clusters[k[0]]) - min(clusters[k[0]]) + v <= self.max_eblock_length - 2 * self.min_overlap):  # Check that the eblock is not becoming too big # TODO Move to separate functino                
-                print("add value to eblock")
+                # print("add value to eblock")
                 clusterscopy[k[0]].append(max_value + v)
         
         # TODO Check that if by adding the value to the eblock, the constraints are met

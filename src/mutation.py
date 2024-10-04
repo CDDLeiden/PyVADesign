@@ -146,7 +146,6 @@ class Mutation:
     def find_unique_items(self, list1, list2):
         set1 = set(list1)
         set2 = set(list2)
-        # Find symmetric difference (elements in either set but not in both)
         unique_items = set1.symmetric_difference(set2)
         return list(unique_items)
     
