@@ -144,7 +144,7 @@ class EblockDesign:
         self.wt_eblocks = self.make_wt_eblocks(bins)
         # print("WT EBLOCKS!!!!!")
         # for i in self.wt_eblocks:
-        #     print(i.name, i.start_index, i.end_index, i.bin_start, i.bin_end, i.sequence)
+        #     print(i.name, len(i.sequence), i.start_index, i.end_index, i.bin_start, i.bin_end, i.sequence)
 
         # Loop over all mutations and create the eBlocks, based on the WT eBlocks
         results = {}
@@ -171,6 +171,8 @@ class EblockDesign:
         self.eblocks_to_csv()  # Save eBlocks to a CSV file
 
         self.print_line("Completed eBlock design.")
+
+        # TODO Give warning if some of the mutations could not be processed
                                                      
     def make_bins(self, clusters: dict):
         bins = []
@@ -227,25 +229,27 @@ class EblockDesign:
                     eblocks.append(eblock)
         count = len(eblocks)
         return copy.deepcopy(eblocks), count
-    
-    def check_wt_codon(self, eblock: Eblock, mut: str):
-        """
-        Check whether the WT codon at the mutation index is the same as in the proposed mutation
-        """
-        codon = eblock.sequence[eblock.mutation_start_index-3:eblock.mutation_start_index].upper()
-        try:
-            result = seq.CodonTable.default_table()[str(codon)]
-        except:
-            result = None
-        if result != mut[0]:
-            raise Exception(f"WT codon does not match residue {mut}, but is {result}, the codon is {codon}")
-    
+        
     def select_mut_codon(self, res: str):
         """
         Select the most abundant codon for a given residue, 
         based on the relative frequencies of the codons in the selected genome
         """
         return self.most_abundant_codons[res][0]
+    
+    def check_wt_codon(self, eblock: Eblock, mut: str):
+        """
+        Check whether the WT codon at the mutation index is the same as in the proposed mutation
+        """
+        print(mut[0])
+        codon = eblock.sequence[eblock.mutation_start_index-3:eblock.mutation_start_index].upper()
+        print(codon)
+        try:
+            result = seq.CodonTable.default_table()[str(codon)]
+        except:
+            result = None
+        if result != mut[0]:
+            raise Exception(f"WT codon does not match residue {mut}, but is {result}, the codon is {codon}")
     
     def mutate_eblock(self, mutation, eblock: Eblock, end_idx=None):
         """
@@ -266,7 +270,7 @@ class EblockDesign:
         length_eblock = len(eblock_seq)
         if not self.min_eblock_length <= length_eblock <= self.max_eblock_length:
             if length_eblock > self.max_eblock_length:
-                raise Exception(f"eBlock is too long, length is {length_eblock}, maximum length is {self.max_eblock_length}")
+                raise Exception(f"eBlock is too long, length is {length_eblock}, maximum length is {self.max_eblock_length}. Try increasing or decreasing the maximum eBlock length.")
             else:
                 raise Exception(f"eBlock is too short, length is {length_eblock}, minimum length is {self.min_eblock_length}")
         
@@ -303,7 +307,7 @@ class EblockDesign:
                             eblock = i
             elif (count_start == 1) and (count_end == 1):
                 eblock = eblock_start[0]
-            # print("selected eblock", eblock.name)        
+            print("selected eblock", eblock.name, eblock.sequence)    
             eblock.mutation_start_index = self.eblock_index(eblock, mutation.idx_dna[0])
             self.check_wt_codon(eblock, mutation.mutation[0][0])
             eblock.insert = self.design_insert(mutation.insert)
@@ -311,13 +315,9 @@ class EblockDesign:
             self.check_eblock_length(eblock.sequence)  # Check if eBlock is too long including the insert
 
         elif mutation.is_deletion:
-            # print(mutation.name, mutation.idx_dna_deletion_begin, mutation.idx_dna_deletion_end, mutation.length_deletion)
             eblock_start, count_start = self.eblocks_within_range(mutation.idx_dna_deletion_begin)
-            # print("EBLOCK START", eblock_start, count_start)
-            # print(i.name for i in eblock_start)
             eblock_end, count_end = self.eblocks_within_range(mutation.idx_dna_deletion_end)
-            # print("EBLOCK END", eblock_end, count_end)
-            # print([i.name for i in eblock_end])
+
             eblock = None
             if (count_start > 1) or (count_end > 1):
                 for i in eblock_start:
@@ -326,61 +326,85 @@ class EblockDesign:
                             eblock = i
             else:
                 eblock = eblock_start[0]
-            # print(mutation.name, mutation.idx_dna_deletion_begin, mutation.idx_dna_deletion_end)
+            # print(mutation.name, mutation.mutation[0][0], mutation.idx_dna_deletion_begin, mutation.idx_dna_deletion_end)
             eblock.mutation_start_index = self.eblock_index(eblock, mutation.idx_dna_deletion_begin)
             idx_end = self.eblock_index(eblock, mutation.idx_dna_deletion_end)
+            # print("idx_end:", idx_end)
+            # print("add", eblock.mutation_start_index, mutation.length_deletion, eblock.mutation_start_index + mutation.length_deletion)
+            # print("mutation.start_index", eblock.mutation_start_index)
             self.check_wt_codon(eblock, mutation.mutation[0][0])  # Check if WT codon at index is same residue as mutation
             eblock.sequence = self.mutate_eblock(mutation, eblock, idx_end)
             self.check_eblock_length(eblock.sequence)  # Check if eBlock is too short
      
         elif mutation.is_multiplemutation:
+            print("MULTIPLE MUTATIONS")
+            
+            # for mut_i in mutation.idx_dna:
+            #     eblock, counts = self.eblocks_within_range(mut_i)
+            #     # print(mut_i, [i.name for i in eblock], counts)
+            #     if counts == 1:  # If only one eBlock for mutation > should be correct eBlock
+            #         selected_eblock = eblock[0]
+
             selected_eblock = None
-            for mut_i in mutation.idx_dna:
-                eblock, counts = self.eblocks_within_range(mut_i)
-                if counts == 1:  # If only one eBlock for mutation > should be correct eBlock
-                    selected_eblock = eblock[0]
-                    
-            all_counts = [counts for _, counts in (self.eblocks_within_range(mut_i) for mut_i in mutation.idx_dna)]
             all_eblocks = []
             for mut_i in mutation.idx_dna:
                 eblocks, _ = self.eblocks_within_range(mut_i)
                 all_eblocks.append([i.name for i in eblocks])
             counter = Counter()
+
+            # for i in all_eblocks:
+            #     print(i)
+            
             for lst in all_eblocks:
                 counter.update(set(lst))
+
             common_eblock = [item for item, count in counter.items() if count == len(all_eblocks)]
-            # print("common_eblock", common_eblock)
-            if len(common_eblock) > 0:
+            # print("common_eblock", common_eblock, len(common_eblock))
+            if len(common_eblock) == 1:
+                print("Length common eblock is 1")
                 selected_eblock = [e for e in eblocks if e.name == common_eblock[0]][0]
-                # print("selected_eblock", selected_eblock)
+                print("selected eblock", selected_eblock.name, selected_eblock.sequence)
+            elif len(common_eblock) > 1:
+                # print("Length common eblock is > 1")
+                # Check which eblock falls better within the range of the mutations ( check not too close to beginning or end)
+                possible_eblocks = [e for e in eblocks if e.name in common_eblock]
+                for eblock in possible_eblocks:
+                    for mut_i in mutation.idx_dna:
+                        eblock.mutation_start_index = self.eblock_index(eblock, mut_i)
+                        if not (eblock.mutation_start_index < self.min_overlap) or (eblock.mutation_start_index > (len(eblock.sequence) - self.min_overlap)):
+                            selected_eblock = eblock           
+                # print("selected eblock", selected_eblock.name, selected_eblock.sequence)     
             else:
                 print(f"Multiple eBlocks for multiple mutations, not all mutations in the same eBlock. Skip mutation {mutation.name} {mutation.idx_dna}.")
                 return results
-
-            # all_eblocks = [eblock.name for eblock, _ in (self.eblocks_within_range(mut_i) for mut_i in mutation.idx_dna)]
-            # all_eblocks = [i.name for i, _ in (self.eblocks_within_range(mut_i) for mut_i in mutation.idx_dna)]
-            # lowest_count = min(all_counts)            
-            for mut_i in mutation.idx_dna:
-                eblock, counts = self.eblocks_within_range(mut_i)
-                try:  # Try to find indexes of mutations, based on eblock. Check if they are too close to beginning or end of eblock
-                    # TODO Move this to a separate function
-                    for mut_i in mutation.idx_dna:
-                        eblock.mutation_start_index = self.eblock_index(selected_eblock, mut_i)  # Check too close to beginning or end
-                        if (selected_eblock.mutation_start_index < self.min_overlap) or (selected_eblock.mutation_start_index > (len(selected_eblock.sequence) - self.min_overlap)):
-                            raise Exception("Mutation too close to beginning or end of eBlock")
-                except Exception:
-                    continue
+       
+            # TODO Do the checks for the eBlock
+            # for mut_i in mutation.idx_dna:
+            #     eblock, counts = self.eblocks_within_range(mut_i)
+            #     try:  # Try to find indexes of mutations, based on eblock. Check if they are too close to beginning or end of eblock
+            #         # TODO Move this to a separate function
+            #         for mut_i in mutation.idx_dna:
+            #             eblock.mutation_start_index = self.eblock_index(selected_eblock, mut_i)  # Check too close to beginning or end
+            #             if (selected_eblock.mutation_start_index < self.min_overlap) or (selected_eblock.mutation_start_index > (len(selected_eblock.sequence) - self.min_overlap)):
+            #                 raise Exception("Mutation too close to beginning or end of eBlock")
+            #     except Exception:
+            #         continue
 
             for num_i, mut_i in enumerate(mutation.idx_dna):
                 selected_eblock.mutation_start_index = self.eblock_index(selected_eblock, mut_i)
                 selected_eblock.mutant_codon = self.select_mut_codon(mutation.mutation[num_i][-1])  # Find most occuring mutant codon based on codon usage for species
                 self.check_wt_codon(selected_eblock, mutation.mutation[num_i][0])  # Check if WT codon at index is same residue as mutation
                 selected_eblock.sequence = self.mutate_eblock(mutation, selected_eblock)
+                print("PROCESED MUTATION", mutation.name, selected_eblock.name, selected_eblock.start_index, selected_eblock.end_index, selected_eblock.sequence)
 
             eblock = selected_eblock
-        print(mutation.name, eblock.name, eblock.start_index, eblock.end_index, eblock.sequence)
+        # print(mutation.name, eblock.name, eblock.start_index, eblock.end_index, eblock.sequence)
         results[mutation] = eblock
         return results
+    
+    def choose_eblock(self, eblocks: list, idx: int) -> Eblock:
+        # TODO Implement function to choose the correct eBlock
+        pass
     
     def make_clones(self):
             
@@ -741,6 +765,9 @@ class Clustering:
             else:
                 n += 1
         
+        # for k, v in possibilities.items():
+        #     cluster_sizes = [max(v) - min(v) for v in possibilities[k].values()]
+        #     print(k, cluster_sizes)
         if len(possibilities) == 0:  # No valid clusters found
             raise Exception("No valid clusterings found for current mutations. \
                             Check your input mutations and make sure that (1) the multi-mutants are not too far apart. \
@@ -748,6 +775,7 @@ class Clustering:
         return possibilities
     
     def extract_indices(self):
+        # TODO Split in two functions?
         X = []  # Store all indices of the mutations
         constraints = []  # Store constraints 
         for i in self.mutation_instance.mutations:
@@ -923,14 +951,15 @@ class Clustering:
             if (max(clusters[k[0]]) - min(clusters[k[0]]) + v <= self.max_eblock_length - 2 * self.min_overlap):  # Check that the eblock is not becoming too big # TODO Move to separate functino                
                 # print("add value to eblock")
                 clusterscopy[k[0]].append(max_value + v)
+
+        # Check if the eblock is not becoming too big
+        # for k, v in clusterscopy.items():
+        #     if (max(v) - min(v) + 2 * self.min_overlap) > self.max_eblock_length:
+        #         return clusters
+        #     elif (max(v) - min(v) + 2 * self.min_overlap) < self.min_eblock_length:
+        #         return clusters
         
         # TODO Check that if by adding the value to the eblock, the constraints are met
-        # TODO Update constraints
-        # TODO Update labels
-        # self.update_labels(clusterscopy, labels)
-        # print(labels)
-        # print(clusters)
-        # print(clusterscopy)
         return clusterscopy
         
     @staticmethod
