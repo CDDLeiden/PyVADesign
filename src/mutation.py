@@ -1,4 +1,5 @@
 import sys
+import itertools
 import numpy as np
 
 
@@ -177,6 +178,59 @@ class Mutation:
             else:
                mutation = mut.mutation.replace("'", "")
                print(f"\t{mut.type.ljust(padding)}\t{mutation.ljust(padding)}")
+
+    def extract_indices(self):
+        """
+        This function extracts the indices of the mutations.
+        """
+        indices = []  # Store all indices of the mutations
+        constraints = []  # Store constraints 
+        for mutation in self.mutations:
+            self._process_mutation_extraction(mutation, indices, constraints)
+        indices = np.asarray(indices).reshape(-1, 1).flatten()
+        constraints_indices = self._generate_constraint_indices(indices, constraints)
+        return indices, constraints_indices
+
+    def _process_mutation_extraction(self, mutation, indices, constraints):
+        """Process a single mutation and update indices and constraints."""
+        if mutation.is_singlemutation:
+            indices.append(mutation.idx_dna[0])
+        elif mutation.is_insert:
+            self._handle_insert_extraction(mutation, indices, constraints)
+        elif mutation.is_deletion:
+            self._handle_deletion_extraction(mutation, indices, constraints)
+        elif mutation.is_multiplemutation:
+            self._handle_multiple_mutation_extraction(mutation, indices, constraints)
+
+    def _handle_insert_extraction(self, mutation, indices, constraints):
+        """Handle insert mutations."""
+        start_insert = mutation.idx_dna[0]
+        end_insert = start_insert + mutation.length_insert
+        constraints.append((start_insert, end_insert))
+        indices.extend([start_insert, end_insert])
+
+    def _handle_deletion_extraction(self, mutation, indices, constraints):
+        """Handle deletion mutations."""
+        indices.append(mutation.idx_dna_deletion_begin)
+        indices.append(mutation.idx_dna_deletion_end)
+        constraints.append((mutation.idx_dna_deletion_begin, mutation.idx_dna_deletion_end))
+
+    def _handle_multiple_mutation_extraction(self, mutation, indices, constraints):
+        """Handle multiple mutations."""
+        idxs = list(mutation.idx_dna)
+        indices.extend(idxs)
+        constraints.append(tuple(idxs))
+
+    def _generate_constraint_indices(self, indices, constraints):
+        """Generate constraint indices from the given constraints."""
+        constraint_indices = []
+        for con in constraints:
+            for pair in itertools.combinations(con, 2):
+                idx_a = np.where(indices == pair[0])[0]
+                idx_b = np.where(indices == pair[1])[0]
+                if idx_a.size > 0 and idx_b.size > 0:
+                    constraint_indices.append((int(idx_a[0]), int(idx_b[0])))
+        return constraint_indices
 
     @classmethod
     def check_nonnatural_aas(cls, mutations: list):
