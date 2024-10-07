@@ -62,6 +62,10 @@ class Mutation:
             content = f.readlines()
             
             for line in content:
+                stripped_line = line.strip()
+                if not stripped_line or stripped_line.startswith("#"):
+                    continue
+
                 try:
                     str_spl_line = line.strip().split()
 
@@ -143,6 +147,10 @@ class Mutation:
         self.mutations = mutations
         self.n_mutants = len(mutations)
         return mutations
+    
+    def skip_blank_lines(self, fp: str):
+        # TODO
+        pass
     
     def find_unique_items(self, list1, list2):
         set1 = set(list1)

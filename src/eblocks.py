@@ -100,7 +100,7 @@ class EblockDesign:
 
         # Store WT and mutated gene blocks
         self.wt_eblocks: list = []
-        self.eblocks: list = []
+        self.eblocks: dict = {} # key: mutation, value: eBlock
 
         self.most_abundant_codons: dict = {}  # Store most abundant codons for the selected genome
         self.validate_optimization_parameters()
@@ -151,6 +151,7 @@ class EblockDesign:
             # print("MUTATION", mutation.name, mutation.idx_dna)
             results = self.make_mutant_eblock(mutation, results)  # Create mutated eBlock, based on mutation type
         # Check if all mutations could be mapped and remove mutations that could not be processed from mutation instance
+        print("RESULTS" , results)
         self.check_eblocks(results)
 
         # for k, v in results.items():
@@ -716,6 +717,7 @@ class Clustering:
             cluster_labels, invalid_constraints = self.kmedoids_clustering(num_clusters=n)
             clusters = self.cluster_to_dict(cluster_labels, self.X)
 
+            cluster_sizes = [max(v) - min(v) for v in clusters.values()]
             # Fix constraints if there are any invalid constraints
             if (invalid_constraints > 0) and not any(size < (self.min_eblock_length - 2 * self.min_overlap) for size in cluster_sizes):
                 clusters_copy = self.fix_constraints(clusters_copy, cluster_labels)
@@ -728,7 +730,6 @@ class Clustering:
             cluster_correct = 0
             cluster_too_big = False
 
-            cluster_sizes = [max(v) - min(v) for v in clusters.values()]
             # Check if the cluster sizes are within bounds
             if any(size > (self.max_eblock_length - 2 * self.min_overlap) for size in cluster_sizes):  # Cluster too big
                 cluster_too_big = True
