@@ -148,7 +148,7 @@ class EblockDesign:
         # Loop over all mutations and create the eBlocks, based on the WT eBlocks
         results = {}
         for mutation in self.mutation_instance.mutations:
-            # print("MUTATION", mutation.name, mutation.idx_dna)
+            print("MUTATION", mutation.name, mutation.idx_dna)
             results = self.make_mutant_eblock(mutation, results)  # Create mutated eBlock, based on mutation type
         # Check if all mutations could be mapped and remove mutations that could not be processed from mutation instance
         print("RESULTS" , results)
@@ -699,8 +699,13 @@ class Clustering:
 
     def run_clustering(self):
         self.X, self.idxs_constraints = self.mutation_instance.extract_indices()
+        print("all constraints", self.idxs_constraints)
+        print("all indices of constraints", self.X)
+        # for i in self.idxs_constraints:
+        #     print(self.X[i[0]], self.X[i[1]])
         valid_clusters = self.find_possible_clusters()
         optimal_clustering = self.choose_cluster(valid_clusters)
+        print("optimal clustering", optimal_clustering)
         return optimal_clustering
         
     def find_possible_clusters(self, threshold_small_clusters=2):
@@ -715,11 +720,16 @@ class Clustering:
         while (valid_clusters) and (n <= len(self.mutation_instance.mutations)):
         
             cluster_labels, invalid_constraints = self.kmedoids_clustering(num_clusters=n)
+            print(n, invalid_constraints)
             clusters = self.cluster_to_dict(cluster_labels, self.X)
-
             cluster_sizes = [max(v) - min(v) for v in clusters.values()]
+            print("cluster sizes:", cluster_sizes)
+            # Calculate the size, based on the largest/deletion/insertion per cluster
+            cluster_sizes = self.calculate_max_min_cluster_sizes(clusters)
+            print("cluster sizes:", cluster_sizes)
+
             # Fix constraints if there are any invalid constraints
-            if (invalid_constraints > 0) and not any(size < (self.min_eblock_length - 2 * self.min_overlap) for size in cluster_sizes):
+            if (invalid_constraints > 0) and not any(min_size < (self.min_eblock_length - 2 * self.min_overlap) for min_size, _ in cluster_sizes.values()):
                 clusters_copy = self.fix_constraints(clusters_copy, cluster_labels)
                 # TODO Check constraints again after fixing them
                 invalid_constraints = 0 
@@ -731,12 +741,13 @@ class Clustering:
             cluster_too_big = False
 
             # Check if the cluster sizes are within bounds
-            if any(size > (self.max_eblock_length - 2 * self.min_overlap) for size in cluster_sizes):  # Cluster too big
+            if any(max_size > (self.max_eblock_length - 2 * self.min_overlap) for _, max_size in cluster_sizes.values()):  # Cluster too big
                 cluster_too_big = True
 
-            elif any(size < (self.min_eblock_length - 2 * self.min_overlap) for size in cluster_sizes):  # Cluster too small
-                exceeding_items = [i for i in cluster_sizes if i < (self.min_eblock_length - 2 * self.min_overlap)]
-                cluster_keys = [k for k, v in clusters.items() if max(v) - min(v) < (self.min_eblock_length - 2 * self.min_overlap)]
+            elif any(min_size < (self.min_eblock_length - 2 * self.min_overlap) for min_size, _ in cluster_sizes.values()):  # Cluster too small
+                exceeding_items = [min_size for min_size, _ in cluster_sizes.values() if min_size < (self.min_eblock_length - 2 * self.min_overlap)]
+                cluster_keys = [k for k, v in cluster_sizes.items() if v[0] in exceeding_items]
+                # cluster_keys = [k for k, v in clusters.items() if max(v) - min(v) < (self.min_eblock_length - 2 * self.min_overlap)]
                 min_length_to_add = [(self.min_eblock_length - size) - 2 * self.min_overlap for size in exceeding_items]
 
                 # See if adding some length to the cluster will make it fit the requirements
@@ -752,7 +763,7 @@ class Clustering:
                         cluster_too_small += 1
                         cluster_correct += 1
             else:
-                cluster_correct += len(cluster_sizes)
+                cluster_correct += len(cluster_sizes.keys())
 
             if (cluster_too_small > threshold_small_clusters):  # Too many small clusters > stop searching
                 valid_clusters = False
@@ -802,6 +813,38 @@ class Clustering:
         best_score = get_score(clusters[best_clustering_k])  # Extract the score separately
         self.print_line(score_label(best_score))
         return clusters[best_clustering_k]
+    
+    def calculate_max_min_cluster_sizes(self, clusters: dict) -> list:
+        cluster_sizes = [max(v) - min(v) for v in clusters.values()]
+        min_max_sizes = {}
+        for k, v in clusters.items():
+            size = max(v) - min(v)
+            max_insert = 0
+            max_deletion = 0
+            # Get the mutation based on the index
+            for mut_idx in v:
+                for mut in self.mutation_instance.mutations:
+                    if mut_idx in mut.idx_dna:
+                        matching_mutation = mut
+                        if matching_mutation.is_insert:  # Calculate size based on insert
+                            if matching_mutation.length_insert > max_insert:
+                                max_insert = matching_mutation.length_insert
+                        elif matching_mutation.is_deletion:  # Calculate size based on deletion
+                            if matching_mutation.length_deletion > max_deletion:
+                                max_deletion = matching_mutation.length_deletion
+            
+            # Calculate the new size based on the largest/deletion/insertion
+            if max_insert > 0:
+                max_size = size + max_insert
+            else:
+                max_size = size
+            if max_deletion > 0:
+                min_size = size - max_deletion
+            else:
+                min_size = size
+
+            min_max_sizes[k] = (min_size, max_size)
+        return min_max_sizes
              
     def calculate_cost(self, clusters: dict) -> float:
         total_cost = 0
@@ -848,10 +891,13 @@ class Clustering:
     def _get_invalid_constraints(self, groups, labels):
         """Identify invalid constraints based on label mismatches."""
         invalid_constraints = {key: [] for key in groups.keys()}
+        print("Invalid constraints", invalid_constraints)
         for con in self.idxs_constraints:
             con_labels = [labels[i] for i in con]
+            print("con", con, con_labels)
             if not all(x == con_labels[0] for x in con_labels):
                 difference = self.X[con[0]] - self.X[con[1]]
+                print("difference", difference)
                 if difference > 0:
                     invalid_constraints[con_labels[0]].append(difference)
                     invalid_constraints[con_labels[1]].append(-1 * difference)
