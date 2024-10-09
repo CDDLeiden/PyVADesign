@@ -194,6 +194,7 @@ class Mutation:
         indices = []  # Store all indices of the mutations
         constraints = []  # Store constraints 
         for mutation in self.mutations:
+            print(f"Processing mutation: {mutation.name}")
             self._process_mutation_extraction(mutation, indices, constraints)
         indices = np.asarray(indices).reshape(-1, 1).flatten()
         constraints_indices = self._generate_constraint_indices(indices, constraints)
@@ -222,12 +223,15 @@ class Mutation:
         indices.append(mutation.idx_dna_deletion_begin)
         indices.append(mutation.idx_dna_deletion_end)
         constraints.append((mutation.idx_dna_deletion_begin, mutation.idx_dna_deletion_end))
+        print(f"Deletion indices: {mutation.idx_dna_deletion_begin}, {mutation.idx_dna_deletion_end}")
 
     def _handle_multiple_mutation_extraction(self, mutation, indices, constraints):
         """Handle multiple mutations."""
         idxs = list(mutation.idx_dna)
         indices.extend(idxs)
         constraints.append(tuple(idxs))
+        print(f"Multiple mutation indices: {idxs}")
+        print(f"Multiple mutation constraints: {constraints}")
 
     def _generate_constraint_indices(self, indices, constraints):
         """Generate constraint indices from the given constraints."""
