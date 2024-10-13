@@ -10,8 +10,6 @@ from .eblocks import EblockDesign
 
 
 
-# TODO Add examples of complementary and hairpin structures to the tests directory
-
 class Primer:
     def __init__(self,
                  name: str = None,
@@ -108,7 +106,7 @@ class DesignPrimers:
                  primers_settingsfile: str = None,
                  seqprimers_settingsfile: str = None,
                  output_dir: str = None,
-                 minimum_overlap: int = 15,
+                 minimum_overhang: int = 14,
                  void_length: int = 100,
                  verbose: bool = True):
 
@@ -118,7 +116,7 @@ class DesignPrimers:
         self.primers_settingsfile = primers_settingsfile
         self.seqprimers_settingsfile = seqprimers_settingsfile
         self.output_dir = output_dir
-        self.minimum_overlap = minimum_overlap
+        self.minimum_overhang = minimum_overhang
         self.void_length = void_length
         self.verbose = verbose
 
@@ -129,7 +127,7 @@ class DesignPrimers:
         min_oh = self.check_overlap()  # Check if the overlap is large enough
         
         print("Designing primer pairs ...")
-        primerpairs = self.run_design_primerpair(min_oh)  # store primers: eblock.name : [fw_primer, rv_primer]
+        primerpairs = self.run_design_primerpair()  # store primers: eblock.name : [fw_primer, rv_primer]
 
         # Add primers to Genbank file of clones
         for mut, eblock in self.eblocks_design_instance.eblocks.items():
@@ -197,26 +195,40 @@ class DesignPrimers:
             primers[eblock.name].append(rv_results)
         return primers
         
-    def run_design_primerpair(self, min_oh):
+    def run_design_primerpair(self):
         primers = {}
         for eblock in self.eblocks_design_instance.wt_eblocks:
+            # print(eblock.name)
+            # print(eblock.sequence)
 
             mid_index = (eblock.start_index + eblock.end_index) // 2
+            # print(f"Mid index: {mid_index}")
             length_product = len(self.vector_instance.vector.seq) - len(eblock.sequence)
+            # print(f"Length product: {length_product}")
             len_start = length_product - 75 # TODO Approximation
             len_end = length_product + 75
 
             sequence_template = self.vector_instance.vector.seq[mid_index:] + self.vector_instance.vector.seq[:mid_index]  # Linearize plasmid to allow for primer design
+            # print(f"Sequence template: {sequence_template}")
             half_eblock = len(eblock.sequence) // 2
+            # print(f"Half eblock: {half_eblock}")
 
-            fw_end_range = self.vector_instance.circular_index(half_eblock, len(self.vector_instance.vector.seq))
-            fw_start_range = self.vector_instance.circular_index(half_eblock - min_oh, len(self.vector_instance.vector.seq))
+            fw_end_range = self.vector_instance.circular_index(half_eblock - self.minimum_overhang, len(self.vector_instance.vector.seq))
+            # print(f"FW end range: {fw_end_range}")
+            fw_start_range = self.vector_instance.circular_index(half_eblock - self.eblocks_design_instance.min_overlap, len(self.vector_instance.vector.seq))
+            # print(f"FW start range: {fw_start_range}")
         
-            rv_start_range = self.vector_instance.circular_index(len(self.vector_instance.vector.seq) - half_eblock, len(self.vector_instance.vector.seq))
-            rv_end_range = self.vector_instance.circular_index(len(self.vector_instance.vector.seq) - half_eblock + min_oh, len(self.vector_instance.vector.seq))
+            rv_start_range = self.vector_instance.circular_index(len(self.vector_instance.vector.seq) - half_eblock + self.minimum_overhang, len(self.vector_instance.vector.seq))
+            # print(f"RV start range: {rv_start_range}")
+            rv_end_range = self.vector_instance.circular_index(len(self.vector_instance.vector.seq) - half_eblock + self.eblocks_design_instance.min_overlap, len(self.vector_instance.vector.seq))  # TODO Check this range
+            # print(f"RV end range: {rv_end_range}")
 
             result = self.find_primerpair(sequence_template, fw_start_range, fw_end_range, rv_start_range, rv_end_range, len_start, len_end)
             fw, rv = self.parse_primer3_result(result, eblock, type='pair')
+
+            # fw_oh, rv_oh = self.calculate_length_overhang(eblock, fw, rv)
+            # print(f"{eblock.name} Overhangs: {fw_oh}, {rv_oh}")
+
             primers[eblock.name] = [fw, rv]
         return primers
 
@@ -251,6 +263,24 @@ class DesignPrimers:
                     f.write("\n")
                 else:
                     pass
+
+    # def calculate_length_overhang(self, eblock, fw, rv):
+    #     """
+    #     Calculate the length of the overlap between the eblock and linearized plasmid
+    #     """
+    #     # TODO make this function
+    #     # TODO Take into account circular indexes of the plasmid
+    #     # Forward primer
+    #     idx_eblock_end = eblock.end_index
+    #     idx_start_fw = fw.idx_start
+    #     len_oh_fw = idx_eblock_end - idx_start_fw
+
+    #     # Reverse primer
+    #     idx_eblock_start = eblock.start_index
+    #     idx_end_rv = rv.idx_end
+    #     len_oh_rv = idx_eblock_start - idx_end_rv
+
+    #     return len_oh_fw, len_oh_rv
     
     def primers_to_fasta(self, name, seq, directory, filename='primers.fasta'):
         """
@@ -385,9 +415,11 @@ class DesignPrimers:
         seq_record.features.append(feature)
         SeqIO.write(seq_record, genbank_file, "genbank")
         
-    def check_overlap(self):
-        min_oh = self.eblocks_design_instance.min_overlap - self.minimum_overlap
-        if min_oh < 0:
-            raise ValueError("Overhang is too small.")
+    def check_overlap(self, min_searchrange=7):
+        min_oh = self.eblocks_design_instance.min_overlap - self.minimum_overhang
+        if min_oh <= 0:
+            raise ValueError("Minimum overhang is smaller then eblocks overlap.")
+        elif min_oh < min_searchrange:
+            print(f"Minimum overlap is smaller than {min_searchrange}. This might lead to difficulty in finding primers.")
         else:
             return min_oh

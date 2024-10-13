@@ -140,7 +140,9 @@ class EblockDesign:
         bins = self.make_bins(optimal_clustering)
 
         # Make gene blocks (WT DNA sequences sliced to the correct size, according to the bins) and renumber them starting from 1
-        self.wt_eblocks = self.make_wt_eblocks(bins)
+        wt_eblocks = self.make_wt_eblocks(bins)
+        self.wt_eblocks = self.add_silent_mutations(wt_eblocks)  # Add silent mutations to beginning and end of eBlocks
+
         # print("WT EBLOCKS!!!!!")
         # for i in self.wt_eblocks:
         #     print(i.name, len(i.sequence), i.start_index, i.end_index, i.bin_start, i.bin_end, i.sequence)
@@ -167,6 +169,7 @@ class EblockDesign:
         # Create a GFF3/gb file for each clone for easy visualization of eBlocks in sequence editor tools
         if self.clone_files:
             self.make_clones()
+            self.make_wt_clone()
 
         self.eblocks_to_csv()  # Save eBlocks to a CSV file
 
@@ -462,6 +465,24 @@ class EblockDesign:
                 self.eblocks_to_genbank(mutvector=mutated_vector, eblocks=results, output_dir=os.path.join(self.output_dir, filename), filename=f"{filename}.gb")
                 
             self.output_dir = original_dir
+
+    def make_wt_clone(self):
+        # TODO generate function to make a clone of the WT sequence
+        pass
+
+    def add_silent_mutations(self, eblock_list):
+        """
+        Add silent mutations to the WT eblocks
+        """
+        eblocks_with_silent_mutations = []
+        for eblock in eblock_list:
+            # Get WT residue
+            # Check if any silent mutations are possible for residue
+            # Introduce mutations
+            pass
+        # TODO Add silent mutations to the wt eblocks
+        # return eblocks_with_silent_mutations
+        return eblock_list
         
     def count_mutations_per_eblock(self) -> dict:
         """

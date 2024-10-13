@@ -3,6 +3,7 @@
 tutorial_output/*
 tests/randominput/*
 tests/randomoutput/*
+DnaE1_original/clones/*
 
 ### Python template
 # Byte-compiled / optimized / DLL files
