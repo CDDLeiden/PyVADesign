@@ -8,18 +8,24 @@ from biotite.sequence import NucleotideSequence
 class Gene:
     def __init__(self,
                  sequence = None,
-                 seqid = None):
+                 seqid = None,
+                 stopcodon = True):
         
         self.sequence = sequence
         self.seqid = seqid
+        self.stopcodon = stopcodon
 
     def parse_sequence(self, fp: str) -> str:
         """
         This function parses the sequence from a .fasta file and checks the input.
         """
         self.sequence, self.seqid = self.read_single_fasta(fp)
-        if not (NucleotideSequence(self.sequence).is_valid() and self.contains_start_stop_codon(self.sequence)):
-            raise ValueError("Invalid nucleotide sequence: Please provide a valid sequence containing start and stop codons.")
+        if self.stopcodon:
+            if not (NucleotideSequence(self.sequence).is_valid() and self.contains_start_stop_codon(self.sequence)):
+                raise ValueError("Invalid nucleotide sequence: Please provide a valid sequence containing start and stop codons.")
+        else:
+            if not NucleotideSequence(self.sequence).is_valid():
+                raise ValueError("Invalid nucleotide sequence: Please provide a valid sequence.")
         
     @staticmethod
     def read_single_fasta(fp: str):
