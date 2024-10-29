@@ -143,9 +143,10 @@ class RandomMutations:
                 deletion = res_b + '-' + res_e
                 deletions.append(deletion)
             else:
-                # If out of range, handle it, e.g., skip or create a deletion with available residues
-                # Here, we'll just create a deletion that ends at the last residue
-                deletion = res_b + '-' + residues[-1]
+                # If out of range: invert start and end index
+                res_e = res_b
+                res_b = residues[start_index - len_deletion]
+                deletion = res_b + '-' + res_e
                 deletions.append(deletion)
         return deletions
 
