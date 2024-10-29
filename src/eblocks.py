@@ -97,6 +97,7 @@ class EblockDesign:
         self.min_eblock_length = min_eblock_length
         self.min_overlap = min_overlap
         self.min_order = min_order
+        self.cost = -1
 
         # Store WT and mutated gene blocks
         self.wt_eblocks: list = []
@@ -134,6 +135,7 @@ class EblockDesign:
             bp_price=self.bp_price,
             verbose=self.verbose)
         optimal_clustering = cluster_instance.run_clustering()
+        self.cost = cluster_instance.cost
         # print("optimal_clustering", optimal_clustering)
         
         self.print_line("Starting eBlock design ...")  # Divide the target gene into clusters based on the position of the mutations
@@ -716,6 +718,7 @@ class Clustering:
         self.amount_optimization = amount_optimization
         self.bp_price = bp_price
         self.verbose = verbose
+        self.cost = -1
 
         self.idxs_constraints = []  # Store indices of constraints
         self.X = []  # Store all indices of the mutations
