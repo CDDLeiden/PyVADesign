@@ -18,7 +18,7 @@ from .utils import CodonUsage
 from .mutation import Mutation
 from .sequence import Vector, Gene
 
-warnings.filterwarnings("ignore", category=UserWarning, module="sklearn_extra.cluster._k_medoids")  # Ignore warnings specifically from sklearn_extra.cluster._k_medoids
+warnings.filterwarnings("ignore", category=UserWarning, module="sklearn_extra.cluster._k_medoids")  # Ignore warnings from sklearn_extra.cluster._k_medoids
 
 
 
@@ -113,7 +113,7 @@ class EblockDesign:
             settings = self.parse_settings(self.settings_file)
             self.update_settings(settings)
             if self.verbose:
-                self.display_settings()  # TODO Display settings in a more fancy way
+                self.display_settings()
 
         self.print_line(f"Calculating relative codon frequencies, based on the selected genome id {self.codon_usage} ...")
         codonusage = CodonUsage(
@@ -121,7 +121,7 @@ class EblockDesign:
             output_dir=self.output_dir)
         self.most_abundant_codons = codonusage.run()
 
-        self.print_line("Starting eBlock design ...")  # Divide the target gene into clusters based on the position of the mutations
+        self.print_line("Clustering mutations ...")
         cluster_instance = Clustering(  
             mutation_instance=self.mutation_instance,
             vector_instance=self.vector_instance,
@@ -135,7 +135,8 @@ class EblockDesign:
             verbose=self.verbose)
         optimal_clustering = cluster_instance.run_clustering()
         # print("optimal_clustering", optimal_clustering)
-
+        
+        self.print_line("Starting eBlock design ...")  # Divide the target gene into clusters based on the position of the mutations
         # Define the beginning and end of each gene block, based on the clusters and include the minimum overlap
         bins = self.make_bins(optimal_clustering)
 
@@ -614,8 +615,9 @@ class EblockDesign:
         """
         Print all class attributes using the __dict__ attribute
         """
+        max_key_length = max(len(key) for key in self.__dict__.keys())
         for key, value in self.__dict__.items():
-            print(f"{key}: {value}")
+            print(f"{key.ljust(max_key_length)}: {value}")
     
     def update_settings(self, settings):
         """
