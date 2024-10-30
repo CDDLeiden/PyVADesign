@@ -117,6 +117,7 @@ class EblockDesign:
                 self.display_settings()
 
         self.print_line(f"Calculating relative codon frequencies, based on the selected genome id {self.codon_usage} ...")
+
         codonusage = CodonUsage(
             genome_id=self.codon_usage,
             output_dir=self.output_dir)
@@ -135,6 +136,7 @@ class EblockDesign:
             bp_price=self.bp_price,
             verbose=self.verbose)
         optimal_clustering = cluster_instance.run_clustering()
+        print("optimal_clustering", optimal_clustering)
         self.cost = cluster_instance.cost
         # print("optimal_clustering", optimal_clustering)
         
@@ -730,6 +732,7 @@ class Clustering:
         # for i in self.idxs_constraints:
         #     print(self.X[i[0]], self.X[i[1]])
         valid_clusters = self.find_possible_clusters()
+        print("valid clusters", valid_clusters)
         optimal_clustering = self.choose_cluster(valid_clusters)
         print("optimal clustering", optimal_clustering)
         return optimal_clustering
@@ -746,17 +749,20 @@ class Clustering:
         while (valid_clusters) and (n <= len(self.mutation_instance.mutations)):
         
             cluster_labels, invalid_constraints = self.kmedoids_clustering(num_clusters=n)
-            print(n, invalid_constraints)
+            # print(n, invalid_constraints)
+            # print(set(cluster_labels))
+
             clusters = self.cluster_to_dict(cluster_labels, self.X)
+            # print("clusters", clusters)
             cluster_sizes = [max(v) - min(v) for v in clusters.values()]
-            print("cluster sizes:", cluster_sizes)
+            # print("cluster sizes:", cluster_sizes)
             # Calculate the size, based on the largest/deletion/insertion per cluster
             cluster_sizes = self.calculate_max_min_cluster_sizes(clusters)
-            print("cluster sizes:", cluster_sizes)
+            # print("cluster sizes:", cluster_sizes)
 
             # Fix constraints if there are any invalid constraints
             if (invalid_constraints > 0) and not any(min_size < (self.min_eblock_length - 2 * self.min_overlap) for min_size, _ in cluster_sizes.values()):
-                clusters_copy = self.fix_constraints(clusters_copy, cluster_labels)
+                clusters_copy = self.fix_constraints(clusters, cluster_labels)
                 # TODO Check constraints again after fixing them
                 invalid_constraints = 0 
             else:
@@ -829,6 +835,7 @@ class Clustering:
             self.print_line("Optimizing based on price per bp ...")
             get_score = lambda c: self.calculate_cost(c)
             score_label = lambda v: f"Lowest estimated cost: €{v} (given price per bp of €{self.bp_price})"
+            # Store the cost of the clustering
         elif self.amount_optimization:
             self.print_line("Optimizing based on number of eBlocks ...")
             get_score = lambda c: len(c)
@@ -836,6 +843,7 @@ class Clustering:
 
         # Find the cluster with the minimum score
         best_clustering_k = min(clusters, key=lambda k: get_score(clusters[k]))
+        self.cost = self.calculate_cost(clusters[best_clustering_k])
         best_score = get_score(clusters[best_clustering_k])  # Extract the score separately
         self.print_line(score_label(best_score))
         return clusters[best_clustering_k]
@@ -920,16 +928,21 @@ class Clustering:
         print("Invalid constraints", invalid_constraints)
         for con in self.idxs_constraints:
             con_labels = [labels[i] for i in con]
-            print("con", con, con_labels)
+            print("con", con, "con_labels", con_labels)
             if not all(x == con_labels[0] for x in con_labels):
                 difference = self.X[con[0]] - self.X[con[1]]
+                print(self.X[con[0]], self.X[con[1]])
                 print("difference", difference)
+                print("Groups", groups)
                 if difference > 0:
                     invalid_constraints[con_labels[0]].append(difference)
                     invalid_constraints[con_labels[1]].append(-1 * difference)
                 else:
+                    print("difference", difference)
+                    print("con_labels", con_labels[0])
                     invalid_constraints[con_labels[0]].append(-1 * difference)
                     invalid_constraints[con_labels[1]].append(difference)
+        print("Invalid constraints", invalid_constraints)
         return invalid_constraints
 
     def _remove_empty_keys(self, invalid_constraints):
