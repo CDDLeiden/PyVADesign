@@ -1,5 +1,8 @@
 ### Specific for this directory
 
+test_pipeline.ipynb
+tests.ipynb
+
 ### Python template
 # Byte-compiled / optimized / DLL files
 __pycache__/
