@@ -198,36 +198,23 @@ class DesignPrimers:
     def run_design_primerpair(self):
         primers = {}
         for eblock in self.eblocks_design_instance.wt_eblocks:
-            # print(eblock.name)
-            # print(eblock.sequence)
 
             mid_index = (eblock.start_index + eblock.end_index) // 2
-            # print(f"Mid index: {mid_index}")
             length_product = len(self.vector_instance.vector.seq) - len(eblock.sequence)
-            # print(f"Length product: {length_product}")
             len_start = length_product - 75 # TODO Approximation
             len_end = length_product + 75
 
             sequence_template = self.vector_instance.vector.seq[mid_index:] + self.vector_instance.vector.seq[:mid_index]  # Linearize plasmid to allow for primer design
-            # print(f"Sequence template: {sequence_template}")
             half_eblock = len(eblock.sequence) // 2
-            # print(f"Half eblock: {half_eblock}")
 
             fw_end_range = self.vector_instance.circular_index(half_eblock - self.minimum_overhang, len(self.vector_instance.vector.seq))
-            # print(f"FW end range: {fw_end_range}")
             fw_start_range = self.vector_instance.circular_index(half_eblock - self.eblocks_design_instance.min_overlap, len(self.vector_instance.vector.seq))
-            # print(f"FW start range: {fw_start_range}")
-        
+       
             rv_start_range = self.vector_instance.circular_index(len(self.vector_instance.vector.seq) - half_eblock + self.minimum_overhang, len(self.vector_instance.vector.seq))
-            # print(f"RV start range: {rv_start_range}")
             rv_end_range = self.vector_instance.circular_index(len(self.vector_instance.vector.seq) - half_eblock + self.eblocks_design_instance.min_overlap, len(self.vector_instance.vector.seq))  # TODO Check this range
-            # print(f"RV end range: {rv_end_range}")
 
             result = self.find_primerpair(sequence_template, fw_start_range, fw_end_range, rv_start_range, rv_end_range, len_start, len_end)
             fw, rv = self.parse_primer3_result(result, eblock, type='pair')
-
-            # fw_oh, rv_oh = self.calculate_length_overhang(eblock, fw, rv)
-            # print(f"{eblock.name} Overhangs: {fw_oh}, {rv_oh}")
 
             primers[eblock.name] = [fw, rv]
         return primers
