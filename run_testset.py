@@ -127,5 +127,3 @@ if __name__ == '__main__':
                             primer_finished = False
                             fo.write(f"{f}\tN{i}\t{file}\t{opt}\t{eblock_finished}\t{num_eblocks}\t{length_eblocks}\t{cost}\t{primer_finished}\n")
                             fo.flush()
-
-            sys.exit()
