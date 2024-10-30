@@ -1,8 +1,8 @@
 import os
 import sys
 import copy
+import random
 import warnings
-import itertools
 import numpy as np
 from Bio import SeqIO
 from Bio.Seq import Seq
@@ -144,6 +144,17 @@ class EblockDesign:
 
         # Make gene blocks (WT DNA sequences sliced to the correct size, according to the bins) and renumber them starting from 1
         wt_eblocks = self.make_wt_eblocks(bins)
+        
+        if len(wt_eblocks) > len(self.eblock_colors):  # Randomly add more hex-colors if there are more eBlocks than colors in the default color scheme
+            num_colors_to_make = len(wt_eblocks) - len(self.eblock_colors)
+            new_colors = []
+            for i in range(num_colors_to_make):
+                new_colors.append(self.random_hex_color())
+            max_num = max(self.eblock_colors.keys())
+            for num, i in enumerate(new_colors, start=max_num+1):
+                self.eblock_colors[num] = i
+
+        # TODO implement this
         self.wt_eblocks = self.add_silent_mutations(wt_eblocks)  # Add silent mutations to beginning and end of eBlocks
 
         # Loop over all mutations and create the eBlocks, based on the WT eBlocks
@@ -273,6 +284,7 @@ class EblockDesign:
             eblock_start, count_start = self.eblocks_within_range(mutation.idx_dna[0])
             eblock_end, count_end = self.eblocks_within_range(mutation.idx_dna[0] + 3)
             eblock = None
+            
             if (count_start > 1) or (count_end > 1):
                 for i in eblock_start:
                     for j in eblock_end:
@@ -290,6 +302,7 @@ class EblockDesign:
             eblock_start, count_start = self.eblocks_within_range(mutation.idx_dna[0])
             eblock_end, count_end = self.eblocks_within_range(mutation.idx_dna[0] + mutation.length_insert)
             eblock = None
+            
             if (count_start > 1) or (count_end > 1):
                 for i in eblock_start:
                     for j in eblock_end:
@@ -306,8 +319,8 @@ class EblockDesign:
         elif mutation.is_deletion:
             eblock_start, count_start = self.eblocks_within_range(mutation.idx_dna_deletion_begin)
             eblock_end, count_end = self.eblocks_within_range(mutation.idx_dna_deletion_end)
-
             eblock = None
+            
             if (count_start > 1) or (count_end > 1):
                 for i in eblock_start:
                     for j in eblock_end:
@@ -336,7 +349,8 @@ class EblockDesign:
             if len(common_eblock) == 1:
                 selected_eblock = [e for e in eblocks if e.name == common_eblock[0]][0]
             elif len(common_eblock) > 1:
-                # Check which eblock falls better within the range of the mutations ( check not too close to beginning or end)
+
+                # Check which eblock falls better within the range of the mutations (check not too close to beginning or end)
                 possible_eblocks = [e for e in eblocks if e.name in common_eblock]
                 for eblock in possible_eblocks:
                     for mut_i in mutation.idx_dna:
@@ -347,18 +361,6 @@ class EblockDesign:
                 print(f"Multiple eBlocks for multiple mutations, not all mutations in the same eBlock. Skip mutation {mutation.name} {mutation.idx_dna}.")
                 return results
        
-            # TODO Do the checks for the eBlock
-            # for mut_i in mutation.idx_dna:
-            #     eblock, counts = self.eblocks_within_range(mut_i)
-            #     try:  # Try to find indexes of mutations, based on eblock. Check if they are too close to beginning or end of eblock
-            #         # TODO Move this to a separate function
-            #         for mut_i in mutation.idx_dna:
-            #             eblock.mutation_start_index = self.eblock_index(selected_eblock, mut_i)  # Check too close to beginning or end
-            #             if (selected_eblock.mutation_start_index < self.min_overlap) or (selected_eblock.mutation_start_index > (len(selected_eblock.sequence) - self.min_overlap)):
-            #                 raise Exception("Mutation too close to beginning or end of eBlock")
-            #     except Exception:
-            #         continue
-
             for num_i, mut_i in enumerate(mutation.idx_dna):
                 selected_eblock.mutation_start_index = self.eblock_index(selected_eblock, mut_i)
                 selected_eblock.mutant_codon = self.select_mut_codon(mutation.mutation[num_i][-1])  # Find most occuring mutant codon based on codon usage for species
@@ -368,11 +370,7 @@ class EblockDesign:
             eblock = selected_eblock
         results[mutation] = eblock
         return results
-    
-    def choose_eblock(self, eblocks: list, idx: int) -> Eblock:
-        # TODO Implement function to choose the correct eBlock
-        pass
-    
+        
     def make_clones(self):
             
             self.make_dir(dirname='clones')  # Make clones-dir
@@ -428,10 +426,7 @@ class EblockDesign:
                 
             self.output_dir = original_dir
 
-    def make_wt_clone(self):
-        # TODO generate function to make a clone of the WT sequence
-        pass
-
+    # TODO Make this function
     def add_silent_mutations(self, eblock_list):
         """
         Add silent mutations to the WT eblocks
@@ -547,6 +542,9 @@ class EblockDesign:
         SeqIO.write(record, outpath, "genbank")
 
     def check_eblocks(self, results: dict):
+        """
+        Check if all mutations could be mapped to an eBlock and remove mutations that could not be processed from the mutation instance.
+        """
         failed_mutations = []
         for num, mutation in enumerate(self.mutation_instance.mutations):
             if mutation not in results.keys():
@@ -628,6 +626,10 @@ class EblockDesign:
                         '#aec7e8','#ffbb78','#98df8a','#ff9896','#c5b0d5','#c49c94','#f7b6d2','#c7c7c7','#dbdb8d','#9edae5',
                         '#393b79','#ff7f0e','#2ca02c','#8c564b','#e377c2','#7f7f7f','#bcbd22','#17becf']
         return {i: tab10_colors[i] for i in range(len(tab10_colors))}
+    
+    @staticmethod
+    def random_hex_color():
+        return "#{:06x}".format(random.randint(0, 0xFFFFFF))
     
     @staticmethod
     def gff3_header(length_sequence, version="3.2.1", sequence_name="myseq"):
