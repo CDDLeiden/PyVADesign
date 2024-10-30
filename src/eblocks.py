@@ -149,10 +149,8 @@ class EblockDesign:
         # Loop over all mutations and create the eBlocks, based on the WT eBlocks
         results = {}
         for mutation in self.mutation_instance.mutations:
-            print("MUTATION", mutation.name, mutation.idx_dna)
             results = self.make_mutant_eblock(mutation, results)  # Create mutated eBlock, based on mutation type
         # Check if all mutations could be mapped and remove mutations that could not be processed from mutation instance
-        print("RESULTS" , results)
         self.check_eblocks(results)
 
         sorted_dict = dict(sorted(results.items(), key=lambda x: (x[1].name, x[1].start_index)))  # Sort the eblocks based on the index of the first mutation in the eblock and the number of the eblock
