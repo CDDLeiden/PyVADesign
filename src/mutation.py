@@ -43,7 +43,7 @@ class Mutation:
         self.mutations = []
         self.unprocessed_mutations = []
         self.unvalid_mutations = []
-        self.colors = {'Mutation': 'black', 'Insert': 'red', 'Deletion': 'blue', 'Combined': 'green'}
+        self.colors = {'Mutation': '#000000', 'Insert': '#FF0000', 'Deletion': '#0000FF', 'Combined': '#00ff00', 'Silent': '#FFA500'}
 
     def parse_mutations(self, fp: str):
         """
@@ -147,11 +147,7 @@ class Mutation:
         self.mutations = mutations
         self.n_mutants = len(mutations)
         return mutations
-    
-    def skip_blank_lines(self, fp: str):
-        # TODO
-        pass
-    
+        
     def find_unique_items(self, list1, list2):
         set1 = set(list1)
         set2 = set(list2)
@@ -194,7 +190,6 @@ class Mutation:
         indices = []  # Store all indices of the mutations
         constraints = []  # Store constraints 
         for mutation in self.mutations:
-            print(f"Processing mutation: {mutation.name}")
             self._process_mutation_extraction(mutation, indices, constraints)
         indices = np.asarray(indices).reshape(-1, 1).flatten()
         constraints_indices = self._generate_constraint_indices(indices, constraints)
@@ -223,15 +218,15 @@ class Mutation:
         indices.append(mutation.idx_dna_deletion_begin)
         indices.append(mutation.idx_dna_deletion_end)
         constraints.append((mutation.idx_dna_deletion_begin, mutation.idx_dna_deletion_end))
-        print(f"Deletion indices: {mutation.idx_dna_deletion_begin}, {mutation.idx_dna_deletion_end}")
+        # print(f"Deletion indices: {mutation.idx_dna_deletion_begin}, {mutation.idx_dna_deletion_end}")
 
     def _handle_multiple_mutation_extraction(self, mutation, indices, constraints):
         """Handle multiple mutations."""
         idxs = list(mutation.idx_dna)
         indices.extend(idxs)
         constraints.append(tuple(idxs))
-        print(f"Multiple mutation indices: {idxs}")
-        print(f"Multiple mutation constraints: {constraints}")
+        # print(f"Multiple mutation indices: {idxs}")
+        # print(f"Multiple mutation constraints: {constraints}")
 
     def _generate_constraint_indices(self, indices, constraints):
         """Generate constraint indices from the given constraints."""
