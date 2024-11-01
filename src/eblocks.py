@@ -155,6 +155,10 @@ class EblockDesign:
                 self.eblock_colors[num] = i
 
         # TODO implement this
+        # TODO Take e.g. residue number 30 (start AND end)
+        # TODO Check if the mutation is before or after the residue
+        # TODO Introduce silent mutation
+        # Create barcode for each eBlock to simplify sequencing
         self.wt_eblocks = self.add_silent_mutations(wt_eblocks)  # Add silent mutations to beginning and end of eBlocks
 
         # Loop over all mutations and create the eBlocks, based on the WT eBlocks
@@ -618,7 +622,6 @@ class EblockDesign:
                 
     @staticmethod
     def generate_eblock_colors() -> dict:
-        # TODO IF THERE ARE MORE COLORS NEEDED, ADD MORE COLORS > MAKE A CHECK FOR THIS!
         """
         Create dictionary with colors for plotting eBlocks using the tab10 color scheme.
         """
