@@ -85,11 +85,11 @@ class Primer3Config:
         return args
     
     @staticmethod
-    def seq_args_sequencing_primer(sequence, start, end):
+    def seq_args_sequencing_primer(sequence, start, length):
         return {
             'SEQUENCE_ID': 'SEQ0001',
             'SEQUENCE_TEMPLATE': sequence,
-            'SEQUENCE_TARGET': [start, end],
+            'SEQUENCE_TARGET': [start, length],
         }
 
 
@@ -107,7 +107,7 @@ class DesignPrimers:
                  seqprimers_settingsfile: str = None,
                  output_dir: str = None,
                  minimum_overhang: int = 14,
-                 void_length: int = 100,
+                 void_length: int = 400,
                  verbose: bool = True):
 
         self.eblocks_design_instance = eblocks_design_instance
@@ -164,23 +164,26 @@ class DesignPrimers:
         primers = {}  # store primers: d[eblock.name] = [fw, rv]
         for eblock in self.eblocks_design_instance.wt_eblocks:
             start = self.vector_instance.circular_index(eblock.start_index - self.void_length, self.vector_instance.length)
-            end = self.vector_instance.circular_index(start + 2*self.void_length, self.vector_instance.length)
+            length = self.void_length
+            end = self.vector_instance.circular_index(start + self.void_length, self.vector_instance.length)
             if start > end:  # change the 0-point of the sequence
                 sequence = self.vector_instance.vector.seq[-1000:] + self.vector_instance.vector.seq[0:-1000]
                 idx_eblock = sequence.find(eblock.sequence)
                 start = self.vector_instance.circular_index(idx_eblock - self.void_length, self.vector_instance.length)
-                end = self.vector_instance.circular_index(start + 2*self.void_length, self.vector_instance.length)
+                length = self.void_length
+                # end = self.vector_instance.circular_index(start + 2*self.void_length, self.vector_instance.length)
             else:
                 sequence = self.vector_instance.vector.seq
 
             # Obtain FW primer
-            result  = self.design_sequencing_primer(sequence=sequence, start=start, end=end)
+            print("start", start, "length", length)
+            result  = self.design_sequencing_primer(sequence=sequence, start=start, length=length)
             fw_result = self.parse_primer3_result(result, eblock, type='seq', direction='forward')
             primers[eblock.name] = [fw_result]
             # Obtain RV primer
             start = self.vector_instance.circular_index(eblock.end_index - self.void_length , self.vector_instance.length)
-            end = self.vector_instance.circular_index(start + 2*self.void_length, self.vector_instance.length)
-            result  = self.design_sequencing_primer(sequence=self.vector_instance.vector.seq, start=start, end=end)
+            length = self.void_length
+            result  = self.design_sequencing_primer(sequence=self.vector_instance.vector.seq, start=start, length=length)
 
             # Find the closest start index that is higher than the end index
             possible_starts = []
@@ -217,15 +220,19 @@ class DesignPrimers:
             fw, rv = self.parse_primer3_result(result, eblock, type='pair')
 
             primers[eblock.name] = [fw, rv]
+
         return primers
 
-    def design_sequencing_primer(self, sequence, start, end):
+    def design_sequencing_primer(self, sequence, start, length):
         try:
-            result = primer3.bindings.design_primers(seq_args=Primer3Config.seq_args_sequencing_primer(sequence, start, end),
+            result = primer3.bindings.design_primers(seq_args=Primer3Config.seq_args_sequencing_primer(sequence, start, length),
                                                      global_args=Primer3Config.read_global_settings(self.seqprimers_settingsfile))
+            print(result)
             # Check if a sequencing primer was found
-            if 'PRIMER_LEFT_0_SEQUENCE' or 'PRIMER_RIGHT_0_SEQUENCE' in result:
-                    seqprimer = result['PRIMER_LEFT_0_SEQUENCE']
+            if 'PRIMER_LEFT_0_SEQUENCE' in result:
+                seqprimer = result['PRIMER_LEFT_0_SEQUENCE']
+            elif 'PRIMER_RIGHT_0_SEQUENCE' in result:
+                seqprimer = result['PRIMER_RIGHT_0_SEQUENCE']
             return result
                 
         except KeyError:  # If no suitable primer is found
