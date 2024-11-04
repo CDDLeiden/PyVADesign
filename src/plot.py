@@ -103,6 +103,13 @@ class Plot:
 
         # Add mutations to plot
         if plot_mutations:
+            for i in self.mutation_instance.silent_mutations:
+                features.append(GraphicFeature(start=int(i.idx_dna[0]), 
+                                               end=int(i.idx_dna[0]) + 3,
+                                               strand=+1, 
+                                               color=self.mutation_instance.colors[i.type], 
+                                               label=f"{i.name}"))
+
             for num, mut in enumerate(self.mutation_instance.mutations):
                 if not mut.is_multiplemutation:
                     features.append(GraphicFeature(start=int(mut.idx_dna[0]), 

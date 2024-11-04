@@ -41,6 +41,7 @@ class Mutation:
         self.is_multiplemutation = is_multiplemutation
         
         self.mutations = []
+        self.silent_mutations = []
         self.unprocessed_mutations = []
         self.unvalid_mutations = []
         self.colors = {'Mutation': '#000000', 'Insert': '#FF0000', 'Deletion': '#0000FF', 'Combined': '#00ff00', 'Silent': '#FFA500'}
