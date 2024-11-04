@@ -474,6 +474,12 @@ class EblockDesign:
                     eblock.sequence = mutated_eblock
                     eblock.silent_mutations.append(str(codon_start[0]) + str(idx_start) + str(codon_start[0]))
                     eblock.mutation_start_index = None
+
+                    silent_mutation = Mutation(name=str(codon_start[0]) + str(idx_start) + str(codon_start[0]), 
+                                               type='Silent',
+                                               idx_dna=[idx_start * 3])
+                    if not silent_mutation.name in [i.name for i in self.mutation_instance.silent_mutations]:
+                        self.mutation_instance.silent_mutations.append(silent_mutation)
                     break
                 else:
                     raise Exception(f"No codon found for residue {codon_start[0]}")
@@ -623,9 +629,9 @@ class EblockDesign:
         """
         for key, value in settings.items():
             if key == 'cost_optimization':
-                self.cost_optimization = bool(value)
+                self.cost_optimization = value == "True"
             elif key == 'amount_optimization':
-                self.amount_optimization = bool(value)
+                self.amount_optimization = value == "True"
             elif key == 'bp_price':
                 self.bp_price = float(value)
             elif key == 'max_eblock_length':
@@ -816,15 +822,19 @@ class Clustering:
         return labels, invalid_constraints
     
     def choose_cluster(self, clusters: dict) -> dict:
-        if self.cost_optimization:
+        print(f"cost_optimization: {self.cost_optimization}, amount_optimization: {self.amount_optimization}")
+        print(type(self.cost_optimization), type(self.amount_optimization))
+        if self.cost_optimization == True:
             self.print_line("Optimizing based on price per bp ...")
             get_score = lambda c: self.calculate_cost(c)
             score_label = lambda v: f"Lowest estimated cost: €{v} (given price per bp of €{self.bp_price})"
             # Store the cost of the clustering
-        elif self.amount_optimization:
+        elif self.amount_optimization == True:
             self.print_line("Optimizing based on number of eBlocks ...")
             get_score = lambda c: len(c)
             score_label = lambda v: f"Lowest number of eBlocks: {v}"
+        else:
+            raise Exception("Please set either cost_optimization or amount_optimization to True, but not both.")
 
         # Find the cluster with the minimum score
         best_clustering_k = min(clusters, key=lambda k: get_score(clusters[k]))
