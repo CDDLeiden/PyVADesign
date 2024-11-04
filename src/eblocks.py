@@ -1,11 +1,13 @@
 import os
 import sys
 import copy
+import math
+import random
 import warnings
-import itertools
 import numpy as np
 from Bio import SeqIO
 from Bio.Seq import Seq
+from Bio.Data import CodonTable
 from datetime import datetime
 import biotite.sequence as seq
 from collections import Counter
@@ -52,6 +54,7 @@ class Eblock:
         self.wt_codon = wt_codon
         self.mutant_codon = mutant_codon
         self.insert = insert
+        self.silent_mutations = []
 
 
 
@@ -77,6 +80,7 @@ class EblockDesign:
                  min_eblock_length: int = 300,
                  min_overlap: int = 25,
                  min_order: int = 24,
+                 silent_mutation_index: int = 30,
                 ):
         
         self.mutation_instance = mutation_instance
@@ -98,6 +102,7 @@ class EblockDesign:
         self.min_overlap = min_overlap
         self.min_order = min_order
         self.cost = -1
+        self.silent_mutation_index = silent_mutation_index
 
         # Store WT and mutated gene blocks
         self.wt_eblocks: list = []
@@ -143,9 +148,28 @@ class EblockDesign:
         bins = self.make_bins(optimal_clustering)
 
         # Make gene blocks (WT DNA sequences sliced to the correct size, according to the bins) and renumber them starting from 1
-        wt_eblocks = self.make_wt_eblocks(bins)
-        self.wt_eblocks = self.add_silent_mutations(wt_eblocks)  # Add silent mutations to beginning and end of eBlocks
+        self.wt_eblocks = self.make_wt_eblocks(bins)
+        
+        # Randomly add more hex-colors if there are more eBlocks than colors in the default color scheme
+        if len(self.wt_eblocks) > len(self.eblock_colors):  
+            num_colors_to_make = len(self.wt_eblocks) - len(self.eblock_colors)
+            new_colors = []
+            for i in range(num_colors_to_make):
+                new_colors.append(self.random_hex_color())
+            max_num = max(self.eblock_colors.keys())
+            for num, i in enumerate(new_colors, start=max_num+1):
+                self.eblock_colors[num] = i
 
+        # Create barcode for each eBlock by adding a silent mutation at the beginning and end of eBlock to simplify sequencing
+        for eblock in self.wt_eblocks:
+
+            # Get starting and ending residue of the eBlock
+            first_residue = math.ceil((eblock.start_index - self.vector_instance.gene_start_idx)/3) +1 # Add 1 to make sure the full codon is included
+            final_residue = math.floor((eblock.end_index - self.vector_instance.gene_start_idx)/3) -1
+
+            self.add_silent_mutations(first_residue, eblock, location='start')
+            self.add_silent_mutations(final_residue, eblock, location='end')
+                
         # Loop over all mutations and create the eBlocks, based on the WT eBlocks
         results = {}
         for mutation in self.mutation_instance.mutations:
@@ -159,7 +183,7 @@ class EblockDesign:
         # Create a GFF3/gb file for each clone for easy visualization of eBlocks in sequence editor tools
         if self.clone_files:
             self.make_clones()
-            self.make_wt_clone()
+            # self.make_wt_clone()  #TODO
 
         self.eblocks_to_csv()  # Save eBlocks to a CSV file
 
@@ -273,6 +297,7 @@ class EblockDesign:
             eblock_start, count_start = self.eblocks_within_range(mutation.idx_dna[0])
             eblock_end, count_end = self.eblocks_within_range(mutation.idx_dna[0] + 3)
             eblock = None
+            
             if (count_start > 1) or (count_end > 1):
                 for i in eblock_start:
                     for j in eblock_end:
@@ -290,6 +315,7 @@ class EblockDesign:
             eblock_start, count_start = self.eblocks_within_range(mutation.idx_dna[0])
             eblock_end, count_end = self.eblocks_within_range(mutation.idx_dna[0] + mutation.length_insert)
             eblock = None
+            
             if (count_start > 1) or (count_end > 1):
                 for i in eblock_start:
                     for j in eblock_end:
@@ -306,8 +332,8 @@ class EblockDesign:
         elif mutation.is_deletion:
             eblock_start, count_start = self.eblocks_within_range(mutation.idx_dna_deletion_begin)
             eblock_end, count_end = self.eblocks_within_range(mutation.idx_dna_deletion_end)
-
             eblock = None
+            
             if (count_start > 1) or (count_end > 1):
                 for i in eblock_start:
                     for j in eblock_end:
@@ -336,7 +362,8 @@ class EblockDesign:
             if len(common_eblock) == 1:
                 selected_eblock = [e for e in eblocks if e.name == common_eblock[0]][0]
             elif len(common_eblock) > 1:
-                # Check which eblock falls better within the range of the mutations ( check not too close to beginning or end)
+
+                # Check which eblock falls better within the range of the mutations (check not too close to beginning or end)
                 possible_eblocks = [e for e in eblocks if e.name in common_eblock]
                 for eblock in possible_eblocks:
                     for mut_i in mutation.idx_dna:
@@ -347,18 +374,6 @@ class EblockDesign:
                 print(f"Multiple eBlocks for multiple mutations, not all mutations in the same eBlock. Skip mutation {mutation.name} {mutation.idx_dna}.")
                 return results
        
-            # TODO Do the checks for the eBlock
-            # for mut_i in mutation.idx_dna:
-            #     eblock, counts = self.eblocks_within_range(mut_i)
-            #     try:  # Try to find indexes of mutations, based on eblock. Check if they are too close to beginning or end of eblock
-            #         # TODO Move this to a separate function
-            #         for mut_i in mutation.idx_dna:
-            #             eblock.mutation_start_index = self.eblock_index(selected_eblock, mut_i)  # Check too close to beginning or end
-            #             if (selected_eblock.mutation_start_index < self.min_overlap) or (selected_eblock.mutation_start_index > (len(selected_eblock.sequence) - self.min_overlap)):
-            #                 raise Exception("Mutation too close to beginning or end of eBlock")
-            #     except Exception:
-            #         continue
-
             for num_i, mut_i in enumerate(mutation.idx_dna):
                 selected_eblock.mutation_start_index = self.eblock_index(selected_eblock, mut_i)
                 selected_eblock.mutant_codon = self.select_mut_codon(mutation.mutation[num_i][-1])  # Find most occuring mutant codon based on codon usage for species
@@ -368,11 +383,7 @@ class EblockDesign:
             eblock = selected_eblock
         results[mutation] = eblock
         return results
-    
-    def choose_eblock(self, eblocks: list, idx: int) -> Eblock:
-        # TODO Implement function to choose the correct eBlock
-        pass
-    
+        
     def make_clones(self):
             
             self.make_dir(dirname='clones')  # Make clones-dir
@@ -381,12 +392,19 @@ class EblockDesign:
 
             # Loop over all mutations and create mutated vector and features that can be read by snapgene
             for mut, eblock in self.eblocks.items():
+                
                 results = {}
                 if not (mut.is_deletion) and not (mut.is_insert):
                     results[eblock.name] = [eblock.start_index, eblock.end_index, self.eblock_colors[eblock.block_number]]
                     results[self.gene_instance.seqid] = [self.vector_instance.gene_start_idx, self.vector_instance.gene_end_idx, self.vector_instance.color]
 
                 filename = mut.name
+                
+                # Add silent mutation information in clones
+                for silmut in eblock.silent_mutations:
+                    start = self.vector_instance.gene_start_idx -3 + (int(silmut[1:-1]*3))
+                    end = self.vector_instance.gene_start_idx + (int(silmut[1:-1]*3))
+                    results[silmut] = [start, end, self.mutation_instance.colors['Silent']]
                 
                 if mut.is_singlemutation:
                     start = self.vector_instance.gene_start_idx -3 + mut.idx_dna[0]
@@ -428,24 +446,40 @@ class EblockDesign:
                 
             self.output_dir = original_dir
 
-    def make_wt_clone(self):
-        # TODO generate function to make a clone of the WT sequence
-        pass
+    def find_codon_for_residue(self, aa: str):
+        codon_table = CodonTable.standard_dna_table
+        return [codon for codon, residue in codon_table.forward_table.items() if residue == aa]
 
-    def add_silent_mutations(self, eblock_list):
+    def add_silent_mutations(self, residue_index: int, eblock: Eblock, location):
         """
         Add silent mutations to the WT eblocks
         """
-        eblocks_with_silent_mutations = []
-        for eblock in eblock_list:
-            # Get WT residue
-            # Check if any silent mutations are possible for residue
-            # Introduce mutations
-            pass
-        # TODO Add silent mutations to the wt eblocks
-        # return eblocks_with_silent_mutations
-        return eblock_list
-        
+        n = self.silent_mutation_index
+        while True:
+
+            if location == 'start':  # Silent mutation beginning of eBlock
+                idx_start = residue_index + n
+            elif location == 'end': # Silent mutation end of eBlock
+                idx_start = residue_index - n
+            
+            codon_start = self.gene_instance.residues[idx_start]
+                
+            if not str(codon_start[0]) in ['W', 'M']: # Only has one option
+                all_codons = self.find_codon_for_residue(codon_start[0].upper())
+                options = [c.upper() for c in all_codons if c != codon_start[1].upper()]
+                if len(options) > 0:
+                    newcodon = options[0] # TODO Choose most abundant codon if there is a choice
+                    eblock.mutation_start_index = self.eblock_index(eblock, idx_start*3)
+                    mutated_eblock = eblock.sequence[:eblock.mutation_start_index -3] + newcodon + eblock.sequence[eblock.mutation_start_index:]
+                    eblock.sequence = mutated_eblock
+                    eblock.silent_mutations.append(str(codon_start[0]) + str(idx_start) + str(codon_start[0]))
+                    eblock.mutation_start_index = None
+                    break
+                else:
+                    raise Exception(f"No codon found for residue {codon_start[0]}")
+            else:
+                n += 1
+
     def count_mutations_per_eblock(self) -> dict:
         """
         Count the numer of mutations in each eBlock
@@ -547,6 +581,9 @@ class EblockDesign:
         SeqIO.write(record, outpath, "genbank")
 
     def check_eblocks(self, results: dict):
+        """
+        Check if all mutations could be mapped to an eBlock and remove mutations that could not be processed from the mutation instance.
+        """
         failed_mutations = []
         for num, mutation in enumerate(self.mutation_instance.mutations):
             if mutation not in results.keys():
@@ -620,7 +657,6 @@ class EblockDesign:
                 
     @staticmethod
     def generate_eblock_colors() -> dict:
-        # TODO IF THERE ARE MORE COLORS NEEDED, ADD MORE COLORS > MAKE A CHECK FOR THIS!
         """
         Create dictionary with colors for plotting eBlocks using the tab10 color scheme.
         """
@@ -628,6 +664,10 @@ class EblockDesign:
                         '#aec7e8','#ffbb78','#98df8a','#ff9896','#c5b0d5','#c49c94','#f7b6d2','#c7c7c7','#dbdb8d','#9edae5',
                         '#393b79','#ff7f0e','#2ca02c','#8c564b','#e377c2','#7f7f7f','#bcbd22','#17becf']
         return {i: tab10_colors[i] for i in range(len(tab10_colors))}
+    
+    @staticmethod
+    def random_hex_color():
+        return "#{:06x}".format(random.randint(0, 0xFFFFFF))
     
     @staticmethod
     def gff3_header(length_sequence, version="3.2.1", sequence_name="myseq"):
@@ -789,8 +829,8 @@ class Clustering:
         # Find the cluster with the minimum score
         best_clustering_k = min(clusters, key=lambda k: get_score(clusters[k]))
         self.cost = self.calculate_cost(clusters[best_clustering_k])
-        best_score = get_score(clusters[best_clustering_k])  # Extract the score separately
-        self.print_line(score_label(best_score))
+        # best_score = get_score(clusters[best_clustering_k])  # Extract the score separately
+        # self.print_line(score_label(best_score))
         return clusters[best_clustering_k]
     
     def calculate_max_min_cluster_sizes(self, clusters: dict) -> list:

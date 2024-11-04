@@ -1,19 +1,21 @@
 import os
 import sys
+import math
 from Bio import SeqIO
+import biotite.sequence as seq
 from biotite.sequence import NucleotideSequence
-
 
 
 class Gene:
     def __init__(self,
-                 sequence = None,
-                 seqid = None,
-                 stopcodon = True):
+                 sequence: str = None,
+                 seqid: str = None,
+                 stopcodon: bool = True):
         
         self.sequence = sequence
         self.seqid = seqid
         self.stopcodon = stopcodon
+        self.residues: dict = {} # Format: resnum: (residue, codon)
 
     def parse_sequence(self, fp: str) -> str:
         """
@@ -26,6 +28,19 @@ class Gene:
         else:
             if not NucleotideSequence(self.sequence).is_valid():
                 raise ValueError("Invalid nucleotide sequence: Please provide a valid sequence.")
+        self.get_residues()
+            
+    def get_residues(self):
+        """
+        This function returns the residues of the gene
+        """
+        count = 1
+        for i in range(0, math.ceil(len(self.sequence)), 3):
+            codon = self.sequence[i:i+3]
+            residue = seq.CodonTable.default_table()[str(codon).upper()]
+            self.residues[count] = (residue, codon)
+            count += 1
+        return self.residues
         
     @staticmethod
     def read_single_fasta(fp: str):
