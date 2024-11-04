@@ -1,6 +1,6 @@
-output_dir=tutorial_output
-cost_optimization=True
-amount_optimization=False
+output_dir=tutorial-output
+cost_optimization=False
+amount_optimization=True
 clone_files=True
 verbose=False
 codon_usage=U00096
