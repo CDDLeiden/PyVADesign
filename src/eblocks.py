@@ -169,7 +169,7 @@ class EblockDesign:
 
             self.add_silent_mutations(first_residue, eblock, location='start')
             self.add_silent_mutations(final_residue, eblock, location='end')
-                
+           
         # Loop over all mutations and create the eBlocks, based on the WT eBlocks
         results = {}
         for mutation in self.mutation_instance.mutations:
@@ -239,10 +239,10 @@ class EblockDesign:
         eblocks = []
         for eblock in self.wt_eblocks:
             if eblock.start_index < eblock.end_index:
-                if eblock.start_index < mutation_idx < eblock.end_index:
+                if eblock.bin_start < mutation_idx < eblock.bin_end:
                     eblocks.append(eblock)
             else:
-                if (eblock.start_index < mutation_idx) or (mutation_idx < eblock.end_index):
+                if (eblock.bin_start < mutation_idx) or (mutation_idx < eblock.bin_end):
                     eblocks.append(eblock)
         count = len(eblocks)
         return copy.deepcopy(eblocks), count
