@@ -1,4 +1,4 @@
-name: base
+name: PyVADesign
 channels:
   - conda-forge
   - defaults
