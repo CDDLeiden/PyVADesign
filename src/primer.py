@@ -241,7 +241,7 @@ class DesignPrimers:
 
             mid_index = (DNABlock.start_index + DNABlock.end_index) // 2
             length_product = len(self.vector_instance.vector.seq) - len(DNABlock.sequence)
-            len_start = length_product - 75 # TODO Approximation
+            len_start = length_product - 75
             len_end = length_product + 75
 
             sequence_template = self.vector_instance.vector.seq[mid_index:] + self.vector_instance.vector.seq[:mid_index]  # Linearize plasmid to allow for primer design
@@ -251,7 +251,7 @@ class DesignPrimers:
             fw_start_range = self.vector_instance.circular_index(half_DNABlock - self.DNABlocks_design_instance.min_overlap, len(self.vector_instance.vector.seq))
        
             rv_start_range = self.vector_instance.circular_index(len(self.vector_instance.vector.seq) - half_DNABlock + self.minimum_overhang, len(self.vector_instance.vector.seq))
-            rv_end_range = self.vector_instance.circular_index(len(self.vector_instance.vector.seq) - half_DNABlock + self.DNABlocks_design_instance.min_overlap, len(self.vector_instance.vector.seq))  # TODO Check this range
+            rv_end_range = self.vector_instance.circular_index(len(self.vector_instance.vector.seq) - half_DNABlock + self.DNABlocks_design_instance.min_overlap, len(self.vector_instance.vector.seq))
 
             result = self.find_primerpair(sequence_template, fw_start_range, fw_end_range, rv_start_range, rv_end_range, len_start, len_end)
             fw, rv = self.parse_primer3_result(result, DNABlock, type='pair')
