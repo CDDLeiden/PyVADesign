@@ -1,4 +1,7 @@
-This package includes code from Primer3, which is licensed under the GNU General Public License v3 (GPL-3.0). The full text of the GPL-3.0 is included below.
+This package includes code from Primer3, which is licensed under the GNU General Public License v3 (GPL-3.0), except for the following MIT-licensed code:
+
+- [DnaFeaturesViewer] (MIT License)
+  - Copyright (c) [2016], [Edinburgh Genome Foundry]
 
                       GNU GENERAL PUBLIC LICENSE
                        Version 3, 29 June 2007
