@@ -1,9 +1,6 @@
 ### Specific for this directory
-tutorial_output/*
-tests/*
-
-test_pipeline.ipynb
-tests.ipynb
+tutorial-output/amount-optimization/*
+tutorial-output/cost-optimization/*
 
 ### Python template
 # Byte-compiled / optimized / DLL files
