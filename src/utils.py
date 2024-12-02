@@ -1,16 +1,32 @@
+#!/usr/bin/env python3
+
 import os
 import tempfile
 import itertools
+import subprocess
 import biotite.sequence as seq
 import biotite.database.entrez as entrez
 import biotite.sequence.io.genbank as gb
 from biotite.sequence import AnnotatedSequence
 
-
+def get_current_git_commit():
+    """Get the current git commit hash."""
+    try:
+        commit_hash = subprocess.check_output(["git", "rev-parse", "HEAD"]).strip().decode('utf-8')
+        return commit_hash
+    except subprocess.CalledProcessError:
+        return None
 
 class CodonUsage:
     """
     Class for generating codon usage tables using biotite
+
+    Attributes:
+    ----------
+    genome_id : str
+        The genome ID
+    output_dir : str
+        The output directory
     """    
     def __init__(self,
                 genome_id: str = None,
@@ -20,20 +36,22 @@ class CodonUsage:
         self.output_dir = output_dir
 
     def run(self):
-        """
-        Obtain the most common codon for each amino acid in a genome
-        """
+        """Obtain the most common codon for each amino acid in a genome."""
         genome = self.get_genome_features()
         codon_counter = CodonUsage.count_codons(genome)
         codon_counter = CodonUsage.get_codon_usage(genome, codon_counter)
         relative_frequencies = CodonUsage.get_relative_frequencies(genome, codon_counter)
+        self.relative_frequencies_to_csv(relative_frequencies)
         max_codons = CodonUsage.most_common_codon_per_aa(relative_frequencies)
-        return max_codons
+        return max_codons, relative_frequencies
+    
+    def codon_usage_exists(self):
+        """Check if the codon usage CSV file exists."""
+        path = os.path.join(self.output_dir, f"{self.genome_id}_codon-usage.csv")
+        return os.path.exists(path)
 
     def get_genome_features(self):
-        """
-        Get the CDS features of a genome
-        """
+        """Get the CDS features of a genome."""
         try:
             gb_file = gb.GenBankFile.read(
                 entrez.fetch(self.genome_id, tempfile.gettempdir(), "gb", "nuccore", "gb"))
@@ -45,12 +63,26 @@ class CodonUsage:
             return genome
         else:
             raise ValueError("No CDS features found in genome")
-    
+        
+    def load_relative_frequencies(self):
+        """Load relative frequencies from a CSV file."""
+        path = os.path.join(self.output_dir, f"{self.genome_id}_codon-usage.csv")
+        frequencies_dict = {}
+        with open(path, "r") as file:
+            content = file.readlines()
+            for line in content[1:]:
+                amino_acid, codon, freq = line.strip().split(",")
+                freq = float(freq)
+                if amino_acid not in frequencies_dict:
+                    frequencies_dict[amino_acid] = []
+                frequencies_dict[amino_acid].append((codon, freq))
+        max_codons = CodonUsage.most_common_codon_per_aa(frequencies_dict)
+        self.relative_frequencies = frequencies_dict
+        return max_codons, frequencies_dict
+
     def relative_frequencies_to_csv(self, frequencies_dict):
-        """
-        Save relative frequencies in a CSV file
-        """
-        outpath = os.path.join(self.output_dir, f"{self.genome_id}_codon_usage.csv")
+        """Save relative frequencies in a CSV file."""
+        outpath = os.path.join(self.output_dir, f"{self.genome_id}_codon-usage.csv")
         with open(outpath, "w") as file:
             file.write("Amino Acid,Codon,Relative Frequency\n")
             for amino_acid, codons in frequencies_dict.items():
@@ -70,9 +102,7 @@ class CodonUsage:
     
     @staticmethod
     def get_codon_usage(genome, codon_counter):
-        """
-        Get the codon usage of a genome
-        """
+        """Get the codon usage of a genome."""
         for feature in genome.annotation:
             cds = genome[feature]  # Get the coding sequence
             if len(cds) % 3 != 0:  # malformed CDS
@@ -84,9 +114,7 @@ class CodonUsage:
     
     @staticmethod
     def get_relative_frequencies(genome, codon_counter):
-        """
-        Convert the total counts into relative frequencies
-        """
+        """Convert the total counts into relative frequencies."""
         table = seq.CodonTable.default_table()
         relative_frequencies = {}
         for amino_acid_code in range(20):
@@ -107,9 +135,7 @@ class CodonUsage:
     
     @staticmethod
     def most_common_codon_per_aa(relative_frequencies):
-        """
-        Get the most common codon for each amino acid
-        """
+        """Get the most common codon for each amino acid."""
         max_freqs = {}
         for amino_acid, codons in relative_frequencies.items():
             max_codon = max(codons, key=lambda x: x[1])

@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import os
 import sys
 import math
@@ -6,7 +8,22 @@ import biotite.sequence as seq
 from biotite.sequence import NucleotideSequence
 
 
+
 class Gene:
+    """
+    This class represents a gene with a given sequence.
+
+    Attributes:
+    ----------
+    sequence : str
+        The nucleotide sequence of the gene.
+    seqid : str
+        The sequence identifier.
+    stopcodon : bool
+        Whether the sequence contains a stop codon.
+    residues : dict
+        The residues of the gene with the format: resnum: (residue, codon)
+    """
     def __init__(self,
                  sequence: str = None,
                  seqid: str = None,
@@ -18,9 +35,7 @@ class Gene:
         self.residues: dict = {} # Format: resnum: (residue, codon)
 
     def parse_sequence(self, fp: str) -> str:
-        """
-        This function parses the sequence from a .fasta file and checks the input.
-        """
+        """This function parses the sequence from a .fasta file and checks the input."""
         self.sequence, self.seqid = self.read_single_fasta(fp)
         if self.stopcodon:
             if not (NucleotideSequence(self.sequence).is_valid() and self.contains_start_stop_codon(self.sequence)):
@@ -31,9 +46,7 @@ class Gene:
         self.get_residues()
             
     def get_residues(self):
-        """
-        This function returns the residues of the gene
-        """
+        """This function returns the residues of the gene."""
         count = 1
         for i in range(0, math.ceil(len(self.sequence)), 3):
             codon = self.sequence[i:i+3]
@@ -44,17 +57,13 @@ class Gene:
         
     @staticmethod
     def read_single_fasta(fp: str):
-        """
-        This function reads a single fasta file and returns the sequence.
-        """
+        """This function reads a single fasta file and returns the sequence."""
         record = next(SeqIO.parse(fp, "fasta"))
         return record.seq, record.id
             
     @staticmethod
     def contains_start_stop_codon(sequence: str) -> bool:
-        """
-        This function checks if the sequence contains start and stop codons.
-        """
+        """This function checks if the sequence contains start and stop codons."""
         stop_codons = ["TAA", "TAG", "TGA"]
         sequence = sequence.upper()
         if (sequence.startswith("ATG")) and (sequence[-3:] in stop_codons):
@@ -65,6 +74,28 @@ class Gene:
 
 
 class Vector:
+    """
+    This class represents a vector with a given sequence.
+
+    Attributes:
+    ----------
+    gene : Gene
+        The gene that is inserted into the vector.
+    vector : SeqRecord
+        The vector sequence.
+    vector_id : str
+        The vector identifier.
+    organism : str
+        The organism of the vector.
+    gene_start_idx : int
+        The start index of the gene in the vector.
+    gene_end_idx : int
+        The end index of the gene in the vector.
+    length : int
+        The length of the vector.
+    color : str
+        The color of the vector for visualization.
+    """
     def __init__(self,
                  gene: Gene,
                  vector = None,
@@ -85,9 +116,7 @@ class Vector:
         self.length = length
 
     def parse_vector(self, fp: str):
-        """
-        This function parses the vector from a DNA file in the SnapGene or GenBank format.
-        """
+        """This function parses the vector from a DNA file in the SnapGene or GenBank format."""
         if fp.endswith(".dna"):
             vector = self.read_snapgene_dna_file(fp)
         elif fp.endswith(".gb"):
@@ -116,18 +145,14 @@ class Vector:
         return idx_begin, idx_end
 
     def save_vector(self, vector, output_dir, filename):
-        """
-        This function saves the vector to a file.
-        """
+        """This function saves the vector to a file."""
         with open(os.path.join(output_dir, filename), "w") as output_handle:
             output_handle.write(f">{self.vector_id}\n")
             for i in range(0, len(vector), 60):
                 output_handle.write(str(vector[i:i+60]) + "\n")
 
     def mutate_vector(self, idx_start, idx_end, sequence, mutation):
-        """
-        This function mutates the input vector with a given sequence
-        """
+        """This function mutates the input vector with a given sequence."""
         if (idx_start < idx_end) and (idx_start >= 0):
             mutated_vector = self.vector.seq[:idx_start] + sequence + self.vector.seq[idx_end:]
         elif (idx_start > idx_end):
@@ -139,9 +164,7 @@ class Vector:
         return mutated_vector
     
     def check_length_mutated_vector(self, mutated_vector, mutation):
-        """
-        This function checks whether the mutated vector has the correct length.
-        """
+        """This function checks whether the mutated vector has the correct length."""
         if mutation.type == "Mutation" or mutation.type == "Combined":
             if len(mutated_vector) != len(self.vector.seq):
                 raise ValueError("The mutated vector has a different length than the original vector.")
@@ -154,9 +177,7 @@ class Vector:
                 
     @staticmethod
     def circular_index(index, sequence_length):
-        """
-        This function returns the circular (=positive) index in a sequence.
-        """
+        """This function returns the circular (=positive) index in a sequence."""
         return (index + sequence_length) % sequence_length
     
     @staticmethod
@@ -179,7 +200,3 @@ class Vector:
         with open(fp, 'r') as handle:
             for record in SeqIO.parse(handle, "genbank"):
                 return record
-    
-    @staticmethod
-    def check_vector():
-        pass

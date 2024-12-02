@@ -1,11 +1,55 @@
+#!/usr/bin/env python3
+
 import sys
 import itertools
 import numpy as np
 
 
+
 class Mutation:
     """
     This class represents a mutation.
+
+    Attributes:
+    ----------
+    type : str
+        The type of the mutation. It can be either "Mutation", "Insert", "Deletion", or "Combined".
+    input : str
+        The mutation as parsed from the input file
+    name : str
+        The name of the mutation.
+    mutation : list
+        The mutation(s) in the format of a list.
+    n_mutants : int
+        The number of variants.
+    insert : str
+        The inserted sequence.
+    idx_dna : list
+        The indices of the mutation.
+    idx_dna_deletion_begin : int
+        The index of the beginning of the deletion.
+    idx_dna_deletion_end : int
+        The index of the end of the deletion.
+    length_deletion : int
+        The length of the deletion.
+    length_insert : int
+        The length of the inserted sequence.
+    is_singlemutation : bool
+        True if the mutation is a single mutation.
+    is_insert : bool
+        True if the mutation is an insertion.
+    is_deletion : bool
+        True if the mutation is a deletion.
+    is_multiplemutation : bool
+        True if the mutation is a combined mutation.
+    mutations : list
+        A list of Mutation objects.
+    silent_mutations : list
+        A list of silent mutations.
+    unprocessed_mutations : list
+        A list of unprocessed mutations.
+    colors : dict
+        A dictionary of colors for the mutations
     """
     def __init__(self, 
                  type: str = None,
@@ -43,21 +87,16 @@ class Mutation:
         self.mutations = []
         self.silent_mutations = []
         self.unprocessed_mutations = []
-        self.unvalid_mutations = []
         self.colors = {'Mutation': '#000000', 'Insert': '#FF0000', 'Deletion': '#0000FF', 'Combined': '#00ff00', 'Silent': '#FFA500'}
 
     def parse_mutations(self, fp: str):
-        """
-        This function parses the mutations from a text file and checks the input
-        """
+        """This function parses the mutations from a text file and checks the input"""
         mutations = self.read_mutations(fp)
         Mutation.check_nonnatural_aas(mutations)
         Mutation.check_format(mutations)
                 
     def read_mutations(self, fp: str):
-        """
-        This function reads the mutations from a text file and returns a list of Mutation objects.
-        """
+        """This function reads the mutations from a text file and returns a list of Mutation objects."""
         mutations = []
         with open(fp, "r") as f:
             content = f.readlines()
@@ -160,9 +199,7 @@ class Mutation:
         return valid 
     
     def sort_mutations(self, mutations: list):
-        """
-        This function sorts the mutations by the position of the mutation.
-        """
+        """This function sorts the mutations by the position of the mutation."""
         sorted_mutations = sorted(mutations, key=lambda x: x.idx_dna[0])
         return sorted_mutations
     
@@ -171,9 +208,7 @@ class Mutation:
         del self.mutations[idx]
     
     def print_mutations(self, padding: int = 10):
-        """
-        This function prints the mutations.
-        """
+        """This function prints the mutations."""
         print("The selected mutations are:")
         for mut in self.mutations:
             if type(mut.mutation) == list:  
@@ -185,9 +220,7 @@ class Mutation:
                print(f"\t{mut.type.ljust(padding)}\t{mutation.ljust(padding)}")
 
     def extract_indices(self):
-        """
-        This function extracts the indices of the mutations.
-        """
+        """This function extracts the indices of the mutations."""
         indices = []  # Store all indices of the mutations
         constraints = []  # Store constraints 
         for mutation in self.mutations:
@@ -219,15 +252,12 @@ class Mutation:
         indices.append(mutation.idx_dna_deletion_begin)
         indices.append(mutation.idx_dna_deletion_end)
         constraints.append((mutation.idx_dna_deletion_begin, mutation.idx_dna_deletion_end))
-        # print(f"Deletion indices: {mutation.idx_dna_deletion_begin}, {mutation.idx_dna_deletion_end}")
 
     def _handle_multiple_mutation_extraction(self, mutation, indices, constraints):
         """Handle multiple mutations."""
         idxs = list(mutation.idx_dna)
         indices.extend(idxs)
         constraints.append(tuple(idxs))
-        # print(f"Multiple mutation indices: {idxs}")
-        # print(f"Multiple mutation constraints: {constraints}")
 
     def _generate_constraint_indices(self, indices, constraints):
         """Generate constraint indices from the given constraints."""
@@ -270,9 +300,7 @@ class Mutation:
 
     @classmethod
     def check_format(cls, mutations: list):
-        """
-        This function checks the format of the mutations.
-        """
+        """This function checks the format of the mutations."""
         for mutation in mutations:
             if mutation.is_singlemutation:
                     if (mutation.mutation[0][0].lower() in Mutation.aas()) \
