@@ -342,7 +342,6 @@ class DesignPrimers:
             rv_primer.gc_content = round(primer3output[f'PRIMER_RIGHT_{index}_GC_PERCENT'], 2)
             return fw_primer, rv_primer
         elif type == 'seq':
-            # TODO Does direction matter here?
             if direction == 'forward':
                 start_idx, end_idx = self.vector_instance.find_index_in_vector(str(primer3output[f'PRIMER_LEFT_{index}_SEQUENCE']))
                 seq_primer = Primer()

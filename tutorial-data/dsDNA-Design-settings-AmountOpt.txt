@@ -1,11 +1,10 @@
-output_dir=tutorial-output
 cost_optimization=False
 amount_optimization=True
 clone_files=True
 verbose=True
 codon_usage=U00096
 bp_price=0.05
-max_eblock_length=1500
-min_eblock_length=300
+max_DNABlock_length=1500
+min_DNABlock_length=300
 min_overlap=25
 min_order=24
