@@ -9,7 +9,6 @@ from src.mutation import Mutation
 from src.sequence import Gene, Vector
 from src.plot import Plot
 
-# Get the absolute path to the `settings` directory
 default_settings_path = os.path.abspath(
     os.path.join(os.path.dirname(__file__), 'settings')
 )
@@ -49,7 +48,7 @@ def PyVADesignParser():
     parser.add_argument("-v",
                         "--vector",
                         type=str,
-                        required=False,
+                        required=True,
                         default=None,
                         help="path to the Plasmid file (.gb/.dna) containing the gene of interest")
     
