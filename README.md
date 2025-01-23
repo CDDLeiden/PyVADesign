@@ -1,7 +1,14 @@
 # PyVADesign
 
 ## Description
-PyVADesign does the design of dsDNA fragments and primers for the introduction of mutations in a gene of interest
+
+The generation and analysis of diverse mutants of a protein is a powerful tool to understand the functioning of a protein. However, the generation of such mutants can be time-consuming while the commercial option of buying a series of mutant plasmids can be expensive. In contrast, the insertion of a synthesized double stranded DNA (dsDNA) fragment into a plasmid is a fast and low-cost method to generate a large library of mutants with one or more point mutations, insertions, or deletions. To aid in the design of these DNA fragments present PyVADesign: a Python package that makes the design and ordering of dsDNA fragments straight-forward and cost-effective. In PyVADesign, the mutations of interest are clustered in different cloning groups for efficient exchange into the target plasmid. Additionally, primers that prepare the target plasmid for insertion of the dsDNA fragment, as well as primers for sequencing, are automatically designed within the same program.
+
+## workflow
+
+User’s input includes a list of desired mutations and a plasmid sequence with gene of interest (blue). PyVADesign clusters the mutations on the gene of interest without explicit user input. Next, the dsDNA fragments and primers are designed to prepare the plasmid for dsDNA fragment insertion (shown in green, magenta and red colours). To linearize the input plasmid for insertion of the dsDNA fragment, PCR reactions are performed using the PyVADesign primers. Finally, the dsDNA fragment can be inserted in the linearized plasmid in a single step.
+
+![overview_v3](https://github.com/user-attachments/assets/77969f38-d03a-4f5e-886c-56776c49b8c9)
 
 ## Installation Instructions
 
