@@ -1,7 +1,7 @@
 cost_optimization=True
 amount_optimization=False
 clone_files=True
-verbose=True
+verbose=False
 codon_usage=U00096
 bp_price=0.05
 max_DNABlock_length=1500
