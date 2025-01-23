@@ -18,11 +18,12 @@ dependencies:
   - matplotlib-inline=0.1.7
   - numpy=1.26.4
   - python=3.9
-  - primer3-py=2.0.3
   - requests=2.32.3
   - scikit-learn=1.2.2
   - scikit-learn-extra=0.3.0
   - scipy=1.13.1
   - pip
+  - pip:
+    - primer3-py==2.0.3
   - wheel
 prefix:
