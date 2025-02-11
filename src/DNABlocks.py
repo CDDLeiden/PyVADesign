@@ -656,9 +656,9 @@ class DNABlockDesign:
         """Save DNABlocks to a CSV file."""
         file_path = os.path.join(self.output_dir, filename)
         with open(file_path, 'w') as f:
-            f.write("DNABlock,Start,End,Sequence\n")
-            for _, value in self.DNABlocks.items():
-                f.write(f"{value.name},{value.start_index},{value.end_index},{value.sequence}\n")
+            f.write("DNABlock,Mutation,Start,End,Sequence\n")
+            for key, value in self.DNABlocks.items():
+                f.write(f"{value.name},{key},{value.start_index},{value.end_index},{value.sequence}\n")
 
     def DNABlocks_to_gff3(self, DNABlocks: dict, output_dir, type='gene', filename='DNABlocks.gff3', header=True):
         """This function converts the DNABlocks to features that can be read by SnapGene."""
