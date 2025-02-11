@@ -218,7 +218,7 @@ class DesignPrimers:
             fw_result = self.parse_primer3_result(result, DNABlock, type='seq', direction='forward')
             primers[DNABlock.name] = [fw_result]
             # Obtain RV primer
-            start = self.vector_instance.circular_index(DNABlock.end_index - self.void_length , self.vector_instance.length)
+            start = self.vector_instance.circular_index(DNABlock.end_index + self.void_length , self.vector_instance.length)
             length = self.void_length
             result  = self.design_sequencing_primer(sequence=self.vector_instance.vector.seq, start=start, length=length)
 
