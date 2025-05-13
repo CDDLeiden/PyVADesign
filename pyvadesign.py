@@ -3,7 +3,7 @@
 import os
 import argparse
 
-from src.DNABlocks import DNABlockDesign
+from src.dna_blocks import DNABlockDesign
 from src.primer import DesignPrimers
 from src.mutation import Mutation
 from src.sequence import Gene, Vector

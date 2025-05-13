@@ -9,7 +9,7 @@ from dna_features_viewer import GraphicFeature, GraphicRecord
 
 from .mutation import Mutation
 from .sequence import Vector, Gene
-from .DNABlocks import DNABlockDesign
+from .dna_blocks import DNABlockDesign
 
 
 
