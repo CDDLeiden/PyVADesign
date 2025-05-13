@@ -47,7 +47,7 @@ conda activate PyVADesign
 To quickly get started with PyVADesign and test its functionality, you can run the provided test files. This will allow you to verify that everything is working as expected without needing to configure your own data.
 
 ```python
-python pyvadesign.py --gene tutorial-data/A0A0H2ZYQ2.fasta --vector tutorial-data/pACE_mmpL3-Mav.dna --mutations tutorial-data/mutations.txt --output tutorial-output/amount-optimization
+python pyvadesign.py --gene tutorial-data/01_base-tutorial/A0A0H2ZYQ2.fasta --vector tutorial-data/01_base-tutorial/pACE_mmpL3-Mav.dna --mutations tutorial-data/01_base-tutorial/mutations.txt --output tutorial-data/01_base-tutorial/tutorial-output/amount-optimization
 ```
 
 The ```--gene``` specifies the gene sequence in .fasta format, ```--vector``` specifies the vector sequence with the gene already cloned into it in .dna format. ```--output``` is the output directory and ```--mutations``` describes the mutations to be made.
