@@ -198,13 +198,13 @@ class DNABlockDesign:
             output_dir=self.output_dir)
         # Check if codon-usage exists, otherwise calculate
         if not codonusage.codon_usage_exists():
-            self.print_line(f"Calculating relative codon frequencies, based on the selected genome id {self.codon_usage} ...")
+            self.print_line(f"Calculating relative codon frequencies, based on the selected genome id {self.codon_usage}")
             self.most_abundant_codons, self.codon_frequences = codonusage.run()
         else:
             self.print_line(f"Loading relative codon frequencies from file")
             self.most_abundant_codons, self.codon_frequences = codonusage.load_relative_frequencies()
 
-        self.print_line("Clustering mutations on gene of interest using K-medioids clustering ...")
+        self.print_line("Clustering mutations on gene of interest using K-medioids clustering")
 
         # Divide the target gene into fragment regions, based on the position of the mutations
         cluster_instance = Clustering(  
@@ -222,7 +222,7 @@ class DNABlockDesign:
 
         self.cost = cluster_instance.cost
 
-        self.print_line("Starting dsDNA fragment design ...")  
+        self.print_line("Starting dsDNA fragment design")  
 
         # Define the beginning and end of each dsDNA fragment, based on the clusters and include a minimum overlap that is needed for IVA cloning
         bins = self.make_bins(optimal_clustering)
@@ -269,8 +269,11 @@ class DNABlockDesign:
 
         self.DNABlocks_to_csv()  # Save dsDNA fragments to a CSV file
 
-        self.print_line("Completed dsDNA fragment design.")
+        self.print_line("Completed dsDNA fragment design. \n")
 
+        self.print_line(f"Clone files (.dna/.gb/.gff3) per input mutation stored in {os.path.join(self.output_dir, 'clones')}")
+        self.print_line(f"CSV file with all dsDNA fragments stored in {os.path.join(self.output_dir, 'DNABlocks.csv')}")
+        
         if len(self.mutation_instance.unprocessed_mutations) > 0:
             self.print_line(f"{' '.join([self.mutation_instance.unprocessed_mutations])} could not be processed and no dsDNA fragment was created for these mutations.")
 
@@ -681,7 +684,7 @@ class DNABlockDesign:
             raise FileNotFoundError(f"Directory {directory} does not exist.")
         if os.listdir(directory):  # Check if the directory is empty
             if self.verbose:
-                print(f"Directory {directory} is not empty. Files might get overwritten or appended to.")
+                print(f"Warning: Directory {directory} is not empty. Files might get overwritten or appended to.")
 
     def check_DNABlocks(self, results: dict):
         """Check if all mutations could be mapped to an DNABlock and remove mutations that could not be processed from the mutation instance."""
@@ -713,8 +716,13 @@ class DNABlockDesign:
     def display_settings(self):
         """Print all class attributes using the __dict__ attribute."""
         max_key_length = max(len(key) for key in self.__dict__.keys())
+        do_not_print = ['mutation_instance', 'vector_instance', 'gene_instance', 'DNABlock_colors', 'wt_DNABlocks', 'DNABlocks', 'most_abundant_codons', 'codon_frequences']
+        print(f"Settings for {self.__class__.__name__}:")
         for key, value in self.__dict__.items():
-            print(f"{key.ljust(max_key_length)}: {value}")
+            if key in do_not_print:
+                continue
+            print(f"\t\t{key.ljust(max_key_length)}: {value}")
+        print("\n")
 
     def print_line(self, txt):
         if self.verbose:
@@ -919,10 +927,10 @@ class Clustering:
     
     def choose_cluster(self, clusters: dict) -> dict:
         if self.cost_optimization == True:
-            self.print_line("Optimizing based on price per bp ...")
+            self.print_line("Optimizing based on price per bp")
             get_score = lambda c: self.calculate_cost(c)
         elif self.amount_optimization == True:
-            self.print_line("Optimizing based on number of fragment regions ...")
+            self.print_line("Optimizing based on number of fragment regions")
             get_score = lambda c: len(c)
         else:
             raise Exception("Please set either cost_optimization or amount_optimization to True, but not both.")
