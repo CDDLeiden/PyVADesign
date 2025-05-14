@@ -8,7 +8,7 @@ from Bio.SeqFeature import SeqFeature, FeatureLocation, CompoundLocation
 
 from .sequence import Vector
 from .mutation import Mutation
-from .DNABlocks import DNABlockDesign
+from .dna_blocks import DNABlockDesign
 
 
 
@@ -167,7 +167,7 @@ class DesignPrimers:
         """Run the design of the primers."""
         min_oh = self.check_overlap()  # Check if the overlap is large enough
         
-        print("Designing primer pairs ...")
+        print("Designing primer pairs")
         primerpairs = self.run_design_primerpair()  # store primers: DNABlock.name : [fw_primer, rv_primer]
 
         # Add primers to Genbank file of clones
@@ -181,7 +181,7 @@ class DesignPrimers:
             self.primers_to_fasta(name=v[0].name, seq=v[0].sequence_5to3, directory=self.output_dir, filename='primers.fasta')
             self.primers_to_fasta(name=v[1].name, seq=v[1].sequence_5to3, directory=self.output_dir, filename='primers.fasta')
 
-        print("Designing sequencing primers ...")
+        print("Designing sequencing primers")
         seqprimers = self.run_design_seqprimer()
 
         # Save primers to fasta file (both pairs and sequenging primers)
@@ -195,7 +195,13 @@ class DesignPrimers:
                     self.add_primers_to_genbank_file(genbank_file=os.path.join(self.output_dir, 'clones', f"{mut.name}", f"{mut.name}.gb"), primer=v[0])
                     self.add_primers_to_genbank_file(genbank_file=os.path.join(self.output_dir, 'clones', f"{mut.name}", f"{mut.name}.gb"), primer=v[1])
         
-        print("Finished designing primers.")
+        print("Finished designing primers.\n")
+
+        print(f"primers are added to the Genbank file in {self.output_dir}/clones/<mutation_name>/<mutation_name>.gb")
+        print(f"primers (5 > 3 direction) are saved in {self.output_dir}/primers.fasta")
+        if self.verbose:
+            print(f"primers names starting with 'fw_' are forward primers and those starting with 'rv_' are reverse primers. DNABlock names for which the primers are designed are used as suffixes.")
+            print(f"Sequencing primers are named starting with 'seq_fw_' and 'seq_rv_' respectively.")
 
         
     def run_design_seqprimer(self):

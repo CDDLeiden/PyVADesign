@@ -1,6 +1,7 @@
 ### Specific for this directory
-tutorial-output/amount-optimization/*
-tutorial-output/cost-optimization/*
+tutorial-data/01_base-tutorial/tutorial-output/amount-optimization/*
+tutorial-data/01_base-tutorial/tutorial-output/cost-optimization/*
+tutorial-data/02_design-examples/*
 
 ### Python template
 # Byte-compiled / optimized / DLL files
