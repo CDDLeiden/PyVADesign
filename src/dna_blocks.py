@@ -17,6 +17,7 @@ from Bio.SeqRecord import SeqRecord
 from sklearn_extra.cluster import KMedoids
 from scipy.spatial.distance import pdist, squareform
 from Bio.SeqFeature import SeqFeature, FeatureLocation, CompoundLocation
+from Bio.SeqUtils import MeltingTemp as mt
 
 from .utils import CodonUsage
 from .mutation import Mutation
@@ -148,7 +149,7 @@ class DNABlockDesign:
                  bp_price: float = 0.05,
                  max_DNABlock_length: int = 1500,
                  min_DNABlock_length: int = 300,
-                 min_overlap: int = 25,
+                 min_overlap: int = 15,
                  min_order: int = 24,
                  silent_mutation: bool = True,
                  silent_mutation_index: int = 30,
@@ -227,9 +228,12 @@ class DNABlockDesign:
         # Define the beginning and end of each dsDNA fragment, based on the clusters and include a minimum overlap that is needed for IVA cloning
         bins = self.make_bins(optimal_clustering)
 
+        # Add flanking regions to the DNABlocks
+        self.add_flanking_regions(bins)
+
         # Make fragment regions (WT DNA sequences sliced to the correct size, according to the bins) and renumber them starting from 1
         self.wt_DNABlocks = self.make_wt_DNABlocks(bins)
-        
+
         # Randomly add more hex-colors if there are more fragment regions than colors in the default color scheme
         if len(self.wt_DNABlocks) > len(self.DNABlock_colors):  
             num_colors_to_make = len(self.wt_DNABlocks) - len(self.DNABlock_colors)
@@ -522,6 +526,43 @@ class DNABlockDesign:
             bins.append(int(max(value) + self.min_overlap))
         return bins
     
+    def add_flanking_regions(self, bins: list, min_tm=47) -> list:
+        """Add flanking region to the DNABlocks according to the IVA protocol. Tm is calculated using Biopython Tm_Wallace method."""
+        for num in range(0, len(bins), 2):
+            
+            flanking_rv_len = self.min_overlap
+            flanking_fv_len = self.min_overlap
+
+            while True:
+                start_index = self.vector_instance.gene_start_idx + bins[num]
+                end_index = self.vector_instance.gene_start_idx + bins[num+1]
+
+                flanking_rv = self.vector_instance.vector.seq[start_index:start_index + flanking_rv_len]
+                flanking_fv = self.vector_instance.vector.seq[end_index - flanking_fv_len:end_index]
+
+                tm_rv = mt.Tm_Wallace(flanking_rv)
+                tm_fv = mt.Tm_Wallace(flanking_fv)
+
+                # print(f"RV: len={flanking_rv_len} Tm={tm_rv:.2f} Seq={flanking_rv}")
+                # print(f"FV: len={flanking_fv_len} Tm={tm_fv:.2f} Seq={flanking_fv}")
+
+                rv_ok = tm_rv > min_tm
+                fv_ok = tm_fv > min_tm
+
+                # If both are good or cannot improve further, break
+                if rv_ok and fv_ok:
+                    break
+
+                # Add 1 nt to increase Tm
+                if not rv_ok:
+                    flanking_rv_len += 1
+                    bins[num] = bins[num] - 1
+
+                if not fv_ok:
+                    flanking_fv_len += 1
+                    bins[num+1] = bins[num+1] + 1
+        return bins
+
     def make_wt_DNABlocks(self, bins: list) -> list:
         """Create fragment regions based bins."""
         gene_blocks = []
